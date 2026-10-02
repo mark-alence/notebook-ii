@@ -32,6 +32,15 @@ export function exportTagged(fields, records, { separator = '---' } = {}) {
     .join(`\r\n${separator}\r\n`) + '\r\n';
 }
 
+// Notebook II's own import text (Utilities > Import, "Notebook" format):
+// %Start:, a %Field:value line per field, %End:. Lines after the first
+// continue the field. Notebook II allowed 50 fields with 20-character names.
+export function exportNotebookText(fields, records) {
+  return records
+    .map((r) => ['%Start:', ...fields.map((f) => `%${f}:${(r.values[f] ?? '').replace(/\r?\n/g, '\r\n')}`), '%End:'].join('\r\n'))
+    .join('\r\n') + '\r\n';
+}
+
 export function exportJson(db, records = db.records) {
   return JSON.stringify({ ...db, records }, null, 2);
 }

@@ -41,24 +41,26 @@ labor OR textiles     either
 (a OR b) c            grouping
 notes:   notes:*      Notes blank / not blank
 "date of birth":1850  field names with spaces
+title=the  -title=the Title begins / doesn't begin with "the"
+year>1980  author<=m  begins later / the same or earlier (also < and >=)
 ```
 
-Search ignores capitals and accents.
+Search ignores capitals and accents. The last two lines are Notebook II's Select conditions (begins with, greater/less than); numbers compare as numbers.
 
 ## Print forms
 
-A print form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{#}` is the record's number in the printout and `{Date}` is today's date. A line written as `[[ … ]]` is dropped when all its fields are blank. Forms are saved with the database. Print goes to the printer, or you can save the output as a text file in UTF-8 or DOS code page 437.
+A print form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{Field:20}` gives exactly 20 characters of it, cut off or padded (Notebook II's fixed fields). `{#}` is the record's number in the printout, `{Date}` today's date and `{Time}` the time. A line written as `[[ … ]]` is dropped when all its fields are blank. A form can have a page header and footer, like Notebook II's custom formats; then the printout is cut into 66-line pages with a form feed between them, and `{Page}` is the page number. Forms are saved with the database. Print goes to the printer, or you can save the output as a text file in UTF-8 or DOS code page 437.
 
 ## Your old Notebook II files
 
-Notebook II could write a database out as ASCII text for other programs, and **F9 Import** reads those files:
+**F9 Import** reads Notebook II's own database files and the text files it and other programs wrote:
 
+- **Notebook II databases.** A database called NAME is several files: choose `NAME.DAT`, `NAME.DEF` and `NAME.IDX` together, plus `NAME.MSC` and any custom print formats (`*.R00`) if you have them. File names can be in any case. Records marked deleted are left out unless you tick *Include records marked deleted* (they then get a `Deleted` field saying `yes`), and print formats become print forms. `NAME.DAT` on its own is recognized too, but without the `.IDX` every saved copy of an edited record comes in, and without the `.DEF` the fields are called Field 1, Field 2 … The format is described in [docs/notebook-ii-format.md](docs/notebook-ii-format.md).
+- **Notebook II import text.** `%Start:`, `%Author:…` lines and `%End:`, the "Notebook format" that Notebook II's own Import read. **F10 Export > Notebook II import text** writes it, in code page 437, so a database can go back to the DOS program.
 - **Delimited text.** Fields split by any character (tab, comma, `|`, `~`, `^`, ASCII 30/31 …), records by line breaks or another character, with an optional marker for line breaks inside a field (the DOS `¶`, character 20, is recognized automatically). Quoted CSV works. The import guesses the delimiters and whether the first row holds field names, and you can change them while watching a preview.
 - **Tagged text.** `Field: value` lines, with records separated by blank lines or rule lines (`---`, `***`, form feeds). Indented lines continue the field above.
 - **DOS characters.** Files are read as code page 437 unless they are valid UTF-8, so accented letters and box-drawing characters come through. A Ctrl-Z end-of-file marker is ignored.
-- **Salvage.** Notebook II's own database files use a format that was never published. Choosing *Read as: Salvage* pulls every readable piece of text out of any file, one piece per record, so nothing is lost. Where you still can, exporting from Notebook II to ASCII gives a cleaner result.
-
-If you have native Notebook II database files, a few of them would allow a proper importer for that format. Add them to `samples/`, with a note of what one or two records contain.
+- **Salvage.** Choosing *Read as: Salvage* pulls every readable piece of text out of any file, one piece per record, so nothing is lost even from a damaged file.
 
 `samples/` has two files to try: `bibliography-dos.txt` (tab-delimited, code page 437, DOS line ends) and `notes-tagged.txt`.
 
@@ -69,7 +71,7 @@ Plain JavaScript modules, no dependencies.
 ```
 js/model.js       database, fields, records, sorting
 js/search.js      the search language
-js/importers.js   delimited, tagged, JSON and salvage readers
+js/importers.js   Notebook II database, delimited, tagged, JSON and salvage readers
 js/exporters.js   writers
 js/printform.js   print form templates
 js/cp437.js       DOS character set
@@ -77,6 +79,6 @@ js/storage.js     saving in the browser
 js/app.js         the screen and keys
 ```
 
-`npm test` runs the tests (Node 20 or later).
+`npm test` runs the tests (Node 20 or later). `test/fixtures/native/` holds a small database and print format made with Notebook II 2.31 itself, running in DOSBox; see the format notes for what it contains.
 
 Notebook II was a product of Pro/Tem Software, Inc. This project is an independent recreation and is not connected with Pro/Tem.

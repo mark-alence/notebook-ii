@@ -4,8 +4,8 @@ import {
   moveField, sortRecords, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
 } from './model.js';
 import { compileQuery, highlightTerms } from './search.js';
-import { importFile } from './importers.js';
-import { exportDelimited, exportTagged, exportJson, toBytes } from './exporters.js';
+import { importFiles } from './importers.js';
+import { exportDelimited, exportTagged, exportNotebookText, exportJson, toBytes } from './exporters.js';
 import { renderReport } from './printform.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey } from './storage.js';
 import { SAMPLE } from './sample.js';
@@ -185,7 +185,7 @@ function renderHome() {
         <p class="hint">↑ ↓ to choose, Enter to open.</p>`
       : '<p>No databases yet. Press <kbd>N</kbd> to make one, <kbd>F9</kbd> to import a file from Notebook II or another program, or <kbd>S</kbd> to try a sample.</p>'}
       <h2>Bringing in your old files</h2>
-      <p>Notebook II could write a database out as ASCII text. Import reads those files: delimited text (tab, comma, <code>|</code>, <code>~</code> or any character you name), tagged text (<code>Author: …</code> lines), and DOS characters (code page 437). Any other file can be opened with <em>Salvage</em>, which pulls out the readable text.</p>
+      <p>Press <kbd>F9</kbd> and choose a Notebook II database's files together: <code>NAME.DAT</code>, <code>NAME.DEF</code> and <code>NAME.IDX</code> (and <code>NAME.MSC</code> and print formats, <code>*.R00</code>, if you have them). Import also reads text that Notebook II or other programs wrote: delimited text (tab, comma, <code>|</code>, <code>~</code> or any character you name), tagged text (<code>Author: …</code> or <code>%Author:…</code> lines), and DOS characters (code page 437). Any other file can be opened with <em>Salvage</em>, which pulls out the readable text.</p>
     </div>`;
   $$('#main tbody tr').forEach((tr) => {
     tr.addEventListener('click', () => { state.homeCursor = +tr.dataset.i; render(); });
@@ -369,19 +369,22 @@ function renderPrint() {
           <button type="button" id="newform">New form</button><button type="button" id="delform" ${db.printForms.length > 1 ? '' : 'disabled'}>Delete form</button></div>
         <div class="row"><label>Name</label><input id="formname" value="${esc(form.name)}"><label>Width</label><input id="formwidth" type="number" min="20" max="250" value="${form.width}"></div>
         <textarea id="template" spellcheck="false" rows="10">${esc(form.template)}</textarea>
-        <p class="hint"><code>{Field}</code> puts in a field. <code>{#}</code> is the record's number, <code>{Date}</code> today's date. A line written as <code>[[ … ]]</code> is left out when its fields are blank. Fields: ${db.fields.map((f) => `<code>{${esc(f.name)}}</code>`).join(' ')}</p>
+        <div class="row"><label>Page header</label><input id="formheader" value="${esc(form.header ?? '')}" placeholder="none" size="40"></div>
+        <div class="row"><label>Page footer</label><input id="formfooter" value="${esc(form.footer ?? '')}" placeholder="none" size="40"></div>
+        <p class="hint"><code>{Field}</code> puts in a field, <code>{Field:20}</code> exactly 20 characters of it. <code>{#}</code> is the record's number, <code>{Date}</code> today's date, <code>{Time}</code> the time. A line written as <code>[[ … ]]</code> is left out when its fields are blank. With a header or footer the printout is cut into pages of ${form.pageLines || 66} lines; <code>{Page}</code> is the page number. Fields: ${db.fields.map((f) => `<code>{${esc(f.name)}}</code>`).join(' ')}</p>
         <div class="buttons"><button type="button" id="doprint">Print</button><button type="button" id="savetxt">Save as text</button>
           <select id="txtenc" aria-label="Text encoding"><option value="utf-8">UTF-8</option><option value="cp437">DOS (code page 437)</option></select></div>
       </div>
       <div class="printpreview"><h2>Preview — ${state.list.length} record${state.list.length === 1 ? '' : 's'}</h2><pre id="printout"></pre></div>
     </div>`;
   const update = () => {
-    const text = renderReport(form, state.list.slice(0, 100), fieldNames(db));
+    const text = renderReport(form, state.list.slice(0, 100), fieldNames(db)).replace(/\f/g, `${'─'.repeat(form.width)}\n`);
     $('#printout').textContent = text + (state.list.length > 100 ? `\n… and ${state.list.length - 100} more (all are printed).\n` : '');
   };
   update();
   $('#template').addEventListener('input', (e) => { form.template = e.target.value; update(); persistSoon(); });
   $('#formname').addEventListener('input', (e) => { form.name = e.target.value; persistSoon(); });
+  for (const k of ['header', 'footer']) $(`#form${k}`).addEventListener('input', (e) => { form[k] = e.target.value; update(); persistSoon(); });
   $('#formname').addEventListener('change', () => render());
   $('#formwidth').addEventListener('input', (e) => { form.width = Math.max(20, Math.min(250, +e.target.value || 76)); update(); persistSoon(); });
   $('#formsel').addEventListener('change', (e) => { state.formIndex = +e.target.value; render(); });
@@ -399,7 +402,8 @@ function renderPrint() {
   });
   const fullText = () => renderReport(form, state.list, fieldNames(db), { title: db.name });
   $('#doprint').addEventListener('click', () => {
-    $('#print-area').textContent = fullText();
+    // One block per page so form feeds become page breaks.
+    $('#print-area').replaceChildren(...fullText().split('\f').map((page) => Object.assign(document.createElement('div'), { className: 'page', textContent: page })));
     window.print();
   });
   $('#savetxt').addEventListener('click', () => {
@@ -410,17 +414,21 @@ function renderPrint() {
 
 // ---------- import ----------
 
-function pickFile(accept, onBytes) {
-  const input = Object.assign(document.createElement('input'), { type: 'file', accept });
+// Several files can be chosen at once: a Notebook II database is NAME.DAT,
+// NAME.DEF, NAME.IDX and NAME.MSC (plus any print formats, *.R00).
+function pickFiles(onFiles) {
+  const input = Object.assign(document.createElement('input'), { type: 'file', multiple: true });
   input.addEventListener('change', async () => {
-    const file = input.files[0];
-    if (file) onBytes(file.name, new Uint8Array(await file.arrayBuffer()));
+    const files = await Promise.all([...input.files].map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
+    if (files.length) onFiles(files);
   });
   input.click();
 }
 
-function startImport(name, bytes) {
-  state.imp = { name, bytes, opts: { format: 'auto', encoding: 'auto' }, target: 'new', dbName: name.replace(/\.[^.]+$/, '') };
+function startImport(files) {
+  const main = files.find((f) => /\.dat$/i.test(f.name)) ?? files[0];
+  const name = files.length > 1 ? files.map((f) => f.name).join(', ') : main.name;
+  state.imp = { name, files, opts: { format: 'auto', encoding: 'auto' }, target: 'new', dbName: main.name.replace(/\.[^.]+$/, '') };
   parseImport();
   go('import');
 }
@@ -428,7 +436,7 @@ function startImport(name, bytes) {
 function parseImport() {
   const imp = state.imp;
   try {
-    imp.result = importFile(imp.bytes, imp.opts);
+    imp.result = importFiles(imp.files, imp.opts);
     imp.error = '';
   } catch (e) {
     imp.result = null;
@@ -448,7 +456,7 @@ function renderImport() {
     <div class="panel" id="importer">
       <h2>Import ${esc(imp.name)}</h2>
       <div class="row">
-        <label>Read as</label><select data-opt="format">${fmtSel('auto', 'Detect automatically')}${fmtSel('delimited', 'Delimited text')}${fmtSel('tagged', 'Tagged text (Field: value)')}${fmtSel('json', 'Notebook file (.json)')}${fmtSel('salvage', 'Salvage text from any file')}</select>
+        <label>Read as</label><select data-opt="format">${fmtSel('auto', 'Detect automatically')}${fmtSel('notebook', 'Notebook II database (.DAT .DEF .IDX)')}${fmtSel('delimited', 'Delimited text')}${fmtSel('tagged', 'Tagged text (Field: value)')}${fmtSel('json', 'Notebook file (.json)')}${fmtSel('salvage', 'Salvage text from any file')}</select>
         <label>Characters</label><select data-opt="encoding">${encSel('auto', 'Detect')}${encSel('cp437', 'DOS (code page 437)')}${encSel('utf-8', 'UTF-8')}</select>
       </div>
       ${delimited ? `
@@ -460,6 +468,8 @@ function renderImport() {
       </div>
       <datalist id="delims"><option value="\\t">Tab</option><option value=",">Comma</option><option value="|"></option><option value="~"></option><option value="^"></option><option value=";"></option><option value="\\n">Line break</option><option value="\\f">Form feed</option><option value="\\x1e">Record separator</option><option value="\\x1f">Unit separator</option><option value="\\x14">¶ (DOS)</option></datalist>
       <p class="hint">Type <code>\\t</code> for tab, <code>\\n</code> for a line break, <code>\\f</code> for form feed or <code>\\xNN</code> for any character code.</p>` : ''}
+      ${r?.format === 'notebook' ? `<div class="row"><label class="check"><input type="checkbox" id="incdel" ${o.includeDeleted ? 'checked' : ''} ${o.deleted || o.includeDeleted ? '' : 'disabled'}> Include records marked deleted${o.deleted ? ` (${o.deleted})` : ''}</label></div>
+      ${r.printForms?.length ? `<p>Print formats: ${r.printForms.map((f) => `<code>${esc(f.name)}</code>`).join(' ')}</p>` : ''}` : ''}
       ${r?.format === 'salvage' ? `<div class="row"><label>Shortest piece</label><input type="number" min="1" data-num="minLength" value="${o.minLength}"><label>Join pieces closer than</label><input type="number" min="0" data-num="mergeGap" value="${o.mergeGap}"> bytes</div>` : ''}
       ${imp.error ? `<p class="error">${esc(imp.error)}</p>` : ''}
       ${(r?.warnings ?? []).map((w) => `<p class="warn">${esc(w)}</p>`).join('')}
@@ -480,7 +490,7 @@ function renderImport() {
     const k = el.dataset.opt;
     if (k === 'header') Object.assign(imp.opts, { ...o, format: 'delimited', header: el.value === 'true' });
     else imp.opts[k] = el.value;
-    if (k === 'format') for (const x of ['fieldDelim', 'recordDelim', 'newlineMarker', 'header', 'quote', 'minLength', 'mergeGap']) delete imp.opts[x];
+    if (k === 'format') for (const x of ['fieldDelim', 'recordDelim', 'newlineMarker', 'header', 'quote', 'minLength', 'mergeGap', 'includeDeleted']) delete imp.opts[x];
     reparse();
   }));
   $$('[data-delim]').forEach((el) => el.addEventListener('change', () => {
@@ -490,6 +500,7 @@ function renderImport() {
     reparse();
   }));
   $$('[data-num]').forEach((el) => el.addEventListener('change', () => { imp.opts[el.dataset.num] = Math.max(0, +el.value || 0); reparse(); }));
+  $('#incdel')?.addEventListener('change', (e) => { imp.opts.includeDeleted = e.target.checked; reparse(); });
   $$('[name=target]').forEach((el) => el.addEventListener('change', () => { imp.target = el.value; }));
   $('#newname')?.addEventListener('input', (e) => { imp.dbName = e.target.value; });
   $('#doimport')?.addEventListener('click', finishImport);
@@ -528,6 +539,7 @@ function renderExport() {
         <option value="csv">Comma-separated (.csv)</option>
         <option value="tab">Tab-delimited (.txt)</option>
         <option value="tagged">Tagged text — Field: value (.txt)</option>
+        <option value="notebook">Notebook II import text — %Field:value (.txt), for the DOS program</option>
         <option value="custom">Delimited, my own characters (.txt)</option>
       </select></div>
       <div class="row custom" hidden>
@@ -548,7 +560,10 @@ function renderExport() {
     $('.custom', form).hidden = form.format.value !== 'custom';
     form.encoding.disabled = form.format.value === 'json';
   };
-  form.format.addEventListener('change', sync);
+  form.format.addEventListener('change', () => {
+    if (form.format.value === 'notebook') form.encoding.value = 'cp437';
+    sync();
+  });
   sync();
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -562,6 +577,7 @@ function renderExport() {
       case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(f, recs), enc), 'text/csv');
       case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, { fieldDelim: '\t' }), enc), 'text/plain');
       case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(f, recs), enc), 'text/plain');
+      case 'notebook': return download(`${base.slice(0, 8)}.txt`, toBytes(exportNotebookText(f, recs), enc), 'text/plain');
       case 'custom': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, {
         fieldDelim: readDelim(form.fieldDelim.value) || '|',
         recordDelim: readDelim(form.recordDelim.value) || '\r\n',
@@ -621,7 +637,7 @@ function onKey(key, e) {
     if (key === 'Enter') return openSaved(state.homeCursor);
     if (key === 'n' || key === 'N') return newDatabase();
     if (key === 's' || key === 'S') return openDb(databaseFromImport(SAMPLE.name, SAMPLE));
-    if (key === 'o' || key === 'O' || key === 'F9') return pickFile('', startImport);
+    if (key === 'o' || key === 'O' || key === 'F9') return pickFiles(startImport);
     if (key === 'Delete' && saved[state.homeCursor]) {
       const d = saved[state.homeCursor];
       if (confirm(`Delete the database "${d.name}" from this browser? Export it first if you want a copy.`)) { removeDb(d.key); render(); }
@@ -658,7 +674,7 @@ function onKey(key, e) {
     F6: () => go('sort'),
     F7: () => go('print'),
     F8: () => go('fields'),
-    F9: () => pickFile('', startImport),
+    F9: () => pickFiles(startImport),
     F10: () => go('export'),
   };
   if (commands[key]) return commands[key]();

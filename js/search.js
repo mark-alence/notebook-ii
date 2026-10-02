@@ -11,6 +11,10 @@
 //   "date of birth":1850  quote a field name that contains spaces
 //   author:               an empty term after a field name finds records where
 //                         that field is blank; author:* finds non-blank ones
+//   title=the             the field begins with the text (Notebook II's
+//                         "begins with"; -title=the is "not begins with")
+//   year>1980  author<m   the field begins with something later / earlier in
+//   year>=1980 year<=1985 alphabetical (or numerical) order, or the same
 
 export function tokenizeQuery(q) {
   const tokens = [];
@@ -34,15 +38,16 @@ export function tokenizeQuery(q) {
       text = m ? m[0] : '';
       i += text.length;
     }
-    // field:term
-    const colon = phrase ? (q[i] === ':' ? -2 : -1) : text.indexOf(':');
-    if (colon === -2) {
-      field = text; i++; phrase = false;
+    // field:term, field=term, field>term ...
+    let op = ':';
+    const quotedOp = phrase ? FIELD_OP.exec(q.slice(i)) : null;
+    const plain = phrase ? null : /^([^:<>=]+)(>=|<=|>|<|=|:)(.*)$/.exec(text);
+    if (quotedOp) {
+      field = text; op = quotedOp[1]; i += op.length; phrase = false;
       ({ text, phrase, i } = readTerm(q, i));
-    } else if (colon > 0) {
-      field = text.slice(0, colon);
-      const rest = text.slice(colon + 1);
-      if (rest) text = rest;
+    } else if (plain) {
+      [, field, op] = plain;
+      if (plain[3]) text = plain[3];
       else ({ text, phrase, i } = readTerm(q, i));
     }
     if (!phrase && field === null && /^(AND|OR|NOT)$/.test(text)) {
@@ -50,10 +55,12 @@ export function tokenizeQuery(q) {
       continue;
     }
     if (neg) tokens.push({ type: 'NOT' });
-    tokens.push({ type: 'term', field, text, phrase });
+    tokens.push({ type: 'term', field, text, phrase, op });
   }
   return tokens;
 }
+
+const FIELD_OP = /^(>=|<=|>|<|=|:)/;
 
 function readTerm(q, i) {
   if (q[i] === '"') {
@@ -96,7 +103,7 @@ export function parseQuery(q) {
       if (next()?.type !== ')') throw new Error('Missing )');
       return e;
     }
-    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase };
+    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase, compare: t.op === ':' ? null : t.op };
     throw new Error(`Unexpected ${t.type}`);
   }
 
@@ -129,6 +136,7 @@ function compileTerm(node, fields) {
     if (!targets.length) throw new Error(`No field called ${node.field}`);
   }
   const text = node.text.trim();
+  if (node.compare) return compileCompare(node.compare, text, targets);
   if (targets && text === '') return (rec) => targets.every((f) => !(rec.values[f] ?? '').trim());
   if (targets && text === '*') return (rec) => targets.some((f) => (rec.values[f] ?? '').trim());
   // Same word split as the record text, but keeping the * and ? wildcards.
@@ -143,6 +151,31 @@ function compileTerm(node, fields) {
     }
     return false;
   };
+}
+
+const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+const leadingNumber = (s) => /^[-+]?\d+(?:\.\d+)?/.exec(s)?.[0];
+
+// Notebook II's Select conditions, which look at how the field begins.
+function compileCompare(op, text, targets) {
+  if (!text) throw new Error(`Nothing to compare after ${op}`);
+  const want = fold(text);
+  const num = leadingNumber(want);
+  const test = (value) => {
+    const v = fold(value).trim();
+    if (!v) return false;
+    if (op === '=') return v.startsWith(want);
+    let c;
+    if (num !== undefined) {
+      const n = leadingNumber(v);
+      if (n === undefined) return false;
+      c = Math.sign(+n - +num);
+    } else {
+      c = collator.compare(v.slice(0, want.length), want);
+    }
+    return op === '>' ? c > 0 : op === '<' ? c < 0 : op === '>=' ? c >= 0 : c <= 0;
+  };
+  return (rec) => targets.some((f) => test(rec.values[f] ?? ''));
 }
 
 export function compileQuery(q, fields) {
@@ -170,7 +203,7 @@ export function highlightTerms(q) {
     const out = [];
     const walk = (n, neg) => {
       if (!n) return;
-      if (n.op === 'term' && !neg) out.push(...words(n.text.replace(/\*/g, '')));
+      if (n.op === 'term' && !neg && !n.compare) out.push(...words(n.text.replace(/\*/g, '')));
       if (n.op === 'not') walk(n.arg, !neg);
       if (n.left) { walk(n.left, neg); walk(n.right, neg); }
     };
