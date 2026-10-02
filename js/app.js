@@ -1,7 +1,7 @@
 // The full-screen, keyboard-driven interface, in the style of the DOS original.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, sortRecords, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
+  moveField, sortRecords, carryOver, copiesFromPrevious, setFieldCopy, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
 } from './model.js';
 import { compileQuery, highlightTerms } from './search.js';
 import { importFiles } from './importers.js';
@@ -9,6 +9,7 @@ import { exportDelimited, exportTagged, exportNotebookText, exportJson, toBytes 
 import { renderReport } from './printform.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey } from './storage.js';
 import { SAMPLE } from './sample.js';
+import { getTheme, setTheme, nextTheme } from './theme.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -25,6 +26,8 @@ const state = {
   back: 'browse',
   homeCursor: 0,
   editId: null,
+  editField: 0, // the editor field that last had the cursor
+  copySource: null, // record F5 copies from in the editor
   formIndex: 0,
   imp: null,
   message: '',
@@ -123,7 +126,7 @@ function goBack() {
 const KEYSETS = {
   home: [['N', 'New'], ['F9', 'Import'], ['O', 'Open file'], ['S', 'Sample'], ['Del', 'Delete'], ['F1', 'Help']],
   browse: [['F1', 'Help'], ['F2', 'Edit'], ['F3', 'Add'], ['F4', 'Find'], ['F5', 'All'], ['F6', 'Sort'], ['F7', 'Print'], ['F8', 'Fields'], ['F9', 'Import'], ['F10', 'Export'], ['Del', 'Delete'], ['Esc', 'Close']],
-  edit: [['F10', 'Save'], ['Esc', 'Cancel']],
+  edit: [['F5', 'Copy previous'], ['F6', 'Copy field'], ['F10', 'Save'], ['Esc', 'Cancel']],
   dialog: [['Esc', 'Back'], ['F1', 'Help']],
 };
 
@@ -147,7 +150,9 @@ function renderTitle() {
     right = state.query ? `Found ${n} of ${total}` : `${total} record${total === 1 ? '' : 's'}`;
     if (['browse', 'view'].includes(state.mode) && n) right = `Rec ${state.cursor + 1}/${n} · ${right}`;
   }
-  $('#title').innerHTML = `<span class="brand">NOTEBOOK II</span><span class="dbname">${esc(db?.name ?? '')}</span><span class="count">${esc(right)}</span>`;
+  const theme = getTheme();
+  $('#title').innerHTML = `<span class="brand">NOTEBOOK II</span><span class="dbname">${esc(db?.name ?? '')}</span><span class="count">${esc(right)}</span>`
+    + `<button type="button" class="theme" id="themebtn" title="Light or dark screen (Alt+T)">${{ auto: 'Auto', light: 'Light', dark: 'Dark' }[theme]}</button>`;
 }
 
 function renderKeys() {
@@ -250,12 +255,53 @@ function renderEdit() {
       ${state.db.fields.map(({ name }, i) => `
         <label class="field"><span class="fname">${esc(name)}</span>
           <textarea name="f${i}" rows="1" spellcheck="true">${esc(rec?.values[name] ?? '')}</textarea></label>`).join('')}
-      <p class="hint">Fields can be any length. <kbd>F10</kbd> or <kbd>Ctrl</kbd>+<kbd>S</kbd> saves, <kbd>Esc</kbd> cancels.</p>
+      <p class="hint">Fields can be any length. <kbd>F5</kbd> fills in ${esc(copyList())} from ${state.copySource ? 'the previous record' : 'the previous record (there is none yet)'}; <kbd>F6</kbd> copies just the field you are in. <kbd>F10</kbd> or <kbd>Ctrl</kbd>+<kbd>S</kbd> saves, <kbd>Esc</kbd> cancels.</p>
     </form>`;
   const grow = (t) => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px`; };
   state.dirty = false;
-  $$('#editform textarea').forEach((t) => { grow(t); t.addEventListener('input', () => { grow(t); state.dirty = true; }); });
+  $$('#editform textarea').forEach((t, i) => {
+    grow(t);
+    t.addEventListener('input', () => { grow(t); state.dirty = true; });
+    t.addEventListener('focus', () => { state.editField = i; });
+  });
+  state.editField = 0;
   $('#editform textarea')?.focus();
+}
+
+function copyList() {
+  const names = state.db.fields.filter(copiesFromPrevious).map((f) => f.name);
+  if (!names.length) return 'no fields (choose them in Fields, F8)';
+  return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+// The record F5 and F6 copy from: for a new record, the one you were on when
+// you pressed F3 (after saving, that is the record just saved); when editing,
+// the record before it in the list.
+function previousRecord() {
+  const { db, list } = state;
+  if (state.editId === null) return current() ?? db.records[db.records.length - 1] ?? null;
+  const order = list?.some((r) => r.id === state.editId) ? list : db.records;
+  const i = order.findIndex((r) => r.id === state.editId);
+  return i > 0 ? order[i - 1] : null;
+}
+
+function copyFromPrevious(onlyCurrentField) {
+  const from = state.copySource;
+  if (!from) return say('There is no previous record to copy from.', true);
+  const areas = $$('#editform textarea');
+  const values = {};
+  state.db.fields.forEach(({ name }, i) => { values[name] = areas[i].value; });
+  const field = state.db.fields[state.editField];
+  const copied = carryOver(state.db, from, values, onlyCurrentField ? field?.name : null);
+  state.db.fields.forEach(({ name }, i) => {
+    if (!copied.includes(name)) return;
+    areas[i].value = values[name];
+    areas[i].dispatchEvent(new Event('input'));
+  });
+  areas[state.editField]?.focus();
+  if (copied.length) return say(`Copied ${copied.join(', ')} from the previous record.`);
+  if (onlyCurrentField) return say(`The previous record's ${field?.name ?? 'field'} is blank or the same.`);
+  say('Nothing to copy: those fields are already filled in or blank in the previous record.');
 }
 
 function saveEdit() {
@@ -332,21 +378,24 @@ function renderFields() {
   $('#main').innerHTML = `
     <div class="panel" id="fields">
       <h2>Fields</h2>
-      <table class="grid"><tbody>${db.fields.map(({ name }, i) => `
+      <table class="grid"><thead><tr><th class="num">#</th><th>Name</th><th>F5 copies</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
         <tr><td class="num">${i + 1}</td>
           <td><input data-rename="${esc(name)}" value="${esc(name)}" aria-label="Field name"></td>
+          <td><label class="check"><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''}> from previous</label></td>
           <td class="buttons">
             <button type="button" data-move="${esc(name)}" data-d="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
             <button type="button" data-move="${esc(name)}" data-d="1" ${i < db.fields.length - 1 ? '' : 'disabled'} title="Move down">↓</button>
-            <button type="button" data-del="${esc(name)}">Delete</button></td></tr>`).join('')}
+            <button type="button" data-del="${esc(name)}">Delete</button></td></tr>`; }).join('')}
       </tbody></table>
       <form id="addfield" class="row"><input name="name" placeholder="New field name" aria-label="New field name"><button type="submit">Add field</button></form>
       <h2>Database name</h2>
       <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Database name"></div>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter.</p>
+      <p class="hint">"F5 copies" marks the fields that describe a source, such as Author, Title and Year. While you edit a record, <kbd>F5</kbd> copies those fields from the previous record into the ones still blank, so a new note on the same book needs only the note.</p>
     </div>`;
   const done = (fn) => { try { fn(); persist(); refreshList(); render(); } catch (e) { say(e.message, true); } };
   $$('[data-rename]').forEach((inp) => inp.addEventListener('change', () => done(() => renameField(db, inp.dataset.rename, inp.value))));
+  $$('[data-copy]').forEach((c) => c.addEventListener('change', () => done(() => setFieldCopy(db, c.dataset.copy, c.checked))));
   $$('[data-move]').forEach((b) => b.addEventListener('click', () => done(() => moveField(db, b.dataset.move, +b.dataset.d))));
   $$('[data-del]').forEach((b) => b.addEventListener('click', () => {
     const n = db.records.filter((r) => (r.values[b.dataset.del] ?? '').trim()).length;
@@ -628,6 +677,7 @@ function onKey(key, e) {
   const typing = e && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
 
   if (key === 'F1') return go(m === 'help' ? (state.db ? 'browse' : 'home') : 'help');
+  if (key === 'Alt+t') return cycleTheme();
 
   if (m === 'home') {
     const saved = listSaved();
@@ -648,6 +698,8 @@ function onKey(key, e) {
 
   if (m === 'edit') {
     if (key === 'F10' || key === 'Ctrl+s') return saveEdit();
+    if (key === 'F5') return copyFromPrevious(false);
+    if (key === 'F6') return copyFromPrevious(true);
     if (key === 'Escape') { if (!state.dirty || confirm('Leave without saving changes?')) goBack(); return; }
     return false;
   }
@@ -667,8 +719,8 @@ function onKey(key, e) {
   if (!state.db) return false;
 
   const commands = {
-    F2: () => { if (current()) { state.editId = current().id; go('edit'); } },
-    F3: () => { state.editId = null; go('edit'); },
+    F2: () => { if (current()) { state.editId = current().id; state.copySource = previousRecord(); go('edit'); } },
+    F3: () => { state.editId = null; state.copySource = previousRecord(); go('edit'); },
     F4: () => go('find'),
     F5: () => { state.query = ''; refreshList(); go('browse'); },
     F6: () => go('sort'),
@@ -697,6 +749,7 @@ function onKey(key, e) {
 document.addEventListener('keydown', (e) => {
   let key = e.key;
   if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === 's') key = 'Ctrl+s';
+  else if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyT') key = 'Alt+t';
   else if (e.ctrlKey || e.metaKey || e.altKey) return;
   // Single letters act as commands only on the database list.
   if (key.length === 1 && state.mode !== 'home' && key !== '/') return;
@@ -709,6 +762,15 @@ $('#keys').addEventListener('click', (e) => {
   const k = b.dataset.key;
   onKey({ Del: 'Delete', Esc: 'Escape', PgUp: 'PageUp', PgDn: 'PageDown' }[k] ?? k, null);
 });
+
+function cycleTheme() {
+  const t = nextTheme(getTheme());
+  setTheme(t);
+  renderTitle();
+  say({ auto: 'Screen follows your computer\'s light or dark setting.', light: 'Light screen.', dark: 'Dark screen.' }[t]);
+}
+
+$('#title').addEventListener('click', (e) => { if (e.target.closest('#themebtn')) cycleTheme(); });
 
 $('#findbar').addEventListener('submit', (e) => { e.preventDefault(); runFind($('#findinput').value); });
 

@@ -1,4 +1,8 @@
 /* The look of a DOS text-mode program: 16-color VGA palette, one monospace face. */
+/* Dark is the original blue screen. Light keeps the VGA blue for bars and
+   labels on white paper, with VGA brown where dark uses yellow. Components use
+   the role tokens below, never the palette directly. The theme follows the
+   system unless data-theme="light" or "dark" is set on <html>. */
 :root {
   --blue: #0000aa;
   --navy: #000066;
@@ -7,19 +11,68 @@
   --white: #ffffff;
   --yellow: #ffff55;
   --black: #000000;
-  --red: #ff5555;
-  --green: #55ff55;
+  --brown: #aa5500;
+  --font: "Perfect DOS VGA 437", "Px437 IBM VGA 8x16", "IBM Plex Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+
   --bg: var(--blue);
   --fg: var(--gray);
   --bright: var(--white);
   --label: var(--yellow);
+  --hint: var(--cyan);
+  --warn: var(--yellow);
+  --focus: var(--yellow);
+  --border: var(--cyan);
   --bar-bg: var(--cyan);
   --bar-fg: var(--black);
   --sel-bg: var(--cyan);
   --sel-fg: var(--black);
+  --row-hover: var(--navy);
   --field-bg: var(--navy);
-  --font: "Perfect DOS VGA 437", "Px437 IBM VGA 8x16", "IBM Plex Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  --status-bg: var(--navy);
+  --status-fg: var(--white);
+  --keys-bg: var(--black);
+  --key-bg: var(--cyan);
+  --key-fg: var(--black);
+  --kbd-bg: var(--black);
+  --kbd-fg: var(--white);
+  --btn-bg: var(--gray);
+  --btn-fg: var(--black);
+  --btn-border: var(--white);
+  --btn-hover: var(--white);
+  --find-bg: var(--gray);
+  --find-fg: var(--black);
+  --find-input-bg: var(--black);
+  --find-hint: var(--navy);
+  --mark-bg: var(--yellow);
+  --mark-fg: var(--black);
+  --paper-bg: var(--white);
+  --paper-fg: var(--black);
   color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f6f6fb; --fg: #2a2a3a; --bright: #000000; --label: var(--blue); --hint: #006a6a;
+    --warn: var(--brown); --focus: var(--brown); --border: #7a7ab8;
+    --bar-bg: var(--blue); --bar-fg: var(--white); --sel-bg: var(--blue); --sel-fg: var(--white);
+    --row-hover: #e1e1f0; --field-bg: var(--white); --status-bg: #dedeec; --status-fg: var(--black);
+    --keys-bg: var(--blue); --key-bg: #dedeec; --key-fg: var(--black); --kbd-bg: var(--blue); --kbd-fg: var(--white);
+    --btn-bg: #dedeec; --btn-fg: var(--black); --btn-border: var(--blue); --btn-hover: var(--white);
+    --find-bg: #dedeec; --find-fg: var(--black); --find-input-bg: var(--white); --find-hint: #44445a;
+    --paper-bg: var(--white); --paper-fg: var(--black);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f6f6fb; --fg: #2a2a3a; --bright: #000000; --label: var(--blue); --hint: #006a6a;
+  --warn: var(--brown); --focus: var(--brown); --border: #7a7ab8;
+  --bar-bg: var(--blue); --bar-fg: var(--white); --sel-bg: var(--blue); --sel-fg: var(--white);
+  --row-hover: #e1e1f0; --field-bg: var(--white); --status-bg: #dedeec; --status-fg: var(--black);
+  --keys-bg: var(--blue); --key-bg: #dedeec; --key-fg: var(--black); --kbd-bg: var(--blue); --kbd-fg: var(--white);
+  --btn-bg: #dedeec; --btn-fg: var(--black); --btn-border: var(--blue); --btn-hover: var(--white);
+  --find-bg: #dedeec; --find-fg: var(--black); --find-input-bg: var(--white); --find-hint: #44445a;
+  --paper-bg: var(--white); --paper-fg: var(--black);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -49,6 +102,8 @@ html, body {
 #title .brand { font-weight: bold; }
 #title .dbname { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; }
 #title .count { text-align: right; }
+#title .theme { color: inherit; background: transparent; border: 0; padding: 0 0 0 1ch; text-decoration: underline dotted; }
+#title .theme:hover, #title .theme:focus-visible { background: transparent; text-decoration: underline; outline: none; }
 
 #main {
   flex: 1;
@@ -60,18 +115,18 @@ html, body {
 #status {
   min-height: 1.4em;
   padding: 0 1ch;
-  color: var(--bright);
-  background: var(--navy);
+  color: var(--status-fg);
+  background: var(--status-bg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#status.error { color: var(--yellow); }
+#status.error { color: var(--warn); }
 
 #keys {
   display: flex;
   flex-wrap: wrap;
-  background: var(--black);
+  background: var(--keys-bg);
 }
 #keys button {
   flex: 1 0 auto;
@@ -80,17 +135,17 @@ html, body {
   padding: 0 0.5ch 0 0;
   font: inherit;
   cursor: pointer;
-  color: var(--black);
-  background: var(--cyan);
-  border-right: 1px solid var(--black);
+  color: var(--key-fg);
+  background: var(--key-bg);
+  border-right: 1px solid var(--keys-bg);
 }
 #keys button kbd {
-  color: var(--white);
-  background: var(--black);
+  color: var(--kbd-fg);
+  background: var(--kbd-bg);
   padding: 0 0.5ch;
   margin-right: 0.5ch;
 }
-#keys button:hover, #keys button:focus-visible { background: var(--white); outline: none; }
+#keys button:hover, #keys button:focus-visible { background: var(--btn-hover); outline: none; }
 
 #findbar {
   display: flex;
@@ -98,13 +153,13 @@ html, body {
   align-items: center;
   gap: 0 1ch;
   padding: 0.25em 1ch;
-  background: var(--gray);
-  color: var(--black);
+  background: var(--find-bg);
+  color: var(--find-fg);
 }
 [hidden] { display: none !important; }
 #findbar label { font-weight: bold; }
-#findbar input { flex: 1 1 20ch; background: var(--black); color: var(--bright); }
-#findbar .hint { color: var(--navy); }
+#findbar input { flex: 1 1 20ch; background: var(--find-input-bg); color: var(--bright); }
+#findbar .hint { color: var(--find-hint); }
 
 /* ---------- shared pieces ---------- */
 
@@ -117,22 +172,22 @@ h2 {
 h2:first-child { margin-top: 0; }
 p { margin: 0.5em 0; max-width: 80ch; }
 code, kbd { font: inherit; color: var(--bright); }
-kbd { background: var(--black); padding: 0 0.5ch; }
-.hint { color: var(--cyan); }
-.error, .warn { color: var(--yellow); }
-mark { background: var(--yellow); color: var(--black); }
+kbd { background: var(--kbd-bg); color: var(--kbd-fg); padding: 0 0.5ch; }
+.hint { color: var(--hint); }
+.error, .warn { color: var(--warn); }
+mark { background: var(--mark-bg); color: var(--mark-fg); }
 
 input, select, textarea, button {
   font: inherit;
   color: var(--bright);
   background: var(--field-bg);
-  border: 1px solid var(--cyan);
+  border: 1px solid var(--border);
   border-radius: 0;
   padding: 0 0.5ch;
 }
-input:focus, select:focus, textarea:focus { outline: 2px solid var(--yellow); outline-offset: -1px; }
-button { background: var(--gray); color: var(--black); border-color: var(--white); cursor: pointer; padding: 0 1ch; }
-button:hover:not(:disabled), button:focus-visible { background: var(--white); outline: none; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--focus); outline-offset: -1px; }
+button { background: var(--btn-bg); color: var(--btn-fg); border-color: var(--btn-border); cursor: pointer; padding: 0 1ch; }
+button:hover:not(:disabled), button:focus-visible { background: var(--btn-hover); outline: none; }
 button:disabled { opacity: 0.5; cursor: default; }
 
 .panel { max-width: 110ch; }
@@ -143,12 +198,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 td.buttons { margin: 0; flex-wrap: nowrap; }
 
 table.grid { border-collapse: collapse; width: 100%; }
-.grid th { text-align: left; color: var(--label); font-weight: normal; border-bottom: 1px solid var(--cyan); padding: 0 1ch; white-space: nowrap; }
+.grid th { text-align: left; color: var(--label); font-weight: normal; border-bottom: 1px solid var(--border); padding: 0 1ch; white-space: nowrap; }
 .grid td { padding: 0 1ch; vertical-align: top; }
 .grid .num { text-align: right; width: 1%; white-space: nowrap; }
 .grid tbody tr { cursor: default; }
 .grid tr.cur td { background: var(--sel-bg); color: var(--sel-fg); }
-.grid tbody tr:hover:not(.cur) td { background: var(--navy); }
+.grid tbody tr:hover:not(.cur) td { background: var(--row-hover); }
 
 table.browse { table-layout: fixed; }
 table.browse th:first-child { width: 6ch; }
@@ -163,7 +218,7 @@ table.browse th:first-child { width: 6ch; }
 .record .field { display: grid; grid-template-columns: minmax(10ch, 18ch) 1fr; gap: 0 2ch; margin: 0 0 0.6em; }
 .record .fname { color: var(--label); overflow-wrap: anywhere; }
 .record .fval { color: var(--bright); white-space: pre-wrap; overflow-wrap: anywhere; }
-.record .fval.empty { color: var(--cyan); opacity: 0.6; }
+.record .fval.empty { color: var(--hint); opacity: 0.6; }
 .edit textarea { width: 100%; resize: vertical; min-height: 1.6em; line-height: 1.4; }
 
 /* ---------- print ---------- */
@@ -173,8 +228,8 @@ table.browse th:first-child { width: 6ch; }
 .printpreview pre {
   margin: 0;
   padding: 0.5em 1ch;
-  background: var(--white);
-  color: var(--black);
+  background: var(--paper-bg);
+  color: var(--paper-fg);
   overflow: auto;
   max-height: 70vh;
 }

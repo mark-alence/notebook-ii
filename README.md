@@ -30,6 +30,10 @@ Databases are saved in the browser as you work. **F10 Export > Notebook file** m
 
 Every command is also on the bar at the bottom of the screen for mouse and touch.
 
+While editing a record, **F5** copies the previous record's source fields (Author, Title, Year and the like) into the ones still blank, so a new note on the same book only needs the note itself. **F6** copies just the field the cursor is in. Which fields F5 copies is a checkbox per field under **F8 Fields**; until you change it, fields with names like Notes, Comments, Pages or Keywords are left out.
+
+The screen follows the computer's light or dark setting. The word at the right of the title bar, or **Alt+T**, switches between Auto, Light and Dark.
+
 ## Finding records
 
 ```
