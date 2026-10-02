@@ -1,0 +1,182 @@
+// Retrieval: find records by any word, in one field or anywhere.
+//
+//   smith                 records containing the word "smith" in any field
+//   author:smith          only in the Author field
+//   "civil war"           the phrase, words adjacent
+//   hist*                 any word starting with "hist"
+//   smith AND jones       both (AND is implied between terms: smith jones)
+//   smith OR jones        either
+//   NOT smith  / -smith   records without it
+//   (a OR b) AND c        grouping
+//   "date of birth":1850  quote a field name that contains spaces
+//   author:               an empty term after a field name finds records where
+//                         that field is blank; author:* finds non-blank ones
+
+export function tokenizeQuery(q) {
+  const tokens = [];
+  let i = 0;
+  while (i < q.length) {
+    const c = q[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '(' || c === ')') { tokens.push({ type: c }); i++; continue; }
+    let neg = false;
+    if (c === '-' && i + 1 < q.length && !/\s/.test(q[i + 1])) { neg = true; i++; }
+    let field = null;
+    let text;
+    let phrase = false;
+    if (q[i] === '"') {
+      const end = q.indexOf('"', i + 1);
+      text = q.slice(i + 1, end < 0 ? q.length : end);
+      i = end < 0 ? q.length : end + 1;
+      phrase = true;
+    } else {
+      const m = /^[^\s()"]+/.exec(q.slice(i));
+      text = m ? m[0] : '';
+      i += text.length;
+    }
+    // field:term
+    const colon = phrase ? (q[i] === ':' ? -2 : -1) : text.indexOf(':');
+    if (colon === -2) {
+      field = text; i++; phrase = false;
+      ({ text, phrase, i } = readTerm(q, i));
+    } else if (colon > 0) {
+      field = text.slice(0, colon);
+      const rest = text.slice(colon + 1);
+      if (rest) text = rest;
+      else ({ text, phrase, i } = readTerm(q, i));
+    }
+    if (!phrase && field === null && /^(AND|OR|NOT)$/.test(text)) {
+      tokens.push({ type: text });
+      continue;
+    }
+    if (neg) tokens.push({ type: 'NOT' });
+    tokens.push({ type: 'term', field, text, phrase });
+  }
+  return tokens;
+}
+
+function readTerm(q, i) {
+  if (q[i] === '"') {
+    const end = q.indexOf('"', i + 1);
+    return { text: q.slice(i + 1, end < 0 ? q.length : end), phrase: true, i: end < 0 ? q.length : end + 1 };
+  }
+  const m = /^[^\s()"]*/.exec(q.slice(i));
+  return { text: m[0], phrase: false, i: i + m[0].length };
+}
+
+export function parseQuery(q) {
+  const tokens = tokenizeQuery(q);
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const next = () => tokens[pos++];
+
+  function parseOr() {
+    let left = parseAnd();
+    while (peek()?.type === 'OR') { next(); left = { op: 'or', left, right: parseAnd() }; }
+    return left;
+  }
+  function parseAnd() {
+    let left = parseNot();
+    for (;;) {
+      const t = peek();
+      if (!t || t.type === 'OR' || t.type === ')') return left;
+      if (t.type === 'AND') next();
+      left = { op: 'and', left, right: parseNot() };
+    }
+  }
+  function parseNot() {
+    if (peek()?.type === 'NOT') { next(); return { op: 'not', arg: parseNot() }; }
+    return parsePrimary();
+  }
+  function parsePrimary() {
+    const t = next();
+    if (!t) throw new Error('The search ends too early');
+    if (t.type === '(') {
+      const e = parseOr();
+      if (next()?.type !== ')') throw new Error('Missing )');
+      return e;
+    }
+    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase };
+    throw new Error(`Unexpected ${t.type}`);
+  }
+
+  if (!tokens.length) return null;
+  const tree = parseOr();
+  if (pos < tokens.length) throw new Error(`Unexpected ${tokens[pos].type}`);
+  return tree;
+}
+
+// Lowercase and strip accents so "Café" matches "cafe".
+export function fold(s) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+export function words(s) {
+  return fold(s).match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) ?? [];
+}
+
+function wordPattern(w) {
+  const esc = w.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${esc}$`);
+}
+
+function compileTerm(node, fields) {
+  let targets = null;
+  if (node.field !== null) {
+    const want = fold(node.field).replace(/_/g, ' ');
+    targets = fields.filter((f) => fold(f) === want);
+    if (!targets.length) targets = fields.filter((f) => fold(f).startsWith(want));
+    if (!targets.length) throw new Error(`No field called ${node.field}`);
+  }
+  const text = node.text.trim();
+  if (targets && text === '') return (rec) => targets.every((f) => !(rec.values[f] ?? '').trim());
+  if (targets && text === '*') return (rec) => targets.some((f) => (rec.values[f] ?? '').trim());
+  // Same word split as the record text, but keeping the * and ? wildcards.
+  const pats = (fold(text).match(/[\p{L}\p{N}*?]+(?:['’][\p{L}\p{N}*?]+)*/gu) ?? []).map(wordPattern);
+  if (!pats.length) return () => false;
+  return (rec) => {
+    for (const f of targets ?? fields) {
+      const ws = words(rec.values[f] ?? '');
+      for (let i = 0; i + pats.length <= ws.length; i++) {
+        if (pats.every((p, k) => p.test(ws[i + k]))) return true;
+      }
+    }
+    return false;
+  };
+}
+
+export function compileQuery(q, fields) {
+  const tree = parseQuery(q);
+  if (!tree) return () => true;
+  const build = (n) => {
+    switch (n.op) {
+      case 'term': return compileTerm(n, fields);
+      case 'not': { const a = build(n.arg); return (r) => !a(r); }
+      case 'and': { const a = build(n.left), b = build(n.right); return (r) => a(r) && b(r); }
+      case 'or': { const a = build(n.left), b = build(n.right); return (r) => a(r) || b(r); }
+    }
+  };
+  return build(tree);
+}
+
+export function search(db, q) {
+  const match = compileQuery(q, db.fields.map((f) => f.name));
+  return db.records.filter(match);
+}
+
+// Words to highlight for a query (ignores NOT terms).
+export function highlightTerms(q) {
+  try {
+    const out = [];
+    const walk = (n, neg) => {
+      if (!n) return;
+      if (n.op === 'term' && !neg) out.push(...words(n.text.replace(/\*/g, '')));
+      if (n.op === 'not') walk(n.arg, !neg);
+      if (n.left) { walk(n.left, neg); walk(n.right, neg); }
+    };
+    walk(parseQuery(q), false);
+    return out;
+  } catch {
+    return [];
+  }
+}

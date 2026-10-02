@@ -1,0 +1,12 @@
+{
+  "name": "notebook-ii",
+  "version": "0.1.0",
+  "description": "A web recreation of Notebook II, the DOS text database from Pro/Tem Software",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "npx --yes http-server -c-1 -p 8080 ."
+  },
+  "license": "MIT"
+}
