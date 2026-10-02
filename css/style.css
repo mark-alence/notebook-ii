@@ -101,7 +101,7 @@ html, body {
   background: var(--gray);
   color: var(--black);
 }
-#findbar[hidden] { display: none; }
+[hidden] { display: none !important; }
 #findbar label { font-weight: bold; }
 #findbar input { flex: 1 1 20ch; background: var(--black); color: var(--bright); }
 #findbar .hint { color: var(--navy); }
