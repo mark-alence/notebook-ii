@@ -12,6 +12,8 @@ npm start            # or: python3 -m http.server 8080
 
 then go to http://localhost:8080. Opening `index.html` straight from disk won't work, because browsers block the JavaScript modules on `file://` pages.
 
+To put it online, turn on GitHub Pages once (Settings > Pages > Source: **GitHub Actions**). After that, `.github/workflows/pages.yml` runs the tests and publishes the app on every push to `main`. Pages for a private repository needs a paid GitHub plan, and the site itself is public. Databases stay in each visitor's own browser and are never uploaded.
+
 Databases are saved in the browser as you work. **F10 Export > Notebook file** makes a `.nb2.json` copy for backups or for moving to another computer.
 
 ## Keys
