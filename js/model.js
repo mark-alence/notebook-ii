@@ -96,6 +96,40 @@ export function moveField(db, name, delta) {
   touch(db);
 }
 
+// Copying from the previous record (F5 in the editor) fills in the fields that
+// describe the source, such as Author, Title and Year, and leaves the note
+// itself alone. Each field can be switched on or off in Fields (F8); until it
+// is, fields whose names sound like notes, pages or keywords are left out.
+const NOT_COPIED = /note|comment|text|abstract|summar|quot|excerpt|remark|page|keyword|tag|subject|categor|topic/i;
+
+export function copiesFromPrevious(field) {
+  return field.copy ?? !NOT_COPIED.test(field.name);
+}
+
+export function setFieldCopy(db, name, copy) {
+  const field = db.fields.find((f) => f.name === name);
+  if (!field) throw new Error(`No field called ${name}`);
+  field.copy = !!copy;
+  touch(db);
+}
+
+// values: the record being edited, { field: text }. Copies from the record
+// `from` into the copied fields that are still blank, or into the one field
+// `only` whatever it holds. Returns the names of the fields filled in.
+export function carryOver(db, from, values, only = null) {
+  const copied = [];
+  if (!from) return copied;
+  const targets = only ? db.fields.filter((f) => f.name === only) : db.fields.filter(copiesFromPrevious);
+  for (const { name } of targets) {
+    const v = from.values[name] ?? '';
+    if (!v.trim() || v === values[name]) continue;
+    if (!only && (values[name] ?? '').trim()) continue;
+    values[name] = v;
+    copied.push(name);
+  }
+  return copied;
+}
+
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 // keys: [{ field, descending }]. Empty values always sort last.
