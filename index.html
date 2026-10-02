@@ -51,12 +51,15 @@
         <tr><td><code>(a OR b) c</code></td><td>grouping</td></tr>
         <tr><td><code>notes:</code> &nbsp; <code>notes:*</code></td><td>Notes is blank &nbsp;/&nbsp; Notes has something</td></tr>
         <tr><td><code>"date of birth":1850</code></td><td>quote field names that have spaces</td></tr>
+        <tr><td><code>title=the</code> &nbsp; <code>-title=the</code></td><td>Title begins / doesn't begin with "the"</td></tr>
+        <tr><td><code>year&gt;1980</code> &nbsp; <code>author&lt;=m</code></td><td>the field begins later / the same or earlier in alphabetical or numerical order (also <code>&lt;</code> and <code>&gt;=</code>)</td></tr>
       </table>
       <p>Capitals and accents don't matter. Sorting and printing work on the records found.</p>
 
       <h2>Importing your Notebook II files</h2>
-      <p>Notebook II wrote databases out as ASCII text for other programs, and the import reads those files: delimited text with any field and record delimiters, tagged <code>Field: value</code> text, and DOS characters (code page 437) such as accented letters and box lines. It guesses the layout and shows a preview, and you can change the delimiters before importing.</p>
-      <p>Notebook II's own database files are in an undocumented format. Open one with <em>Read as: Salvage</em> to pull out the text it contains, one piece per record. If you can, export from Notebook II itself to ASCII text first.</p>
+      <p><strong>Database files.</strong> A Notebook II database called NAME is several files. Press <kbd>F9</kbd> and choose <code>NAME.DAT</code>, <code>NAME.DEF</code> and <code>NAME.IDX</code> together (add <code>NAME.MSC</code> and any custom print formats, <code>*.R00</code>, if you have them). Records you marked deleted are left out unless you tick <em>Include records marked deleted</em>, and print formats become print forms. The <code>.DAT</code> file alone also works, but then field names are missing and records you edited in Notebook II show up once for every saved copy.</p>
+      <p><strong>Text files.</strong> The import also reads text written by Notebook II or other programs: delimited text with any field and record delimiters, tagged <code>Field: value</code> text, Notebook II's own import text (<code>%Start:</code>, <code>%Author:…</code>, <code>%End:</code>), and DOS characters (code page 437) such as accented letters and box lines. It guesses the layout and shows a preview, and you can change the delimiters before importing. Anything else can be opened with <em>Read as: Salvage</em>, which pulls out the readable text.</p>
+      <p><strong>Back to DOS.</strong> <kbd>F10</kbd> Export &gt; Notebook II import text writes a file that Notebook II's Utilities &gt; Import reads in Notebook format.</p>
 
       <h2>Where your data is kept</h2>
       <p>Databases are saved in this browser as you work. To move them to another computer, or to keep a backup, use <kbd>F10</kbd> Export &gt; Notebook file, and Import that file elsewhere.</p>

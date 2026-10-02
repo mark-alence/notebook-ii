@@ -75,7 +75,8 @@ export function renameField(db, oldName, newName) {
     delete r.values[oldName];
   }
   for (const form of db.printForms) {
-    form.template = form.template.split(`{${oldName}}`).join(`{${newName}}`);
+    const esc = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    form.template = form.template.replace(new RegExp(`\\{${esc}(:\\d+)?\\}`, 'g'), (_, w) => `{${newName}${w ?? ''}}`);
   }
   touch(db);
 }
@@ -117,6 +118,8 @@ export function sortRecords(records, keys) {
 export function databaseFromImport(name, imported) {
   const db = createDatabase(name, imported.fields.length ? imported.fields : ['Text']);
   for (const values of imported.records) addRecord(db, values);
+  // Print formats that came with a Notebook II database go first.
+  if (imported.printForms?.length) db.printForms.unshift(...imported.printForms);
   return db;
 }
 

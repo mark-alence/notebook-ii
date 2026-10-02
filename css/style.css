@@ -101,7 +101,7 @@ html, body {
   background: var(--gray);
   color: var(--black);
 }
-#findbar[hidden] { display: none; }
+[hidden] { display: none !important; }
 #findbar label { font-weight: bold; }
 #findbar input { flex: 1 1 20ch; background: var(--black); color: var(--bright); }
 #findbar .hint { color: var(--navy); }
@@ -198,4 +198,6 @@ table.browse th:first-child { width: 6ch; }
   .app { display: none; }
   html, body { background: #fff; color: #000; height: auto; }
   #print-area { display: block; margin: 0; font: 11pt/1.3 "Courier New", monospace; white-space: pre-wrap; }
+  #print-area .page { break-after: page; }
+  #print-area .page:last-child { break-after: auto; }
 }
