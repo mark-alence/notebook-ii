@@ -1,4 +1,7 @@
-// The full-screen, keyboard-driven interface, in the style of the DOS original.
+// The full-screen interface, in the style of the DOS original: a title bar, the
+// screen, a status line and a command bar. Every command has a name, a letter
+// key and a place in the command palette (Ctrl+K); the original F-keys still
+// work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
   moveField, sortRecords, carryOver, copiesFromPrevious, setFieldCopy, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
@@ -14,6 +17,8 @@ import { getTheme, setTheme, nextTheme } from './theme.js';
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const CTRL = MAC ? '⌘' : 'Ctrl ';
 
 const state = {
   db: null,
@@ -25,9 +30,11 @@ const state = {
   mode: 'home',
   back: 'browse',
   homeCursor: 0,
-  editId: null,
-  editField: 0, // the editor field that last had the cursor
-  copySource: null, // record F5 copies from in the editor
+  viewId: null, // the record open on the record screen
+  viewSnapshot: null, // its values when it was opened, for Revert
+  viewIsNew: false,
+  editField: 0, // the field that last had the cursor on the record screen
+  copySource: null, // the record "Copy previous" copies from
   formIndex: 0,
   imp: null,
   message: '',
@@ -55,10 +62,14 @@ function current() {
   return state.list?.[state.cursor] ?? null;
 }
 
+function viewed() {
+  return state.db?.records.find((r) => r.id === state.viewId) ?? null;
+}
+
 function persist() {
   if (!state.db || !state.key) return;
   if (!saveDb(state.key, state.db)) {
-    say('Could not save in this browser (storage may be full). Use F10 Export > Notebook file to keep a copy.', true);
+    say('Could not save in this browser (storage may be full). Use Export > Notebook file to keep a copy.', true);
   }
 }
 
@@ -75,9 +86,17 @@ function openDb(db, key = newKey()) {
   state.sortKeys = [];
   state.cursor = 0;
   state.formIndex = 0;
+  $('#search').value = '';
   refreshList();
   persist();
   go('browse');
+}
+
+function closeDb() {
+  leaveRecord();
+  persist();
+  state.db = null; state.key = null; state.list = null; state.query = '';
+  go('home');
 }
 
 function say(msg, isError = false) {
@@ -111,6 +130,7 @@ function readDelim(s) {
 // ---------- navigation ----------
 
 function go(mode) {
+  if (state.mode === 'view' && mode !== 'view') leaveRecord();
   if (mode !== state.mode && ['browse', 'view'].includes(state.mode)) state.back = state.mode;
   state.mode = mode;
   state.message = '';
@@ -118,25 +138,70 @@ function go(mode) {
 }
 
 function goBack() {
-  go(state.db ? (state.back === 'view' && current() ? 'view' : 'browse') : 'home');
+  go(state.db ? 'browse' : 'home');
+}
+
+// ---------- commands ----------
+//
+// key: the letter (or key name) that runs it; fkey: the original F-key;
+// where: the screens it belongs to; bar: shown on the command bar there.
+
+const COMMANDS = [
+  { id: 'newdb', label: 'New database', key: 'n', where: ['home'], bar: true, run: () => newDatabase() },
+  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openDb(databaseFromImport(SAMPLE.name, SAMPLE)) },
+  { id: 'open', label: 'Open selected database', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
+  { id: 'deldb', label: 'Delete selected database', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
+
+  { id: 'back', label: 'Back to the list', key: 'Escape', where: ['view'], bar: true, run: () => go('browse') },
+  { id: 'prev', label: 'Previous record', key: 'PageUp', where: ['view'], bar: true, run: () => moveRecord(-1) },
+  { id: 'next', label: 'Next record', key: 'PageDown', where: ['view'], bar: true, run: () => moveRecord(1) },
+  { id: 'new', label: 'New note', key: 'n', fkey: 'F3', where: ['browse', 'view'], bar: true, run: () => newRecord() },
+  { id: 'edit', label: 'Edit record', key: 'e', fkey: 'F2', where: ['browse', 'view'], run: () => editRecord() },
+  { id: 'copyprev', label: 'Copy source from previous', key: 'Ctrl+d', fkey: 'F5', where: ['view'], bar: true, run: () => copyFromPrevious(false) },
+  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', fkey: 'F6', where: ['view'], run: () => copyFromPrevious(true) },
+  { id: 'revert', label: 'Revert changes to this record', where: ['view'], bar: true, run: () => revertRecord() },
+  { id: 'find', label: 'Find', key: '/', fkey: 'F4', where: ['browse', 'view'], bar: true, run: () => focusSearch() },
+  { id: 'all', label: 'Show all records', fkey: 'F5', where: ['browse'], run: () => clearSearch() },
+  { id: 'sort', label: 'Sort…', key: 's', fkey: 'F6', where: ['browse'], bar: true, run: () => go('sort') },
+  { id: 'print', label: 'Print', key: 'p', fkey: 'F7', where: ['browse', 'view'], bar: true, run: () => go('print') },
+  { id: 'fields', label: 'Fields', fkey: 'F8', where: ['browse', 'view'], bar: true, run: () => go('fields') },
+  { id: 'import', label: 'Import', key: 'i', fkey: 'F9', where: ['home', 'browse', 'view'], bar: true, run: () => pickFiles(startImport) },
+  { id: 'export', label: 'Export', key: 'x', fkey: 'F10', where: ['browse', 'view'], bar: true, run: () => go('export') },
+  { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
+  { id: 'close', label: 'Close database', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
+  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'print', 'import', 'export', 'help'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
+  { id: 'help', label: 'Help', key: '?', fkey: 'F1', where: ['home', 'browse', 'view', 'sort', 'fields', 'print', 'import', 'export'], bar: true, run: () => go('help') },
+  { id: 'theme', label: 'Light or dark screen', key: 'Alt+t', where: ['*'], run: () => cycleTheme() },
+  { id: 'palette', label: 'Commands', key: 'Ctrl+k', where: ['*'], bar: true, run: () => openPalette() },
+];
+
+const KEY_NAMES = { Escape: 'Esc', Delete: 'Del', PageUp: 'PgUp', PageDown: 'PgDn', Enter: 'Enter' };
+const MOD_NAMES = MAC ? { Ctrl: '⌘', Shift: '⇧', Alt: '⌥' } : { Ctrl: 'Ctrl+', Shift: 'Shift+', Alt: 'Alt+' };
+function keyLabel(key) {
+  if (!key) return '';
+  const parts = key.split('+');
+  const k = parts.pop() || '+';
+  return parts.map((m) => MOD_NAMES[m]).join('') + (KEY_NAMES[k] ?? (k.length === 1 ? k.toUpperCase() : k));
+}
+
+function available(c) {
+  if (!(c.where.includes('*') || c.where.includes(state.mode))) return false;
+  if (['browse', 'view'].includes(state.mode) && !state.db) return false;
+  return true;
+}
+
+function runCommand(id) {
+  const c = COMMANDS.find((x) => x.id === id);
+  if (c && available(c)) c.run();
 }
 
 // ---------- rendering ----------
 
-const KEYSETS = {
-  home: [['N', 'New'], ['F9', 'Import'], ['O', 'Open file'], ['S', 'Sample'], ['Del', 'Delete'], ['F1', 'Help']],
-  browse: [['F1', 'Help'], ['F2', 'Edit'], ['F3', 'Add'], ['F4', 'Find'], ['F5', 'All'], ['F6', 'Sort'], ['F7', 'Print'], ['F8', 'Fields'], ['F9', 'Import'], ['F10', 'Export'], ['Del', 'Delete'], ['Esc', 'Close']],
-  edit: [['F5', 'Copy previous'], ['F6', 'Copy field'], ['F10', 'Save'], ['Esc', 'Cancel']],
-  dialog: [['Esc', 'Back'], ['F1', 'Help']],
-};
-
 function render() {
   document.body.dataset.mode = state.mode;
   renderTitle();
-  const views = { home: renderHome, browse: renderBrowse, view: renderView, edit: renderEdit, find: renderBrowse, sort: renderSort, fields: renderFields, print: renderPrint, import: renderImport, export: renderExport, help: renderHelp };
+  const views = { home: renderHome, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, print: renderPrint, import: renderImport, export: renderExport, help: renderHelp };
   views[state.mode]();
-  if (state.mode === 'find') renderFind();
-  else $('#findbar').hidden = true;
   renderKeys();
   renderStatus();
 }
@@ -147,19 +212,31 @@ function renderTitle() {
   if (db && state.list) {
     const n = state.list.length;
     const total = db.records.length;
-    right = state.query ? `Found ${n} of ${total}` : `${total} record${total === 1 ? '' : 's'}`;
-    if (['browse', 'view'].includes(state.mode) && n) right = `Rec ${state.cursor + 1}/${n} · ${right}`;
+    right = state.query ? `${n} of ${total} found` : `${total} record${total === 1 ? '' : 's'}`;
+    if (state.mode === 'view' && n) {
+      const i = state.list.findIndex((r) => r.id === state.viewId);
+      if (i >= 0) right = `${i + 1} of ${n}${state.query ? ' found' : ''}`;
+    }
   }
-  const theme = getTheme();
-  $('#title').innerHTML = `<span class="brand">NOTEBOOK II</span><span class="dbname">${esc(db?.name ?? '')}</span><span class="count">${esc(right)}</span>`
-    + `<button type="button" class="theme" id="themebtn" title="Light or dark screen (Alt+T)">${{ auto: 'Auto', light: 'Light', dark: 'Dark' }[theme]}</button>`;
+  $('#title .dbname').textContent = db?.name ?? '';
+  $('#title .count').textContent = right;
+  const search = $('#search');
+  search.hidden = !db;
+  search.placeholder = `Find (/)   e.g. smith  author:smith  year>1980`;
+  $('#themebtn').textContent = { auto: 'Auto', light: 'Light', dark: 'Dark' }[getTheme()];
 }
 
 function renderKeys() {
-  const set = state.mode === 'home' ? 'home' : ['browse', 'view', 'find'].includes(state.mode) ? 'browse' : state.mode === 'edit' ? 'edit' : 'dialog';
-  let keys = KEYSETS[set];
-  if (state.mode === 'view') keys = [...keys.slice(0, -1), ['PgUp', 'Prev'], ['PgDn', 'Next'], ['Esc', 'List']];
-  $('#keys').innerHTML = keys.map(([k, label]) => `<button type="button" data-key="${k}"><kbd>${k}</kbd>${label}</button>`).join('');
+  const shown = COMMANDS.filter((c) => c.bar && available(c) && !(c.id === 'revert' && !recordChanged()));
+  $('#keys').innerHTML = shown.map((c) => {
+    const k = keyLabel(c.key);
+    return `<button type="button" data-cmd="${c.id}" title="${esc(c.label)}${k ? ` (${esc(k)})` : ''}"><span>${esc(barLabel(c))}</span>${k ? `<kbd>${esc(k)}</kbd>` : ''}</button>`;
+  }).join('');
+}
+
+const SHORT = { newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort' };
+function barLabel(c) {
+  return SHORT[c.id] ?? c.label;
 }
 
 function renderStatus() {
@@ -187,15 +264,13 @@ function renderHome() {
     <div class="panel home">
       <h2>Databases</h2>
       ${saved.length ? `<table class="grid"><thead><tr><th>Name</th><th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table>
-        <p class="hint">↑ ↓ to choose, Enter to open.</p>`
-      : '<p>No databases yet. Press <kbd>N</kbd> to make one, <kbd>F9</kbd> to import a file from Notebook II or another program, or <kbd>S</kbd> to try a sample.</p>'}
+        <p class="hint">Click a database to open it, or use ↑ ↓ and Enter.</p>`
+      : '<p>No databases yet. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import a file from Notebook II or another program, or <kbd>S</kbd> to try a sample.</p>'}
+      <p class="hint">Every command is on the bar at the bottom, and <kbd>${esc(keyLabel('Ctrl+k'))}</kbd> lists them all.</p>
       <h2>Bringing in your old files</h2>
-      <p>Press <kbd>F9</kbd> and choose a Notebook II database's files together: <code>NAME.DAT</code>, <code>NAME.DEF</code> and <code>NAME.IDX</code> (and <code>NAME.MSC</code> and print formats, <code>*.R00</code>, if you have them). Import also reads text that Notebook II or other programs wrote: delimited text (tab, comma, <code>|</code>, <code>~</code> or any character you name), tagged text (<code>Author: …</code> or <code>%Author:…</code> lines), and DOS characters (code page 437). Any other file can be opened with <em>Salvage</em>, which pulls out the readable text.</p>
+      <p>Press <kbd>I</kbd> (Import) and choose a Notebook II database's files together: <code>NAME.DAT</code>, <code>NAME.DEF</code> and <code>NAME.IDX</code> (and <code>NAME.MSC</code> and print formats, <code>*.R00</code>, if you have them). Import also reads text that Notebook II or other programs wrote: delimited text (tab, comma, <code>|</code>, <code>~</code> or any character you name), tagged text (<code>Author: …</code> or <code>%Author:…</code> lines), and DOS characters (code page 437). Any other file can be opened with <em>Salvage</em>, which pulls out the readable text.</p>
     </div>`;
-  $$('#main tbody tr').forEach((tr) => {
-    tr.addEventListener('click', () => { state.homeCursor = +tr.dataset.i; render(); });
-    tr.addEventListener('dblclick', () => openSaved(+tr.dataset.i));
-  });
+  $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
 }
 
 function openSaved(i) {
@@ -206,6 +281,12 @@ function openSaved(i) {
   } catch (e) {
     say(e.message, true);
   }
+}
+
+function deleteSavedDb() {
+  const d = listSaved()[state.homeCursor];
+  if (!d) return;
+  if (confirm(`Delete the database "${d.name}" from this browser? Export it first if you want a copy.`)) { removeDb(d.key); render(); }
 }
 
 const PAGE = 200;
@@ -220,14 +301,29 @@ function renderBrowse() {
     return `<tr data-i="${i}" class="${i === state.cursor ? 'cur' : ''}"><td class="num">${i + 1}</td>${cols.map((c) => `<td>${esc(preview(r.values[c]))}</td>`).join('')}</tr>`;
   }).join('');
   const more = state.list.length > PAGE ? `<p class="hint">Showing ${start + 1}–${start + slice.length} of ${state.list.length}. PgUp/PgDn moves a page.</p>` : '';
+  const sortMark = (c) => {
+    const k = state.sortKeys[0];
+    return k?.field === c ? (k.descending ? ' ▼' : ' ▲') : '';
+  };
   $('#main').innerHTML = state.list.length
-    ? `<table class="grid browse"><thead><tr><th class="num">#</th>${cols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>${more}`
-    : `<div class="panel"><p>${db.records.length ? 'No records match. Press <kbd>F5</kbd> to show all records or <kbd>F4</kbd> to search again.' : 'This database is empty. Press <kbd>F3</kbd> to add a record or <kbd>F9</kbd> to import some.'}</p></div>`;
-  $$('#main tbody tr').forEach((tr) => {
-    tr.addEventListener('click', () => { state.cursor = +tr.dataset.i; render(); });
-    tr.addEventListener('dblclick', () => { state.cursor = +tr.dataset.i; go('view'); });
-  });
+    ? `<table class="grid browse"><thead><tr><th class="num">#</th>${cols.map((c) => `<th><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>${more}`
+    : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This database is empty. Press <kbd>N</kbd> for a new note or <kbd>I</kbd> to import some.'}</p></div>`;
+  $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => { state.cursor = +tr.dataset.i; openRecord(); }));
+  $$('#main [data-sort]').forEach((b) => b.addEventListener('click', () => sortByColumn(b.dataset.sort)));
   $('#main tr.cur')?.scrollIntoView({ block: 'nearest' });
+}
+
+// A column heading sorts by that field; clicking again reverses, then a third
+// click goes back to the order the records were entered.
+function sortByColumn(field) {
+  const k = state.sortKeys[0];
+  if (k?.field !== field) state.sortKeys = [{ field, descending: false }];
+  else if (!k.descending) state.sortKeys = [{ field, descending: true }];
+  else state.sortKeys = [];
+  const id = current()?.id;
+  refreshList();
+  state.cursor = Math.max(0, state.list.findIndex((r) => r.id === id));
+  render();
 }
 
 function highlight(text, terms) {
@@ -237,58 +333,129 @@ function highlight(text, terms) {
   return safe.replace(new RegExp(`(^|[^\\p{L}\\p{N}])(${alts})`, 'giu'), '$1<mark>$2</mark>');
 }
 
-function renderView() {
-  const rec = current();
-  if (!rec) { go('browse'); return; }
-  const terms = highlightTerms(state.query);
-  $('#main').innerHTML = `<div class="record">${state.db.fields.map(({ name }) => {
-    const v = rec.values[name] ?? '';
-    return `<div class="field"><div class="fname">${esc(name)}</div><div class="fval ${v.trim() ? '' : 'empty'}">${v.trim() ? highlight(v, terms) : '(blank)'}</div></div>`;
-  }).join('')}</div>`;
+// ---------- the record screen: read and edit in one place ----------
+
+function openRecord(rec = current(), { isNew = false, focus = false } = {}) {
+  if (!rec) return;
+  state.viewId = rec.id;
+  state.viewSnapshot = { ...rec.values };
+  state.viewIsNew = isNew;
+  if (!isNew) state.copySource = previousInList(rec);
+  go('view');
+  if (focus) focusField(isNew ? 0 : state.editField);
 }
 
-function renderEdit() {
-  const rec = state.editId === null ? null : state.db.records.find((r) => r.id === state.editId);
+function previousInList(rec) {
+  const order = state.list?.some((r) => r.id === rec.id) ? state.list : state.db.records;
+  const i = order.findIndex((r) => r.id === rec.id);
+  return i > 0 ? order[i - 1] : null;
+}
+
+function newRecord() {
+  // "Previous" for a new note is the record you were on.
+  const from = state.mode === 'view' ? viewed() : current() ?? state.db.records[state.db.records.length - 1] ?? null;
+  leaveRecord();
+  const rec = addRecord(state.db, {});
+  state.copySource = from;
+  openRecord(rec, { isNew: true, focus: true });
+  say(from ? `New note. ${keyLabel('Ctrl+d')} fills in ${copyList()} from the previous one.` : 'New note.');
+}
+
+function editRecord() {
+  if (state.mode === 'browse') openRecord(current(), { focus: true });
+  else focusField(state.editField);
+}
+
+function focusField(i) {
+  const areas = $$('#recordform textarea');
+  (areas[i] ?? areas[0])?.focus();
+}
+
+function recordChanged() {
+  const rec = viewed();
+  return !!(rec && state.viewSnapshot && state.db.fields.some(({ name }) => (rec.values[name] ?? '') !== (state.viewSnapshot[name] ?? '')));
+}
+
+// Leaving the record screen: a new note left blank is dropped, and the list is
+// brought up to date (the record may no longer match the search).
+function leaveRecord() {
+  const rec = viewed();
+  state.viewId = null;
+  if (!rec) return;
+  for (const { name } of state.db.fields) rec.values[name] = (rec.values[name] ?? '').replace(/\s+$/, '');
+  if (state.viewIsNew && !Object.values(rec.values).some((v) => v.trim())) deleteRecords(state.db, [rec.id]);
+  persist();
+  refreshList();
+  const i = state.list.findIndex((r) => r.id === rec.id);
+  if (i >= 0) state.cursor = i;
+}
+
+function moveRecord(delta) {
+  const rec = viewed();
+  leaveRecord();
+  const list = state.list;
+  let i = list.findIndex((r) => r.id === rec?.id);
+  if (i < 0) i = state.cursor - (delta > 0 ? 1 : 0);
+  const j = Math.max(0, Math.min(list.length - 1, i + delta));
+  if (!list[j]) return go('browse');
+  state.cursor = j;
+  openRecord(list[j]);
+}
+
+function renderView() {
+  const rec = viewed();
+  if (!rec) { go('browse'); return; }
+  const terms = highlightTerms(state.query);
   $('#main').innerHTML = `
-    <form class="record edit" id="editform">
-      <h2>${rec ? 'Edit record' : 'New record'}</h2>
+    <form class="record" id="recordform" autocomplete="off">
       ${state.db.fields.map(({ name }, i) => `
         <label class="field"><span class="fname">${esc(name)}</span>
-          <textarea name="f${i}" rows="1" spellcheck="true">${esc(rec?.values[name] ?? '')}</textarea></label>`).join('')}
-      <p class="hint">Fields can be any length. <kbd>F5</kbd> fills in ${esc(copyList())} from ${state.copySource ? 'the previous record' : 'the previous record (there is none yet)'}; <kbd>F6</kbd> copies just the field you are in. <kbd>F10</kbd> or <kbd>Ctrl</kbd>+<kbd>S</kbd> saves, <kbd>Esc</kbd> cancels.</p>
+          <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
+      <p class="hint">Click a field to change it; changes are saved as you type. <kbd>Esc</kbd> leaves a field, then goes back to the list. <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies ${esc(copyList())} from ${state.copySource ? 'the previous record' : 'the previous record (there is none here)'} into blank fields, <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> just the field you are in.</p>
     </form>`;
-  const grow = (t) => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px`; };
-  state.dirty = false;
-  $$('#editform textarea').forEach((t, i) => {
-    grow(t);
-    t.addEventListener('input', () => { grow(t); state.dirty = true; });
+  $$('#recordform textarea').forEach((t, i) => {
+    growField(t);
+    t.addEventListener('input', () => {
+      growField(t);
+      t.parentElement.querySelector('.fmark')?.remove();
+      const name = state.db.fields[i].name;
+      const wasChanged = recordChanged();
+      rec.values[name] = t.value;
+      state.db.modified = new Date().toISOString();
+      persistSoon();
+      if (wasChanged !== recordChanged()) renderKeys();
+    });
     t.addEventListener('focus', () => { state.editField = i; });
   });
-  state.editField = 0;
-  $('#editform textarea')?.focus();
+  $('#recordform').addEventListener('submit', (e) => e.preventDefault());
+}
+
+// Fields grow to fit their text, and fit again when the window changes width.
+function growField(t) {
+  t.style.height = 'auto';
+  t.style.height = `${t.scrollHeight + 2}px`;
+}
+window.addEventListener('resize', () => $$('#recordform textarea').forEach(growField));
+
+function revertRecord() {
+  const rec = viewed();
+  if (!rec || !recordChanged()) return;
+  Object.assign(rec.values, state.viewSnapshot);
+  persist();
+  render();
+  say('Changes to this record undone.');
 }
 
 function copyList() {
   const names = state.db.fields.filter(copiesFromPrevious).map((f) => f.name);
-  if (!names.length) return 'no fields (choose them in Fields, F8)';
+  if (!names.length) return 'no fields (choose them in Fields)';
   return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-
-// The record F5 and F6 copy from: for a new record, the one you were on when
-// you pressed F3 (after saving, that is the record just saved); when editing,
-// the record before it in the list.
-function previousRecord() {
-  const { db, list } = state;
-  if (state.editId === null) return current() ?? db.records[db.records.length - 1] ?? null;
-  const order = list?.some((r) => r.id === state.editId) ? list : db.records;
-  const i = order.findIndex((r) => r.id === state.editId);
-  return i > 0 ? order[i - 1] : null;
 }
 
 function copyFromPrevious(onlyCurrentField) {
   const from = state.copySource;
   if (!from) return say('There is no previous record to copy from.', true);
-  const areas = $$('#editform textarea');
+  const areas = $$('#recordform textarea');
   const values = {};
   state.db.fields.forEach(({ name }, i) => { values[name] = areas[i].value; });
   const field = state.db.fields[state.editField];
@@ -298,52 +465,71 @@ function copyFromPrevious(onlyCurrentField) {
     areas[i].value = values[name];
     areas[i].dispatchEvent(new Event('input'));
   });
-  areas[state.editField]?.focus();
+  const firstBlank = areas.findIndex((a) => !a.value.trim());
+  areas[onlyCurrentField || firstBlank < 0 ? state.editField : firstBlank]?.focus();
   if (copied.length) return say(`Copied ${copied.join(', ')} from the previous record.`);
   if (onlyCurrentField) return say(`The previous record's ${field?.name ?? 'field'} is blank or the same.`);
   say('Nothing to copy: those fields are already filled in or blank in the previous record.');
 }
 
-function saveEdit() {
-  const values = {};
-  state.db.fields.forEach(({ name }, i) => { values[name] = $(`#editform [name=f${i}]`).value.replace(/\s+$/, ''); });
-  const rec = state.editId === null ? addRecord(state.db, values) : updateRecord(state.db, state.editId, values);
-  persist();
-  refreshList();
-  const i = state.list.indexOf(rec);
-  if (i >= 0) {
-    state.cursor = i;
-    go('view');
-    say('Saved.');
-  } else {
-    go('browse');
-    say('Saved. The record does not match the current search, so it is not in this list. F5 shows all.');
-  }
+// ---------- search box ----------
+
+function focusSearch() {
+  if (state.mode !== 'browse' && state.mode !== 'view') go('browse');
+  const s = $('#search');
+  s.focus();
+  s.select();
 }
 
-function renderFind() {
-  const bar = $('#findbar');
-  bar.hidden = false;
-  const input = $('#findinput');
-  input.value = state.query;
-  input.focus();
-  input.select();
+function clearSearch() {
+  $('#search').value = '';
+  applySearch('');
 }
 
-function runFind(q) {
+// Runs as you type. A search that is not finished yet ("author:" with an
+// unknown field, an open bracket) keeps the last good result on screen.
+function applySearch(q) {
   q = q.trim();
   try {
     compileQuery(q, fieldNames(state.db));
   } catch (e) {
     say(e.message, true);
-    return;
+    return false;
   }
+  if (q === state.query) return true;
+  if (state.mode === 'view') go('browse');
   state.query = q;
   state.cursor = 0;
   refreshList();
-  go('browse');
-  if (q) say(state.list.length ? `Found ${state.list.length} record${state.list.length === 1 ? '' : 's'}.` : 'No records found.', !state.list.length);
+  state.message = q ? (state.list.length ? `Found ${state.list.length} record${state.list.length === 1 ? '' : 's'}.` : 'No records found.') : '';
+  state.messageIsError = !!q && !state.list.length;
+  render();
+  return true;
 }
+
+let searchTimer = null;
+$('#search').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => applySearch(e.target.value), 150);
+});
+$('#search').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.target.value) clearSearch();
+    else e.target.blur();
+  } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(searchTimer);
+    if (applySearch(e.target.value)) {
+      e.target.blur();
+      if (state.mode !== 'browse') go('browse');
+      if (e.key === 'Enter' && state.list.length === 1) openRecord();
+    }
+  }
+});
+
 
 function fieldOptions(selected, blank) {
   return (blank ? `<option value="">${blank}</option>` : '') +
@@ -378,7 +564,7 @@ function renderFields() {
   $('#main').innerHTML = `
     <div class="panel" id="fields">
       <h2>Fields</h2>
-      <table class="grid"><thead><tr><th class="num">#</th><th>Name</th><th>F5 copies</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
+      <table class="grid"><thead><tr><th class="num">#</th><th>Name</th><th>Copy previous</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
         <tr><td class="num">${i + 1}</td>
           <td><input data-rename="${esc(name)}" value="${esc(name)}" aria-label="Field name"></td>
           <td><label class="check"><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''}> from previous</label></td>
@@ -391,7 +577,7 @@ function renderFields() {
       <h2>Database name</h2>
       <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Database name"></div>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter.</p>
-      <p class="hint">"F5 copies" marks the fields that describe a source, such as Author, Title and Year. While you edit a record, <kbd>F5</kbd> copies those fields from the previous record into the ones still blank, so a new note on the same book needs only the note.</p>
+      <p class="hint">"Copy previous" marks the fields that describe a source, such as Author, Title and Year. On a record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies those fields from the previous record into the ones still blank, so a new note on the same book needs only the note.</p>
     </div>`;
   const done = (fn) => { try { fn(); persist(); refreshList(); render(); } catch (e) { say(e.message, true); } };
   $$('[data-rename]').forEach((inp) => inp.addEventListener('change', () => done(() => renameField(db, inp.dataset.rename, inp.value))));
@@ -640,9 +826,10 @@ function renderExport() {
 
 function renderHelp() {
   $('#main').innerHTML = $('#helptext').innerHTML;
+  $$('#main [data-key-label]').forEach((el) => { el.textContent = keyLabel(el.dataset.keyLabel); });
 }
 
-// ---------- commands ----------
+// ---------- commands that need more than one line ----------
 
 function newDatabase() {
   const name = prompt('Name of the new database:', 'Notes');
@@ -654,15 +841,15 @@ function newDatabase() {
 }
 
 function deleteCurrent() {
-  const rec = current();
+  const rec = state.mode === 'view' ? viewed() : current();
   if (!rec) return;
-  const label = preview(rec.values[state.db.fields[0].name], 50) || `record ${state.cursor + 1}`;
+  const label = preview(rec.values[state.db.fields[0].name], 50) || 'this record';
   if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
+  if (state.mode === 'view') state.viewId = null;
   deleteRecords(state.db, [rec.id]);
   persist();
   refreshList();
-  if (!state.list.length) go('browse');
-  else render();
+  go('browse');
   say('Record deleted.');
 }
 
@@ -672,97 +859,6 @@ function moveCursor(delta) {
   render();
 }
 
-function onKey(key, e) {
-  const m = state.mode;
-  const typing = e && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-
-  if (key === 'F1') return go(m === 'help' ? (state.db ? 'browse' : 'home') : 'help');
-  if (key === 'Alt+t') return cycleTheme();
-
-  if (m === 'home') {
-    const saved = listSaved();
-    if (typing) return false;
-    if (key === 'ArrowDown') { state.homeCursor = Math.min(saved.length - 1, state.homeCursor + 1); render(); return; }
-    if (key === 'ArrowUp') { state.homeCursor = Math.max(0, state.homeCursor - 1); render(); return; }
-    if (key === 'Enter') return openSaved(state.homeCursor);
-    if (key === 'n' || key === 'N') return newDatabase();
-    if (key === 's' || key === 'S') return openDb(databaseFromImport(SAMPLE.name, SAMPLE));
-    if (key === 'o' || key === 'O' || key === 'F9') return pickFiles(startImport);
-    if (key === 'Delete' && saved[state.homeCursor]) {
-      const d = saved[state.homeCursor];
-      if (confirm(`Delete the database "${d.name}" from this browser? Export it first if you want a copy.`)) { removeDb(d.key); render(); }
-      return;
-    }
-    return false;
-  }
-
-  if (m === 'edit') {
-    if (key === 'F10' || key === 'Ctrl+s') return saveEdit();
-    if (key === 'F5') return copyFromPrevious(false);
-    if (key === 'F6') return copyFromPrevious(true);
-    if (key === 'Escape') { if (!state.dirty || confirm('Leave without saving changes?')) goBack(); return; }
-    return false;
-  }
-
-  if (m === 'find') {
-    if (key === 'Escape') return go('browse');
-    return false;
-  }
-
-  if (key === 'Escape') {
-    if (m === 'view') return go('browse');
-    if (m === 'browse') { state.db = null; state.key = null; state.list = null; return go('home'); }
-    if (m === 'import' && !state.db) return go('home');
-    if (m === 'help' && !state.db) return go('home');
-    return goBack();
-  }
-  if (!state.db) return false;
-
-  const commands = {
-    F2: () => { if (current()) { state.editId = current().id; state.copySource = previousRecord(); go('edit'); } },
-    F3: () => { state.editId = null; state.copySource = previousRecord(); go('edit'); },
-    F4: () => go('find'),
-    F5: () => { state.query = ''; refreshList(); go('browse'); },
-    F6: () => go('sort'),
-    F7: () => go('print'),
-    F8: () => go('fields'),
-    F9: () => pickFiles(startImport),
-    F10: () => go('export'),
-  };
-  if (commands[key]) return commands[key]();
-
-  if (typing) return false;
-  if (m === 'browse' || m === 'view') {
-    const page = m === 'view' ? 1 : 15;
-    const nav = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
-    if (m === 'view') Object.assign(nav, { ArrowRight: 1, ArrowLeft: -1 });
-    if (key in nav) return moveCursor(nav[key]);
-    if (key === 'Home') return moveCursor(-Infinity);
-    if (key === 'End') return moveCursor(Infinity);
-    if (key === 'Enter' && m === 'browse' && current()) return go('view');
-    if (key === 'Delete') return deleteCurrent();
-    if (key === '/') return go('find');
-  }
-  return false;
-}
-
-document.addEventListener('keydown', (e) => {
-  let key = e.key;
-  if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === 's') key = 'Ctrl+s';
-  else if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyT') key = 'Alt+t';
-  else if (e.ctrlKey || e.metaKey || e.altKey) return;
-  // Single letters act as commands only on the database list.
-  if (key.length === 1 && state.mode !== 'home' && key !== '/') return;
-  if (onKey(key, e) !== false) e.preventDefault();
-});
-
-$('#keys').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-key]');
-  if (!b) return;
-  const k = b.dataset.key;
-  onKey({ Del: 'Delete', Esc: 'Escape', PgUp: 'PageUp', PgDn: 'PageDown' }[k] ?? k, null);
-});
-
 function cycleTheme() {
   const t = nextTheme(getTheme());
   setTheme(t);
@@ -770,8 +866,158 @@ function cycleTheme() {
   say({ auto: 'Screen follows your computer\'s light or dark setting.', light: 'Light screen.', dark: 'Dark screen.' }[t]);
 }
 
-$('#title').addEventListener('click', (e) => { if (e.target.closest('#themebtn')) cycleTheme(); });
+// ---------- command palette ----------
+//
+// Ctrl+K (⌘K on a Mac): type part of a command's name, or a field's name to
+// sort by it or search in it.
 
-$('#findbar').addEventListener('submit', (e) => { e.preventDefault(); runFind($('#findinput').value); });
+const palette = { open: false, items: [], sel: 0 };
+
+function paletteItems() {
+  const items = COMMANDS.filter((c) => c.id !== 'palette' && c.id !== 'open' && available(c) && !(c.id === 'revert' && !recordChanged()))
+    .map((c) => ({ label: c.label, hint: keyLabel(c.key) || c.fkey || '', run: c.run }));
+  if (state.db && ['browse', 'view'].includes(state.mode)) {
+    for (const { name } of state.db.fields) {
+      items.push({ label: `Sort by ${name}`, hint: '', run: () => { if (state.mode === 'view') go('browse'); state.sortKeys = []; sortByColumn(name); } });
+      items.push({ label: `Find in ${name}…`, hint: '', run: () => { const s = $('#search'); focusSearch(); s.value = `${/\s/.test(name) ? `"${name}"` : name}:`; } });
+    }
+  }
+  return items;
+}
+
+function openPalette() {
+  palette.open = true;
+  palette.sel = 0;
+  $('#palette').hidden = false;
+  const input = $('#pinput');
+  input.value = '';
+  renderPalette();
+  input.focus();
+}
+
+function closePalette() {
+  palette.open = false;
+  $('#palette').hidden = true;
+}
+
+function renderPalette() {
+  const words = $('#pinput').value.toLowerCase().split(/\s+/).filter(Boolean);
+  // Names that start with what was typed come first, then word starts, then the rest.
+  const rank = (label) => {
+    const l = label.toLowerCase();
+    if (!words.length || l.startsWith(words[0])) return 0;
+    return words.every((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(l)) ? 1 : 2;
+  };
+  palette.items = paletteItems()
+    .filter((it) => words.every((w) => it.label.toLowerCase().includes(w)))
+    .map((it, i) => ({ it, i, r: rank(it.label) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.it);
+  palette.sel = Math.min(palette.sel, Math.max(0, palette.items.length - 1));
+  $('#plist').innerHTML = palette.items.length
+    ? palette.items.map((it, i) => `<li role="option" data-i="${i}" class="${i === palette.sel ? 'cur' : ''}" aria-selected="${i === palette.sel}"><span>${esc(it.label)}</span>${it.hint ? `<kbd>${esc(it.hint)}</kbd>` : ''}</li>`).join('')
+    : '<li class="none">No command matches.</li>';
+  $('#plist li.cur')?.scrollIntoView({ block: 'nearest' });
+}
+
+function runPaletteItem(i) {
+  const it = palette.items[i];
+  closePalette();
+  it?.run();
+}
+
+$('#pinput').addEventListener('input', () => { palette.sel = 0; renderPalette(); });
+$('#pinput').addEventListener('keydown', (e) => {
+  const n = palette.items.length;
+  if (e.key === 'ArrowDown') palette.sel = (palette.sel + 1) % Math.max(n, 1);
+  else if (e.key === 'ArrowUp') palette.sel = (palette.sel - 1 + n) % Math.max(n, 1);
+  else if (e.key === 'Enter') { e.preventDefault(); return runPaletteItem(palette.sel); }
+  else if (e.key === 'Escape') { e.preventDefault(); return closePalette(); }
+  else return;
+  e.preventDefault();
+  renderPalette();
+});
+$('#plist').addEventListener('click', (e) => { const li = e.target.closest('[data-i]'); if (li) runPaletteItem(+li.dataset.i); });
+$('#palette').addEventListener('click', (e) => { if (e.target.id === 'palette') closePalette(); });
+
+// ---------- keys ----------
+
+function keyName(e) {
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (e.altKey && !ctrl && /^Key[A-Z]$/.test(e.code)) return `Alt+${e.code.slice(3).toLowerCase()}`;
+  if (ctrl) return `Ctrl+${e.shiftKey ? 'Shift+' : ''}${e.key.toLowerCase()}`;
+  if (e.altKey) return null;
+  return e.key;
+}
+
+function onKey(key, e) {
+  const m = state.mode;
+  const target = e?.target;
+  const inRecordField = target?.closest?.('#recordform');
+  const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+
+  if (key === 'Ctrl+s') { persist(); say('Saved.'); return; }
+
+  // Old F-keys: the command that had it on this screen.
+  if (/^F\d+$/.test(key)) {
+    const c = COMMANDS.find((x) => x.fkey === key && available(x));
+    if (c) return c.run();
+    return key === 'F1' ? go('help') : false;
+  }
+
+  const modified = key.includes('+');
+  if (typing && !modified) {
+    if (inRecordField) {
+      if (key === 'Escape') { target.blur(); say('Esc again goes back to the list.'); return; }
+      if (key === 'PageUp') return moveRecord(-1);
+      if (key === 'PageDown') return moveRecord(1);
+      return false;
+    }
+    if (key === 'Escape') return runCommand('dback');
+    return false;
+  }
+
+  if (m === 'home' && !typing) {
+    const saved = listSaved();
+    if (key === 'ArrowDown') { state.homeCursor = Math.min(saved.length - 1, state.homeCursor + 1); render(); return; }
+    if (key === 'ArrowUp') { state.homeCursor = Math.max(0, state.homeCursor - 1); render(); return; }
+    if (key === 'o' || key === 'O') return runCommand('import');
+  }
+  if (m === 'browse' && !typing) {
+    const nav = { ArrowDown: 1, ArrowUp: -1, PageDown: 15, PageUp: -15 };
+    if (key in nav) return moveCursor(nav[key]);
+    if (key === 'Home') return moveCursor(-Infinity);
+    if (key === 'End') return moveCursor(Infinity);
+    if (key === 'Enter') return openRecord();
+    if (key === 'f' || key === 'F') return focusSearch();
+  }
+  if (m === 'view' && !typing) {
+    if (key === 'ArrowRight') return moveRecord(1);
+    if (key === 'ArrowLeft') return moveRecord(-1);
+    if (key === 'Enter') return editRecord();
+    if (key === 'f' || key === 'F') return focusSearch();
+  }
+
+  const k = key.length === 1 ? key.toLowerCase() : key;
+  const c = COMMANDS.find((x) => x.key && (x.key.length === 1 ? x.key.toLowerCase() : x.key) === k && available(x));
+  if (c) return c.run();
+  return false;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (palette.open) return;
+  const key = keyName(e);
+  if (!key) return;
+  // Leave browser and text-editing shortcuts alone (copy, paste, undo …).
+  if (key.startsWith('Ctrl+') && !['Ctrl+s', 'Ctrl+k', 'Ctrl+d', 'Ctrl+Shift+d'].includes(key)) return;
+  if (onKey(key, e) !== false) e.preventDefault();
+});
+
+$('#keys').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cmd]');
+  if (b) runCommand(b.dataset.cmd);
+});
+
+$('#themebtn').addEventListener('click', cycleTheme);
 
 render();

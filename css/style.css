@@ -39,10 +39,6 @@
   --btn-fg: var(--black);
   --btn-border: var(--white);
   --btn-hover: var(--white);
-  --find-bg: var(--gray);
-  --find-fg: var(--black);
-  --find-input-bg: var(--black);
-  --find-hint: var(--navy);
   --mark-bg: var(--yellow);
   --mark-fg: var(--black);
   --paper-bg: var(--white);
@@ -58,7 +54,7 @@
     --row-hover: #e1e1f0; --field-bg: var(--white); --status-bg: #dedeec; --status-fg: var(--black);
     --keys-bg: var(--blue); --key-bg: #dedeec; --key-fg: var(--black); --kbd-bg: var(--blue); --kbd-fg: var(--white);
     --btn-bg: #dedeec; --btn-fg: var(--black); --btn-border: var(--blue); --btn-hover: var(--white);
-    --find-bg: #dedeec; --find-fg: var(--black); --find-input-bg: var(--white); --find-hint: #44445a;
+   
     --paper-bg: var(--white); --paper-fg: var(--black);
     color-scheme: light;
   }
@@ -70,7 +66,6 @@
   --row-hover: #e1e1f0; --field-bg: var(--white); --status-bg: #dedeec; --status-fg: var(--black);
   --keys-bg: var(--blue); --key-bg: #dedeec; --key-fg: var(--black); --kbd-bg: var(--blue); --kbd-fg: var(--white);
   --btn-bg: #dedeec; --btn-fg: var(--black); --btn-border: var(--blue); --btn-hover: var(--white);
-  --find-bg: #dedeec; --find-fg: var(--black); --find-input-bg: var(--white); --find-hint: #44445a;
   --paper-bg: var(--white); --paper-fg: var(--black);
   color-scheme: light;
 }
@@ -100,8 +95,21 @@ html, body {
   white-space: nowrap;
 }
 #title .brand { font-weight: bold; }
-#title .dbname { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; }
-#title .count { text-align: right; }
+#title { align-items: center; }
+#title .dbname { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; padding: 0 1ch; }
+#title .count { margin-left: auto; text-align: right; }
+#search {
+  flex: 1 1 30ch;
+  max-width: 64ch;
+  margin: 1px 0;
+  border: 0;
+  padding: 0 0.5ch;
+  background: var(--field-bg);
+  color: var(--bright);
+}
+#search::placeholder { color: var(--hint); opacity: 0.8; }
+#search:focus { outline: 2px solid var(--focus); outline-offset: 0; }
+#search[hidden] + .count { margin-left: auto; }
 #title .theme { color: inherit; background: transparent; border: 0; padding: 0 0 0 1ch; text-decoration: underline dotted; }
 #title .theme:hover, #title .theme:focus-visible { background: transparent; text-decoration: underline; outline: none; }
 
@@ -132,9 +140,10 @@ html, body {
   flex: 1 0 auto;
   border: 0;
   margin: 0;
-  padding: 0 0.5ch 0 0;
+  padding: 0 0.75ch;
   font: inherit;
   cursor: pointer;
+  white-space: nowrap;
   color: var(--key-fg);
   background: var(--key-bg);
   border-right: 1px solid var(--keys-bg);
@@ -143,23 +152,12 @@ html, body {
   color: var(--kbd-fg);
   background: var(--kbd-bg);
   padding: 0 0.5ch;
-  margin-right: 0.5ch;
+  margin-left: 0.75ch;
+  font-size: 0.85em;
 }
 #keys button:hover, #keys button:focus-visible { background: var(--btn-hover); outline: none; }
 
-#findbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 1ch;
-  padding: 0.25em 1ch;
-  background: var(--find-bg);
-  color: var(--find-fg);
-}
 [hidden] { display: none !important; }
-#findbar label { font-weight: bold; }
-#findbar input { flex: 1 1 20ch; background: var(--find-input-bg); color: var(--bright); }
-#findbar .hint { color: var(--find-hint); }
 
 /* ---------- shared pieces ---------- */
 
@@ -201,7 +199,9 @@ table.grid { border-collapse: collapse; width: 100%; }
 .grid th { text-align: left; color: var(--label); font-weight: normal; border-bottom: 1px solid var(--border); padding: 0 1ch; white-space: nowrap; }
 .grid td { padding: 0 1ch; vertical-align: top; }
 .grid .num { text-align: right; width: 1%; white-space: nowrap; }
-.grid tbody tr { cursor: default; }
+.grid tbody tr { cursor: pointer; }
+.sorthead { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.sorthead:hover:not(:disabled), .sorthead:focus-visible { background: none; text-decoration: underline; }
 .grid tr.cur td { background: var(--sel-bg); color: var(--sel-fg); }
 .grid tbody tr:hover:not(.cur) td { background: var(--row-hover); }
 
@@ -219,7 +219,35 @@ table.browse th:first-child { width: 6ch; }
 .record .fname { color: var(--label); overflow-wrap: anywhere; }
 .record .fval { color: var(--bright); white-space: pre-wrap; overflow-wrap: anywhere; }
 .record .fval.empty { color: var(--hint); opacity: 0.6; }
-.edit textarea { width: 100%; resize: vertical; min-height: 1.6em; line-height: 1.4; }
+/* Fields read like text and become boxes when you point at them or type. */
+.record .fwrap { position: relative; display: block; min-width: 0; }
+.record textarea {
+  display: block;
+  width: 100%;
+  min-height: 1.6em;
+  line-height: 1.4;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  background: transparent;
+  border-color: transparent;
+}
+.record textarea:hover { border-color: var(--border); }
+.record textarea:focus { background: var(--field-bg); border-color: var(--border); }
+.record textarea::placeholder { color: var(--hint); opacity: 0.6; }
+/* Search words are marked by a copy of the text laid over the field. */
+.record .fmark {
+  position: absolute;
+  inset: 0;
+  padding: 0 0.5ch;
+  border: 1px solid transparent;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: transparent;
+  pointer-events: none;
+}
+.record .fmark mark { color: transparent; background: color-mix(in srgb, var(--mark-bg) 55%, transparent); }
 
 /* ---------- print ---------- */
 
@@ -236,6 +264,24 @@ table.browse th:first-child { width: 6ch; }
 #formwidth { width: 7ch; }
 #print-area { display: none; }
 
+/* ---------- command palette, drawn like a DOS dialog box ---------- */
+
+#palette { position: fixed; inset: 0; z-index: 10; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 0; background: color-mix(in srgb, var(--black) 35%, transparent); }
+#palette .pbox {
+  width: min(64ch, 100%);
+  background: var(--bg);
+  color: var(--fg);
+  border: 3px double var(--bright);
+  box-shadow: 1ch 0.7em 0 color-mix(in srgb, var(--black) 60%, transparent);
+  padding: 0.5em 1ch;
+}
+#pinput { width: 100%; margin-bottom: 0.5em; }
+#plist { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }
+#plist li { display: flex; justify-content: space-between; gap: 2ch; padding: 0 1ch; cursor: pointer; }
+#plist li.cur { background: var(--sel-bg); color: var(--sel-fg); }
+#plist li.none { color: var(--hint); cursor: default; }
+#plist kbd { font-size: 0.85em; }
+
 .keys-table td { padding: 0.1em 2ch 0.1em 0; vertical-align: top; }
 .keys-table td:nth-child(odd) { white-space: nowrap; }
 
@@ -244,7 +290,10 @@ table.browse th:first-child { width: 6ch; }
   .print { grid-template-columns: 1fr; }
   .record .field { grid-template-columns: 1fr; }
   table.browse th:nth-child(n+4), table.browse td:nth-child(n+4) { display: none; }
+  #title { flex-wrap: wrap; }
+  #title .dbname { flex: 1 1 0; min-width: 0; }
   #title .count { font-size: 0.85em; }
+  #search { order: 5; flex-basis: 100%; max-width: none; margin-bottom: 2px; }
   #keys button { flex-basis: 25%; }
   .keys-table td { display: block; padding-right: 0; }
 }
