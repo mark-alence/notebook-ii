@@ -235,6 +235,11 @@ table.browse th:first-child { width: 6ch; }
 .record textarea:hover { border-color: var(--border); }
 .record textarea:focus { background: var(--field-bg); border-color: var(--border); }
 .record textarea::placeholder { color: var(--hint); opacity: 0.6; }
+.record .meta { color: var(--hint); font-size: 0.85em; margin-top: 1em; }
+.grid.fields td { vertical-align: middle; }
+.grid.fields input[type=number] { width: 6ch; }
+.layout { display: flex; align-items: flex-start; gap: 1ch; margin: 0.5em 0; }
+.layout input { margin-top: 0.3em; }
 /* Search words are marked by a copy of the text laid over the field. */
 .record .fmark {
   position: absolute;

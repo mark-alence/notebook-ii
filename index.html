@@ -50,14 +50,20 @@
       <p class="hint">The F-keys of the original work too: F2 edit, F3 new, F4 find, F5 show all, F6 sort, F7 print, F8 fields, F9 import, F10 export.</p>
 
       <h2>On a record</h2>
-      <p>A record opens ready to read and to change: click a field and type. Changes are saved as you go. <em>Revert</em> on the command bar puts the record back as it was when you opened it.</p>
+      <p>A record opens ready to read and to change: click a field and type. Fields can be any length; a long note simply scrolls. Changes are saved as you go. <em>Revert</em> on the command bar puts the record back as it was when you opened it.</p>
       <table class="keys-table">
-        <tr><td><kbd data-key-label="Ctrl+d">Ctrl+D</kbd></td><td>Copy from the previous record: fills the source fields (Author, Title, Year …) that are still blank, and leaves the note alone. Choose which fields it copies in Fields.</td></tr>
-        <tr><td><kbd data-key-label="Ctrl+Shift+d">Ctrl+Shift+D</kbd></td><td>Copy just the field the cursor is in from the previous record</td></tr>
-        <tr><td><kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Previous / next record (also ← → when you are not in a field)</td></tr>
+        <tr><td><kbd>F5</kbd> or <kbd data-key-label="Ctrl+d">Ctrl+D</kbd></td><td>Copy previous: fills the fields ticked "Copy with F5" in Fields (say Author, Title and Year) from the previous record, where they are still blank, and leaves the note alone</td></tr>
+        <tr><td><kbd>F6</kbd> or <kbd data-key-label="Ctrl+Shift+d">Ctrl+Shift+D</kbd></td><td>Copy just the field the cursor is in from the previous record</td></tr>
+        <tr><td><kbd>F10</kbd> or <kbd data-key-label="Ctrl+s">Ctrl+S</kbd></td><td>Save now (it saves as you type anyway)</td></tr>
+        <tr><td><kbd>Tab</kbd> <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Next / previous field. Inside a field, ↑ ↓ PgUp PgDn move through the text.</td></tr>
+        <tr><td><kbd data-key-label="Ctrl+Home">Ctrl+Home</kbd> <kbd data-key-label="Ctrl+End">Ctrl+End</kbd></td><td>Start / end of the whole record</td></tr>
+        <tr><td><kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Previous / next record, when you are not in a field (also ← →). In a field, <kbd>Alt</kbd>+<kbd>PgUp</kbd> / <kbd>PgDn</kbd>.</td></tr>
         <tr><td><kbd>E</kbd> or <kbd>Enter</kbd></td><td>Start typing in the record</td></tr>
       </table>
-      <p>"Previous record" means, for a new note, the record you were on when you made it, so after one note you can press <kbd>N</kbd> and then <kbd data-key-label="Ctrl+d">Ctrl+D</kbd> for the next note on the same book. For an existing record it is the one before it in the list.</p>
+      <p>"Previous record" means, for a new note, the record you were on when you made it, so after one note you can press <kbd>N</kbd> and then <kbd>F5</kbd> for the next note from the same source. For an existing record it is the one before it in the list.</p>
+
+      <h2>Fields</h2>
+      <p>A notebook is whatever fields you give it, and every field holds plain text of any length. Dates and numbers are typed as text too: <code>1938-03-17</code> sorts in date order, and so does <code>1938-03-17 (approx.)</code>. In Fields you can rename, add, remove and reorder fields, tick which ones <kbd>F5</kbd> copies, set how many lines each one shows when a record opens, and choose which appear as columns in the list. The list remembers how you last sorted it.</p>
 
       <h2>Light or dark</h2>
       <p>The screen follows your computer's light or dark setting. Click the word at the right of the title bar, or press <kbd>Alt</kbd>+<kbd>T</kbd>, to switch between Auto, Light and Dark. This browser remembers the choice.</p>
@@ -85,7 +91,8 @@
       <p><strong>Back to DOS.</strong> Export (<kbd>X</kbd>) &gt; Notebook II import text writes a file that Notebook II's Utilities &gt; Import reads in Notebook format.</p>
 
       <h2>Where your data is kept</h2>
-      <p>Databases are saved in this browser as you work. To move them to another computer, or to keep a backup, use Export (<kbd>X</kbd>) &gt; Notebook file, and Import that file elsewhere.</p>
+      <p>Notebooks are saved in this browser as you work. They are not on your other devices, and clearing the browser's history or site data deletes them. <em>Backup</em> on the command bar (<kbd data-key-label="Ctrl+Shift+s">Ctrl+Shift+S</kbd>) saves a copy of the open notebook as a file; Import reads it back, on this computer or another. If a notebook has changed and has not been backed up for a week, it reminds you when you open it.</p>
+      <p>Export also writes <em>vertical text</em>: each record's fields one after another, long notes under their label. It is the most readable copy to keep, print or quote from, and Import can read it back. Exports follow the list's current order and search.</p>
     </div>
   </template>
 
