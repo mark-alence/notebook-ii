@@ -121,3 +121,22 @@ test('print forms: optional lines, hanging indent wrap', () => {
   assert.equal(out, '3. Smith\nNotes: one two three\n       four five six');
   assert.deepEqual(wrapLine('abc', 10), ['abc']);
 });
+
+test('search: plain terms match parts of words, quotes match whole words', () => {
+  const db = createDatabase('t', ['Author', 'Title', 'Citation']);
+  addRecord(db, { Author: 'Goldsmith, Ann', Title: 'Cotton and the war', Citation: 'CO 96/728' });
+  addRecord(db, { Author: 'Smith', Title: 'Warfare in the Café', Citation: 'CSO 15/2/4' });
+  const ids = (q) => search(db, q).map((r) => r.id);
+  assert.deepEqual(ids('smith'), [1, 2]);
+  assert.deepEqual(ids('"smith"'), [2]);
+  assert.deepEqual(ids('cott'), [1]);
+  assert.deepEqual(ids('otto'), [1]);
+  assert.deepEqual(ids('war'), [1, 2]);
+  assert.deepEqual(ids('"war"'), [1]);
+  assert.deepEqual(ids('author:gold'), [1]);
+  assert.deepEqual(ids('title:gold'), []);
+  assert.deepEqual(ids('96/72'), [1]);
+  assert.deepEqual(ids('cafe'), [2]);
+  assert.deepEqual(ids('war -gold'), [2]);
+  assert.deepEqual(ids('war*'), [1, 2]);
+});

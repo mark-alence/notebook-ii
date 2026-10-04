@@ -1,8 +1,10 @@
 // Retrieval: find records by any word, in one field or anywhere.
 //
-//   smith                 records containing the word "smith" in any field
+//   smith                 records with "smith" anywhere in any field, also
+//                         inside longer words (smithy, Goldsmith); "smith"
+//                         in quotes matches only the whole word
 //   author:smith          only in the Author field
-//   "civil war"           the phrase, words adjacent
+//   "civil war"           the phrase, whole words, adjacent
 //   hist*                 any word starting with "hist"
 //   smith AND jones       both (AND is implied between terms: smith jones)
 //   smith OR jones        either
@@ -139,7 +141,14 @@ function compileTerm(node, fields) {
   if (node.compare) return compileCompare(node.compare, text, targets);
   if (targets && text === '') return (rec) => targets.every((f) => !(rec.values[f] ?? '').trim());
   if (targets && text === '*') return (rec) => targets.some((f) => (rec.values[f] ?? '').trim());
-  // Same word split as the record text, but keeping the * and ? wildcards.
+  // A plain term is found anywhere in the text, as Notebook II's Find did:
+  // "cott" finds cotton, "96/728" finds CO 96/728.
+  if (!node.phrase && !/[*?]/.test(text)) {
+    const want = fold(text);
+    if (!want) return () => false;
+    return (rec) => (targets ?? fields).some((f) => fold(rec.values[f] ?? '').includes(want));
+  }
+  // Quoted words and wildcards match whole words, keeping * and ? as wildcards.
   const pats = (fold(text).match(/[\p{L}\p{N}*?]+(?:['’][\p{L}\p{N}*?]+)*/gu) ?? []).map(wordPattern);
   if (!pats.length) return () => false;
   return (rec) => {

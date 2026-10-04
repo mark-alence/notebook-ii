@@ -10,7 +10,8 @@ import { compileQuery, highlightTerms } from './search.js';
 import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportNotebookText, exportVertical, exportJson, toBytes } from './exporters.js';
 import { renderReport } from './printform.js';
-import { listSaved, saveDb, loadDb, removeDb, newKey } from './storage.js';
+import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent } from './storage.js';
+import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
 import { getTheme, setTheme, nextTheme } from './theme.js';
 
@@ -22,7 +23,8 @@ const CTRL = MAC ? '⌘' : 'Ctrl ';
 
 const state = {
   db: null,
-  key: null,
+  key: null, // where the notebook is kept in browser storage, or null
+  path: null, // desktop app: the notebook's file, or null
   query: '',
   sortKeys: [],
   list: null, // records shown, after search and sort
@@ -69,11 +71,31 @@ function viewed() {
 // Asks the browser not to clear this site's storage when space runs low.
 let askedToKeep = false;
 function persist() {
-  if (!state.db || !state.key) return;
+  if (!state.db) return;
+  if (state.path) return writeFile();
+  if (!state.key) return;
   if (!askedToKeep) { askedToKeep = true; navigator.storage?.persist?.().catch(() => {}); }
   if (!saveDb(state.key, state.db)) {
     say('Could not save in this browser (storage may be full). Use Export > Notebook file to keep a copy.', true);
   }
+}
+
+// Desktop app: the notebook is a file, rewritten as it changes. Writes run one
+// after another, so a slow disk never gets them out of order.
+let writing = Promise.resolve();
+function writeFile() {
+  const { db, path } = state;
+  const text = exportJson(db);
+  writing = writing
+    .then(() => platform.writeText(path, text))
+    .then(() => addRecent({ path, name: db.name, records: db.records.length, modified: db.modified }))
+    .catch((e) => say(String(e), true));
+  return writing;
+}
+
+async function flushAll() {
+  flush();
+  await writing;
 }
 
 let persistTimer = null;
@@ -92,18 +114,24 @@ function flush() {
 addEventListener('pagehide', flush);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
-function openDb(db, key = newKey()) {
+// key: the notebook's place in browser storage (a new one by default); path:
+// its file, in the desktop app, when it was opened from or saved to one.
+function openDb(db, key = newKey(), path = null) {
   state.db = db;
-  state.key = key;
+  state.key = path ? null : key;
+  state.path = path;
   state.query = '';
   state.sortKeys = (db.sortKeys ?? []).filter((k) => db.fields.some((f) => f.name === k.field));
   state.cursor = 0;
   state.formIndex = 0;
   $('#search').value = '';
   refreshList();
-  persist();
+  if (path) addRecent({ path, name: db.name, records: db.records.length, modified: db.modified });
+  else persist();
+  platform.setTitle(`${db.name} · Notebook II`);
   go('browse');
-  if (needsBackup(db)) say(`This notebook has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
+  if (!path && platform.desktop) say(`This notebook is kept inside the app. Save As (${keyLabel('Ctrl+Shift+s')}) makes it a file you can back up and move.`);
+  else if (!path && needsBackup(db)) say(`This notebook has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
 }
 
 // The notebook remembers its sort; "order entered" is no sort at all.
@@ -123,21 +151,64 @@ function needsBackup(db) {
 // Notebooks live in this browser's storage, which is lost if the browser's
 // site data is cleared. A backup is the same file Export > Notebook file
 // makes; Import reads it back.
-function backupDb() {
+async function backupDb() {
   const db = state.db;
-  leaveRecord();
-  db.lastBackup = new Date().toISOString();
-  download(`${safeName(db.name)}-${db.lastBackup.slice(0, 10)}.nb2.json`, toBytes(exportJson(db)), 'application/json');
+  if (state.mode === 'view') leaveRecord();
+  const stamp = new Date().toISOString();
+  const saved = await download(`${safeName(db.name)}-${stamp.slice(0, 10)}${platform.desktop ? '.nb2' : '.nb2.json'}`, toBytes(exportJson(db)), 'application/json');
+  if (!saved) return;
+  db.lastBackup = stamp;
   persist();
   if (state.mode === 'view') render();
-  say('Backup saved to your downloads. Import reads it back.');
+  say(platform.desktop ? `Copy saved as ${platform.fileName(saved)}.` : 'Backup saved to your downloads. Import reads it back.');
 }
 
-function closeDb() {
+async function closeDb() {
   leaveRecord();
   persist();
-  state.db = null; state.key = null; state.list = null; state.query = '';
+  await flushAll();
+  state.db = null; state.key = null; state.path = null; state.list = null; state.query = '';
+  platform.setTitle('Notebook II');
   go('home');
+}
+
+// ---------- desktop app: notebooks as files ----------
+
+async function openFile(path = null) {
+  try {
+    path ??= await platform.pickNotebookToOpen();
+    if (!path) return;
+    let db;
+    try {
+      db = validateDatabase(JSON.parse(await platform.readText(path)));
+    } catch (e) {
+      if (/read/i.test(String(e))) throw e;
+      throw new Error(`${platform.fileName(path)} is not a Notebook file. To bring in other files, including Notebook II's own .DAT files, use Import.`);
+    }
+    if (state.db) await closeDb();
+    openDb(db, null, path);
+  } catch (e) {
+    removeRecent(path);
+    say(String(e.message ?? e), true);
+    if (state.mode === 'home') render();
+  }
+}
+
+// Saves the open notebook to a new file and keeps working on that file. A
+// notebook that was kept inside the app moves out to the file.
+async function saveAs() {
+  const db = state.db;
+  if (state.mode === 'view') leaveRecord();
+  const path = await platform.pickNotebookPath(safeName(db.name));
+  if (!path) return;
+  const oldKey = state.key;
+  state.path = path;
+  state.key = null;
+  await writeFile();
+  if (oldKey) removeDb(oldKey);
+  platform.setTitle(`${db.name} · Notebook II`);
+  if (state.mode === 'view') render();
+  say(`Saved as ${platform.fileName(path)}. Changes now go straight to that file.`);
 }
 
 function say(msg, isError = false) {
@@ -146,13 +217,14 @@ function say(msg, isError = false) {
   renderStatus();
 }
 
-function download(name, bytes, type = 'application/octet-stream') {
-  const url = URL.createObjectURL(new Blob([bytes], { type }));
-  const a = Object.assign(document.createElement('a'), { href: url, download: name });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+// A download in the browser, a Save dialog in the desktop app.
+async function download(name, bytes, type = 'application/octet-stream') {
+  try {
+    return await platform.saveBytes(name, bytes, type);
+  } catch (e) {
+    say(String(e.message ?? e), true);
+    return null;
+  }
 }
 
 function safeName(s) {
@@ -189,6 +261,7 @@ function goBack() {
 
 const COMMANDS = [
   { id: 'newdb', label: 'New notebook', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
+  { id: 'openfile', label: 'Open notebook file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
   { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openDb(databaseFromImport(SAMPLE.name, SAMPLE)) },
   { id: 'open', label: 'Open selected database', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
   { id: 'deldb', label: 'Delete selected database', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
@@ -209,7 +282,8 @@ const COMMANDS = [
   { id: 'fields', label: 'Fields', fkey: 'F8', where: ['browse', 'view'], bar: true, run: () => go('fields') },
   { id: 'import', label: 'Import', key: 'i', fkey: 'F9', where: ['home', 'browse', 'view'], bar: true, run: () => pickFiles(startImport) },
   { id: 'export', label: 'Export', key: 'x', fkey: 'F10', where: ['browse', 'view'], bar: true, run: () => go('export') },
-  { id: 'backup', label: 'Backup: save a copy as a file', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, run: () => backupDb() },
+  { id: 'saveas', label: 'Save notebook as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, desktop: true, run: () => saveAs() },
+  { id: 'backup', label: platform.desktop ? 'Save a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
   { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
   { id: 'close', label: 'Close database', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
   { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'print', 'import', 'export', 'help', 'newdb'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
@@ -228,6 +302,7 @@ function keyLabel(key) {
 }
 
 function available(c) {
+  if (c.desktop && !platform.desktop) return false;
   if (!(c.where.includes('*') || c.where.includes(state.mode))) return false;
   if (['browse', 'view'].includes(state.mode) && !state.db) return false;
   return true;
@@ -277,7 +352,7 @@ function renderKeys() {
   }).join('');
 }
 
-const SHORT = { newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort', backup: 'Backup' };
+const SHORT = { openfile: 'Open', saveas: 'Save as', newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
   return SHORT[c.id] ?? c.label;
 }
@@ -296,21 +371,37 @@ function preview(text, max = 120) {
   return one.length > max ? one.slice(0, max - 1) + '…' : one;
 }
 
+// The start screen lists notebooks: in the desktop app, recent notebook files
+// first, then any kept inside the app; on the web, those kept in this browser.
+function homeEntries() {
+  const files = platform.desktop ? listRecent().map((r) => ({ ...r, kind: 'file' })) : [];
+  return [...files, ...listSaved().map((d) => ({ ...d, kind: 'app' }))];
+}
+
+// The folder and file name; the full path shows on hover.
+function shortPath(path) {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : path;
+}
+
 function renderHome() {
-  const saved = listSaved();
-  state.homeCursor = Math.min(state.homeCursor, Math.max(0, saved.length - 1));
-  const rows = saved.map((d, i) => `
+  const entries = homeEntries();
+  state.homeCursor = Math.min(state.homeCursor, Math.max(0, entries.length - 1));
+  const rows = entries.map((d, i) => `
     <tr data-i="${i}" class="${i === state.homeCursor ? 'cur' : ''}">
-      <td>${esc(d.name)}</td><td class="num">${d.records}</td><td>${esc(new Date(d.modified).toLocaleString())}</td>
+      <td>${esc(d.name)}</td>${platform.desktop ? `<td class="where" title="${esc(d.kind === 'file' ? d.path : '')}">${esc(d.kind === 'file' ? shortPath(d.path) : 'kept in the app')}</td>` : ''}<td class="num">${d.records ?? ''}</td><td>${d.modified ? esc(new Date(d.modified).toLocaleString()) : ''}</td>
     </tr>`).join('');
+  const keep = platform.desktop
+    ? `<p class="hint">Each notebook is a file on your computer (<code>.nb2</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.</p>`
+    : `<p class="warn">Notebooks are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a notebook, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>`;
   $('#main').innerHTML = `
     <div class="panel home">
-      <h2>Notebooks</h2>
-      ${saved.length ? `<table class="grid"><thead><tr><th>Name</th><th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table>
-        <p class="hint">Click a database to open it, or use ↑ ↓ and Enter.</p>`
-      : '<p>No notebooks yet. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import a file from Notebook II or another program, or <kbd>S</kbd> to try a sample.</p>'}
+      <h2>${platform.desktop ? 'Recent notebooks' : 'Notebooks'}</h2>
+      ${entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th>${platform.desktop ? '<th>File</th>' : ''}<th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="hint">Click a notebook to open it, or use ↑ ↓ and Enter.</p>`
+      : `<p>No notebooks yet. Press <kbd>N</kbd> to make one, ${platform.desktop ? '<kbd>O</kbd> to open a notebook file, ' : ''}<kbd>I</kbd> to import a file from Notebook II or another program, or <kbd>S</kbd> to try a sample.</p>`}
       <p class="hint">Every command is on the bar at the bottom, and <kbd>${esc(keyLabel('Ctrl+k'))}</kbd> lists them all.</p>
-      <p class="warn">Notebooks are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a notebook, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>
+      ${keep}
       <h2>Bringing in your old files</h2>
       <p>Press <kbd>I</kbd> (Import) and choose a Notebook II database's files together: <code>NAME.DAT</code>, <code>NAME.DEF</code> and <code>NAME.IDX</code> (and <code>NAME.MSC</code> and print formats, <code>*.R00</code>, if you have them). Import also reads text that Notebook II or other programs wrote: delimited text (tab, comma, <code>|</code>, <code>~</code> or any character you name), tagged text (<code>Author: …</code> or <code>%Author:…</code> lines), and DOS characters (code page 437). Any other file can be opened with <em>Salvage</em>, which pulls out the readable text.</p>
     </div>`;
@@ -318,8 +409,9 @@ function renderHome() {
 }
 
 function openSaved(i) {
-  const d = listSaved()[i];
+  const d = homeEntries()[i];
   if (!d) return;
+  if (d.kind === 'file') return openFile(d.path);
   try {
     openDb(loadDb(d.key), d.key);
   } catch (e) {
@@ -328,9 +420,14 @@ function openSaved(i) {
 }
 
 function deleteSavedDb() {
-  const d = listSaved()[state.homeCursor];
+  const d = homeEntries()[state.homeCursor];
   if (!d) return;
-  if (confirm(`Delete the database "${d.name}" from this browser? Export it first if you want a copy.`)) { removeDb(d.key); render(); }
+  if (d.kind === 'file') {
+    removeRecent(d.path);
+    render();
+    return say(`Removed ${platform.fileName(d.path)} from this list. The file itself is untouched.`);
+  }
+  ask(`Delete the notebook "${d.name}" from ${platform.desktop ? 'the app' : 'this browser'}? Make a backup first if you want a copy.`, 'Delete').then((yes) => { if (yes) { removeDb(d.key); render(); } });
 }
 
 const PAGE = 200;
@@ -375,7 +472,7 @@ function highlight(text, terms) {
   const safe = esc(text);
   if (!terms.length) return safe;
   const alts = terms.map((t) => esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  return safe.replace(new RegExp(`(^|[^\\p{L}\\p{N}])(${alts})`, 'giu'), '$1<mark>$2</mark>');
+  return safe.replace(new RegExp(`(${alts})`, 'giu'), '<mark>$1</mark>');
 }
 
 // ---------- the record screen: read and edit in one place ----------
@@ -663,7 +760,7 @@ function renderFields() {
   $$('[data-move]').forEach((b) => b.addEventListener('click', () => done(() => moveField(db, b.dataset.move, +b.dataset.d))));
   $$('[data-del]').forEach((b) => b.addEventListener('click', () => {
     const n = db.records.filter((r) => (r.values[b.dataset.del] ?? '').trim()).length;
-    if (confirm(`Delete the field "${b.dataset.del}"?${n ? ` Its text in ${n} record${n === 1 ? '' : 's'} will be lost.` : ''}`)) done(() => deleteField(db, b.dataset.del));
+    ask(`Delete the field "${b.dataset.del}"?${n ? ` Its text in ${n} record${n === 1 ? '' : 's'} will be lost.` : ''}`, 'Delete field').then((yes) => { if (yes) done(() => deleteField(db, b.dataset.del)); });
   }));
   $('#addfield').addEventListener('submit', (e) => { e.preventDefault(); done(() => addField(db, e.target.name.value)); });
   $('#dbname').addEventListener('change', (e) => done(() => { db.name = e.target.value.trim() || db.name; }));
@@ -707,8 +804,8 @@ function renderPrint() {
     persist();
     render();
   });
-  $('#delform').addEventListener('click', () => {
-    if (!confirm(`Delete the print form "${form.name}"?`)) return;
+  $('#delform').addEventListener('click', async () => {
+    if (!(await ask(`Delete the print form "${form.name}"?`, 'Delete form'))) return;
     db.printForms.splice(state.formIndex, 1);
     persist();
     render();
@@ -930,21 +1027,30 @@ function renderNewDb() {
   const form = $('#newdbform');
   form.name.focus();
   form.name.select();
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const layout = LAYOUTS.find((l) => l.id === form.layout.value) ?? LAYOUTS[0];
     const name = form.name.value.trim() || 'Notes';
-    openDb(createDatabase(name, layout.fields));
+    const db = createDatabase(name, layout.fields);
+    if (platform.desktop) {
+      const path = await platform.pickNotebookPath(safeName(name));
+      if (!path) return say('Not made: choose where to save the notebook file.');
+      if (state.db) await closeDb();
+      openDb(db, null, path);
+      await writeFile();
+    } else {
+      openDb(db);
+    }
     go('fields');
     say(`Notebook "${name}" made. Set up its fields here, then press Esc to start adding notes.`);
   });
 }
 
-function deleteCurrent() {
+async function deleteCurrent() {
   const rec = state.mode === 'view' ? viewed() : current();
   if (!rec) return;
   const label = preview(rec.values[state.db.fields[0].name], 50) || 'this record';
-  if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
+  if (!(await ask(`Delete "${label}"? This cannot be undone.`, 'Delete'))) return;
   if (state.mode === 'view') state.viewId = null;
   deleteRecords(state.db, [rec.id]);
   persist();
@@ -965,6 +1071,42 @@ function cycleTheme() {
   renderTitle();
   say({ auto: 'Screen follows your computer\'s light or dark setting.', light: 'Light screen.', dark: 'Dark screen.' }[t]);
 }
+
+// ---------- yes / no questions ----------
+//
+// Drawn in the page like the command palette, because desktop windows and some
+// embedded browsers do not show the browser's own confirm() box. Y or Enter on
+// the button says yes; N or Esc says no.
+
+let asking = null;
+
+function ask(message, yesLabel = 'Yes') {
+  const box = $('#ask');
+  $('#askmsg').textContent = message;
+  $('#askyes').textContent = yesLabel;
+  box.hidden = false;
+  const back = document.activeElement;
+  $('#askno').focus();
+  return new Promise((resolve) => {
+    asking = (answer) => {
+      asking = null;
+      box.hidden = true;
+      back?.focus?.();
+      resolve(answer);
+    };
+  });
+}
+
+$('#askyes').addEventListener('click', () => asking?.(true));
+$('#askno').addEventListener('click', () => asking?.(false));
+document.addEventListener('keydown', (e) => {
+  if (!asking) return;
+  const k = e.key.toLowerCase();
+  if (k === 'escape' || k === 'n') { e.preventDefault(); asking(false); }
+  else if (k === 'y') { e.preventDefault(); asking(true); }
+  else if (k === 'tab') { e.preventDefault(); (document.activeElement === $('#askno') ? $('#askyes') : $('#askno')).focus(); }
+  e.stopImmediatePropagation();
+}, true);
 
 // ---------- command palette ----------
 //
@@ -1079,10 +1221,10 @@ function onKey(key, e) {
   }
 
   if (m === 'home' && !typing) {
-    const saved = listSaved();
+    const saved = homeEntries();
     if (key === 'ArrowDown') { state.homeCursor = Math.min(saved.length - 1, state.homeCursor + 1); render(); return; }
     if (key === 'ArrowUp') { state.homeCursor = Math.max(0, state.homeCursor - 1); render(); return; }
-    if (key === 'o' || key === 'O') return runCommand('import');
+    if ((key === 'o' || key === 'O') && !platform.desktop) return runCommand('import');
   }
   if (m === 'browse' && !typing) {
     const nav = { ArrowDown: 1, ArrowUp: -1, PageDown: 15, PageUp: -15 };
@@ -1122,4 +1264,45 @@ $('#keys').addEventListener('click', (e) => {
 
 $('#themebtn').addEventListener('click', cycleTheme);
 
+// ---------- desktop app: menu bar, closing, files opened from outside ----------
+
+const MENU = {
+  newdb: () => go('newdb'),
+  open: () => openFile(),
+  saveas: () => state.db && saveAs(),
+  import: () => pickFiles(startImport),
+  export: () => state.db && go('export'),
+  print: () => state.db && go('print'),
+  close: () => state.db && closeDb(),
+  new: () => state.db && newRecord(),
+  copyprev: () => runCommand('copyprev'),
+  copyfield: () => runCommand('copyfield'),
+  delete: () => state.db && ['browse', 'view'].includes(state.mode) && deleteCurrent(),
+  find: () => state.db && focusSearch(),
+  all: () => state.db && (state.mode === 'browse' || go('browse'), clearSearch()),
+  sort: () => state.db && go('sort'),
+  fields: () => state.db && go('fields'),
+  theme: () => cycleTheme(),
+  palette: () => openPalette(),
+  help: () => go('help'),
+  quit: () => platform.closeWindow(),
+};
+platform.onMenu((id) => {
+  if (asking) return;
+  if (palette.open) closePalette();
+  MENU[id]?.();
+});
+platform.onOpenFile((path) => openFile(path));
+platform.beforeClose(async () => {
+  if (state.mode === 'view') leaveRecord();
+  persist();
+  await flushAll();
+});
+
 render();
+platform.launchFile().then((path) => { if (path) openFile(path); });
+
+// The web page works offline once visited, and can be installed as an app.
+if (!platform.desktop && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
