@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { decodeCp437, encodeCp437, decodeBytes } from '../js/cp437.js';
 import { importFile, parseDelimited, parseTagged, parseSalvage, detectTagged } from '../js/importers.js';
 import { exportDelimited, exportTagged } from '../js/exporters.js';
-import { search, parseQuery } from '../js/search.js';
+import { search, parseQuery, highlightPatterns } from '../js/search.js';
 import { createDatabase, addRecord, sortRecords, renameField, databaseFromImport } from '../js/model.js';
 import { renderRecord, wrapLine } from '../js/printform.js';
 
@@ -139,4 +139,27 @@ test('search: plain terms match parts of words, quotes match whole words', () =>
   assert.deepEqual(ids('cafe'), [2]);
   assert.deepEqual(ids('war -gold'), [2]);
   assert.deepEqual(ids('war*'), [1, 2]);
+});
+
+test('search: regular expressions, alone, in a field, and mixed with other terms', () => {
+  const db = createDatabase('t', ['Header', 'Citation', 'Date']);
+  addRecord(db, { Header: 'Cocoa prices', Citation: 'CO 96/728', Date: '1938-03-17' });
+  addRecord(db, { Header: 'Farmers (Akim)', Citation: 'CSO 15/2/4', Date: '1938-04' });
+  addRecord(db, { Header: 'Colour bar', Citation: 'CO 96/731', Date: 'c. 1937' });
+  const ids = (q) => search(db, q).map((r) => r.id);
+  assert.deepEqual(ids('/colou?r/'), [3]);
+  assert.deepEqual(ids('/^co /'), [1, 3]);
+  assert.deepEqual(ids('citation:/^CO 9\\d/'), [1, 3]);
+  assert.deepEqual(ids('header:/^co/'), [1, 3]);
+  assert.deepEqual(ids('date:/^\\d{4}-\\d\\d-\\d\\d$/'), [1]);
+  assert.deepEqual(ids('/96\\/7[0-9]+/ -colour'), [1]);
+  assert.deepEqual(ids('/(akim)/ OR cocoa'), [1, 2]);
+  assert.deepEqual(ids('/Cocoa/c'), [1]);
+  assert.deepEqual(ids('/cocoa/c'), []);
+  assert.deepEqual(ids('/[/]2[/]/'), [2]);
+  assert.deepEqual(ids('"Date":/^c\\./'), [3]);
+  assert.throws(() => search(db, '/abc'), /needs a \/ at the end/);
+  assert.throws(() => search(db, '/(ab/'), /does not work/);
+  assert.throws(() => search(db, '/ab/x'), /Unknown pattern flag/);
+  assert.deepEqual(highlightPatterns('/co\\w+/ prices').map((r) => r.source), ['co\\w+', 'prices']);
 });

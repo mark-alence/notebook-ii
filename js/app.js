@@ -6,7 +6,7 @@ import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
   moveField, sortRecords, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
 } from './model.js';
-import { compileQuery, highlightTerms } from './search.js';
+import { compileQuery, highlightPatterns } from './search.js';
 import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportNotebookText, exportVertical, exportJson, toBytes } from './exporters.js';
 import { renderReport } from './printform.js';
@@ -468,11 +468,29 @@ function sortByColumn(field) {
   render();
 }
 
-function highlight(text, terms) {
-  const safe = esc(text);
-  if (!terms.length) return safe;
-  const alts = terms.map((t) => esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  return safe.replace(new RegExp(`(${alts})`, 'giu'), '<mark>$1</mark>');
+// Marks every stretch of text a pattern matches, on the plain text, then
+// escapes the rest.
+function highlight(text, pats) {
+  if (!pats.length) return esc(text);
+  const ranges = [];
+  for (const re of pats) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) && ranges.length < 5000) {
+      if (!m[0].length) { re.lastIndex++; continue; }
+      ranges.push([m.index, m.index + m[0].length]);
+    }
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  let out = '';
+  let at = 0;
+  for (const [a, b] of ranges) {
+    if (b <= at) continue;
+    const from = Math.max(a, at);
+    out += esc(text.slice(at, from)) + `<mark>${esc(text.slice(from, b))}</mark>`;
+    at = b;
+  }
+  return out + esc(text.slice(at));
 }
 
 // ---------- the record screen: read and edit in one place ----------
@@ -547,7 +565,7 @@ function moveRecord(delta) {
 function renderView() {
   const rec = viewed();
   if (!rec) { go('browse'); return; }
-  const terms = highlightTerms(state.query);
+  const terms = highlightPatterns(state.query);
   $('#main').innerHTML = `
     <form class="record" id="recordform" autocomplete="off">
       ${state.db.fields.map(({ name }, i) => `

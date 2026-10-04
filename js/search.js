@@ -17,6 +17,9 @@
 //                         "begins with"; -title=the is "not begins with")
 //   year>1980  author<m   the field begins with something later / earlier in
 //   year>=1980 year<=1985 alphabetical (or numerical) order, or the same
+//   /colou?r/             a regular expression, anywhere in any field; ignores
+//                         capitals unless the flag c is added (/Smith/c)
+//   citation:/^CO 9\d/    a regular expression in one field
 
 export function tokenizeQuery(q) {
   const tokens = [];
@@ -30,6 +33,17 @@ export function tokenizeQuery(q) {
     let field = null;
     let text;
     let phrase = false;
+    // /pattern/ or field:/pattern/ — read whole, since a pattern may hold
+    // spaces, brackets and quotes.
+    const fieldRegex = /^([^\s()"/:<>=]+):\//.exec(q.slice(i));
+    if (q[i] === '/' || fieldRegex) {
+      if (fieldRegex) { field = fieldRegex[1]; i += field.length + 1; }
+      const r = readRegex(q, i);
+      i = r.i;
+      if (neg) tokens.push({ type: 'NOT' });
+      tokens.push({ type: 'term', field, text: r.source, phrase: false, op: ':', regex: { source: r.source, flags: r.flags } });
+      continue;
+    }
     if (q[i] === '"') {
       const end = q.indexOf('"', i + 1);
       text = q.slice(i + 1, end < 0 ? q.length : end);
@@ -42,11 +56,12 @@ export function tokenizeQuery(q) {
     }
     // field:term, field=term, field>term ...
     let op = ':';
+    let regex = null;
     const quotedOp = phrase ? FIELD_OP.exec(q.slice(i)) : null;
     const plain = phrase ? null : /^([^:<>=]+)(>=|<=|>|<|=|:)(.*)$/.exec(text);
     if (quotedOp) {
       field = text; op = quotedOp[1]; i += op.length; phrase = false;
-      ({ text, phrase, i } = readTerm(q, i));
+      ({ text, phrase, i, regex = null } = readTerm(q, i));
     } else if (plain) {
       [, field, op] = plain;
       if (plain[3]) text = plain[3];
@@ -57,14 +72,47 @@ export function tokenizeQuery(q) {
       continue;
     }
     if (neg) tokens.push({ type: 'NOT' });
-    tokens.push({ type: 'term', field, text, phrase, op });
+    tokens.push({ type: 'term', field, text, phrase, op, ...(regex ? { regex } : {}) });
   }
   return tokens;
 }
 
 const FIELD_OP = /^(>=|<=|>|<|=|:)/;
 
+// q[i] is the opening /. The pattern runs to the next / that is not escaped
+// (\/) or inside [ ]; flags follow it.
+function readRegex(q, i) {
+  let j = i + 1;
+  let inClass = false;
+  for (; j < q.length; j++) {
+    const ch = q[j];
+    if (ch === '\\') { j++; continue; }
+    if (ch === '[') inClass = true;
+    else if (ch === ']') inClass = false;
+    else if (ch === '/' && !inClass) break;
+  }
+  if (j >= q.length) throw new Error('A pattern that starts with / needs a / at the end too');
+  const flags = /^[a-z]*/i.exec(q.slice(j + 1))[0];
+  if (/[^imsuc]/.test(flags)) throw new Error(`Unknown pattern flag in /…/${flags}: use i, m, s, u or c (match capitals exactly)`);
+  return { source: q.slice(i + 1, j), flags, i: j + 1 + flags.length };
+}
+
+// Capitals are ignored unless the flags include c.
+export function makeRegex(source, flags = '', extra = '') {
+  let f = flags.replace(/[cg]/g, '');
+  if (!flags.includes('c') && !f.includes('i')) f += 'i';
+  try {
+    return new RegExp(source, f + extra);
+  } catch (e) {
+    throw new Error(`The pattern /${source}/ does not work: ${e.message.replace(/^Invalid regular expression: \/.*\/[a-z]*: /, '')}`);
+  }
+}
+
 function readTerm(q, i) {
+  if (q[i] === '/') {
+    const r = readRegex(q, i);
+    return { text: r.source, phrase: false, i: r.i, regex: { source: r.source, flags: r.flags } };
+  }
   if (q[i] === '"') {
     const end = q.indexOf('"', i + 1);
     return { text: q.slice(i + 1, end < 0 ? q.length : end), phrase: true, i: end < 0 ? q.length : end + 1 };
@@ -105,7 +153,7 @@ export function parseQuery(q) {
       if (next()?.type !== ')') throw new Error('Missing )');
       return e;
     }
-    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase, compare: t.op === ':' ? null : t.op };
+    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase, compare: t.op === ':' ? null : t.op, regex: t.regex ?? null };
     throw new Error(`Unexpected ${t.type}`);
   }
 
@@ -136,6 +184,10 @@ function compileTerm(node, fields) {
     targets = fields.filter((f) => fold(f) === want);
     if (!targets.length) targets = fields.filter((f) => fold(f).startsWith(want));
     if (!targets.length) throw new Error(`No field called ${node.field}`);
+  }
+  if (node.regex) {
+    const re = makeRegex(node.regex.source, node.regex.flags);
+    return (rec) => (targets ?? fields).some((f) => re.test(rec.values[f] ?? ''));
   }
   const text = node.text.trim();
   if (node.compare) return compileCompare(node.compare, text, targets);
@@ -204,6 +256,27 @@ export function compileQuery(q, fields) {
 export function search(db, q) {
   const match = compileQuery(q, db.fields.map((f) => f.name));
   return db.records.filter(match);
+}
+
+// Patterns to mark in a record for a query (ignores NOT terms and
+// comparisons): each word, or the regular expression itself.
+export function highlightPatterns(q) {
+  try {
+    const out = [];
+    const walk = (n, neg) => {
+      if (!n) return;
+      if (n.op === 'term' && !neg && !n.compare) {
+        if (n.regex) out.push(makeRegex(n.regex.source, n.regex.flags, 'g'));
+        else for (const w of words(n.text.replace(/[*?]/g, ' '))) out.push(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu'));
+      }
+      if (n.op === 'not') walk(n.arg, !neg);
+      if (n.left) { walk(n.left, neg); walk(n.right, neg); }
+    };
+    walk(parseQuery(q), false);
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 // Words to highlight for a query (ignores NOT terms).

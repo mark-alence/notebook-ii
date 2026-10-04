@@ -80,9 +80,11 @@ notes:   notes:*      Notes blank / not blank
 "date of birth":1850  field names with spaces
 title=the  -title=the Title begins / doesn't begin with "the"
 year>1980  author<=m  begins later / the same or earlier (also < and >=)
+/colou?r/             a regular expression (add c after it to match capitals: /Smith/c)
+citation:/^CO 9\d/    a regular expression in one field
 ```
 
-Search ignores capitals and accents. The last two lines are Notebook II's Select conditions (begins with, greater/less than); numbers compare as numbers.
+Search ignores capitals and accents (regular expressions ignore capitals but not accents). The last two lines are Notebook II's Select conditions (begins with, greater/less than); numbers compare as numbers.
 
 ## Print forms
 

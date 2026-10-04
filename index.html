@@ -93,6 +93,8 @@
         <tr><td><code>"date of birth":1850</code></td><td>quote field names that have spaces</td></tr>
         <tr><td><code>title=the</code> &nbsp; <code>-title=the</code></td><td>Title begins / doesn't begin with "the"</td></tr>
         <tr><td><code>year&gt;1980</code> &nbsp; <code>author&lt;=m</code></td><td>the field begins later / the same or earlier in alphabetical or numerical order (also <code>&lt;</code> and <code>&gt;=</code>)</td></tr>
+        <tr><td><code>/colou?r/</code></td><td>a regular expression, anywhere in the record. Capitals don't matter unless you add <code>c</code> after it: <code>/Smith/c</code></td></tr>
+        <tr><td><code>citation:/^CO 9\d/</code></td><td>a regular expression in one field; mix it with any other terms, e.g. <code>/^19[34]\d/ -farmers</code></td></tr>
       </table>
       <p>Capitals and accents don't matter. Sorting and printing work on the records found.</p>
 
