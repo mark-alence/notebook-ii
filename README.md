@@ -14,7 +14,7 @@ then go to http://localhost:8080. Opening `index.html` straight from disk won't 
 
 To put it online, turn on GitHub Pages once (Settings > Pages > Source: **GitHub Actions**). After that, `.github/workflows/pages.yml` runs the tests and publishes the app on every push to `main`. Pages for a private repository needs a paid GitHub plan, and the site itself is public. Databases stay in each visitor's own browser and are never uploaded.
 
-Databases are saved in the browser as you work. **Export > Notebook file** makes a `.nb2.json` copy for backups or for moving to another computer.
+Notebooks are saved in the browser as you work; see [Keeping your notebooks safe](#keeping-your-notebooks-safe).
 
 ## Using it
 
@@ -26,14 +26,34 @@ Every command is on the bar at the bottom of the screen, labelled, with its key 
 | Click or Enter | Open a record | S | Sort by up to three fields |
 | Column heading | Sort by it (again: Z to A, again: off) | P | Print |
 | Esc | Back: out of a field, the record, the database | X / I | Export / Import |
-| PgUp / PgDn | Previous / next record | Del | Delete record |
-| Ctrl+D | Copy the source from the previous record | ? | Help |
+| PgUp / PgDn | Previous / next record (outside a field) | Del | Delete record |
+| F5 / F6 | Copy previous / copy this field | ? | Help |
+| Tab | Next field (inside a field, arrows and PgUp/PgDn move through the text) | Ctrl+Shift+S | Backup |
 
 The search box in the title bar filters as you type; Enter or ↓ moves to the list and Esc clears it. The original F-keys still work: F2 edit, F3 new, F4 find, F5 show all, F6 sort, F7 print, F8 fields, F9 import, F10 export.
 
-A record opens ready to read and to change: click a field and type, and changes are saved as you go. **Revert** on the command bar puts the record back as it was when you opened it. A new note left blank is dropped when you leave it.
+A record opens ready to read and to change: click a field and type, and changes are saved as you go (F10 or Ctrl+S saves at once). Fields can be any length; a long note just scrolls. **Revert** on the command bar puts the record back as it was when you opened it. A new note left blank is dropped when you leave it. Ctrl+Home and Ctrl+End go to the start and end of the record, and Alt+PgUp/PgDn moves to the previous or next record from inside a field.
 
-On a record, **Ctrl+D** copies the previous record's source fields (Author, Title, Year and the like) into the ones still blank, so a new note on the same book only needs the note itself; **Ctrl+Shift+D** copies just the field the cursor is in. "Previous" is the record you were on when you pressed N, or for an existing record the one before it in the list. Which fields are copied is a checkbox per field under **Fields**; until you change it, fields with names like Notes, Comments, Pages or Keywords are left out.
+On a record, **F5** (or Ctrl+D) copies the previous record's source fields (Author, Title, Year and the like) into the ones still blank, so a new note from the same source only needs the note itself; **F6** (or Ctrl+Shift+D) copies just the field the cursor is in. "Previous" is the record you were on when you pressed N, or for an existing record the one before it in the list.
+
+## Fields
+
+A notebook is whatever fields you give it, and every field holds plain text of any length. There are no date or number types: `1938-03-17` sorts in date order as text, and `1938-03-17 (approx.)` still does. A new notebook starts from a layout (research notes, archive notes, archive sources, or one field) and opens on **Fields**, where each field has:
+
+| Setting | |
+|---|---|
+| Name, order | rename, add, delete, move up and down |
+| Copy with F5 | copied from the previous record by F5; until changed, fields named like Notes, Comments, Pages or Keywords are not |
+| Lines | room it gets when a record opens (1–40); it grows as you type either way |
+| In list | shown as a column in the list; the first four until changed |
+
+The list remembers its sort per notebook; clicking a column heading a third time goes back to the order entered.
+
+## Keeping your notebooks safe
+
+Notebooks are saved in the browser as you work. They are not on your other devices, and clearing the browser's history or site data deletes them. **Backup** (Ctrl+Shift+S) saves the open notebook as a `.nb2.json` file, which Import reads back. The app reminds you when a notebook has changed and not been backed up for a week, and asks the browser to keep its storage.
+
+Export also writes **vertical text**: each record's fields one after another, short values beside their label and long notes below it, records separated by a rule. It is the most readable copy to keep, print or quote from, and Import reads it back. Exports follow the list's current order and search.
 
 The screen follows the computer's light or dark setting. The word at the right of the title bar, or **Alt+T**, switches between Auto, Light and Dark.
 

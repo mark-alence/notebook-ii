@@ -4,11 +4,11 @@
 // work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, sortRecords, carryOver, copiesFromPrevious, setFieldCopy, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
+  moveField, sortRecords, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
 } from './model.js';
 import { compileQuery, highlightTerms } from './search.js';
 import { importFiles } from './importers.js';
-import { exportDelimited, exportTagged, exportNotebookText, exportJson, toBytes } from './exporters.js';
+import { exportDelimited, exportTagged, exportNotebookText, exportVertical, exportJson, toBytes } from './exporters.js';
 import { renderReport } from './printform.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey } from './storage.js';
 import { SAMPLE } from './sample.js';
@@ -66,8 +66,11 @@ function viewed() {
   return state.db?.records.find((r) => r.id === state.viewId) ?? null;
 }
 
+// Asks the browser not to clear this site's storage when space runs low.
+let askedToKeep = false;
 function persist() {
   if (!state.db || !state.key) return;
+  if (!askedToKeep) { askedToKeep = true; navigator.storage?.persist?.().catch(() => {}); }
   if (!saveDb(state.key, state.db)) {
     say('Could not save in this browser (storage may be full). Use Export > Notebook file to keep a copy.', true);
   }
@@ -79,17 +82,55 @@ function persistSoon() {
   persistTimer = setTimeout(persist, 400);
 }
 
+// Write anything still waiting when the tab is hidden, closed or reloaded.
+function flush() {
+  if (!persistTimer) return;
+  clearTimeout(persistTimer);
+  persistTimer = null;
+  persist();
+}
+addEventListener('pagehide', flush);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+
 function openDb(db, key = newKey()) {
   state.db = db;
   state.key = key;
   state.query = '';
-  state.sortKeys = [];
+  state.sortKeys = (db.sortKeys ?? []).filter((k) => db.fields.some((f) => f.name === k.field));
   state.cursor = 0;
   state.formIndex = 0;
   $('#search').value = '';
   refreshList();
   persist();
   go('browse');
+  if (needsBackup(db)) say(`This notebook has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
+}
+
+// The notebook remembers its sort; "order entered" is no sort at all.
+function setSort(keys) {
+  state.sortKeys = keys;
+  state.db.sortKeys = keys;
+  persist();
+}
+
+const WEEK = 7 * 24 * 3600 * 1000;
+function needsBackup(db) {
+  if (!db.records.length) return false;
+  if (!db.lastBackup) return Date.now() - Date.parse(db.created ?? db.modified) > WEEK;
+  return db.modified > db.lastBackup && Date.now() - Date.parse(db.lastBackup) > WEEK;
+}
+
+// Notebooks live in this browser's storage, which is lost if the browser's
+// site data is cleared. A backup is the same file Export > Notebook file
+// makes; Import reads it back.
+function backupDb() {
+  const db = state.db;
+  leaveRecord();
+  db.lastBackup = new Date().toISOString();
+  download(`${safeName(db.name)}-${db.lastBackup.slice(0, 10)}.nb2.json`, toBytes(exportJson(db)), 'application/json');
+  persist();
+  if (state.mode === 'view') render();
+  say('Backup saved to your downloads. Import reads it back.');
 }
 
 function closeDb() {
@@ -147,7 +188,7 @@ function goBack() {
 // where: the screens it belongs to; bar: shown on the command bar there.
 
 const COMMANDS = [
-  { id: 'newdb', label: 'New database', key: 'n', where: ['home'], bar: true, run: () => newDatabase() },
+  { id: 'newdb', label: 'New notebook', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
   { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openDb(databaseFromImport(SAMPLE.name, SAMPLE)) },
   { id: 'open', label: 'Open selected database', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
   { id: 'deldb', label: 'Delete selected database', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
@@ -157,8 +198,9 @@ const COMMANDS = [
   { id: 'next', label: 'Next record', key: 'PageDown', where: ['view'], bar: true, run: () => moveRecord(1) },
   { id: 'new', label: 'New note', key: 'n', fkey: 'F3', where: ['browse', 'view'], bar: true, run: () => newRecord() },
   { id: 'edit', label: 'Edit record', key: 'e', fkey: 'F2', where: ['browse', 'view'], run: () => editRecord() },
-  { id: 'copyprev', label: 'Copy source from previous', key: 'Ctrl+d', fkey: 'F5', where: ['view'], bar: true, run: () => copyFromPrevious(false) },
-  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', fkey: 'F6', where: ['view'], run: () => copyFromPrevious(true) },
+  { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy with F5")', key: 'Ctrl+d', fkey: 'F5', barKey: 'F5', where: ['view'], bar: true, run: () => copyFromPrevious(false) },
+  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', fkey: 'F6', barKey: 'F6', where: ['view'], bar: true, run: () => copyFromPrevious(true) },
+  { id: 'save', label: 'Save', key: 'Ctrl+s', fkey: 'F10', barKey: 'F10', where: ['view'], bar: true, run: () => saveRecord() },
   { id: 'revert', label: 'Revert changes to this record', where: ['view'], bar: true, run: () => revertRecord() },
   { id: 'find', label: 'Find', key: '/', fkey: 'F4', where: ['browse', 'view'], bar: true, run: () => focusSearch() },
   { id: 'all', label: 'Show all records', fkey: 'F5', where: ['browse'], run: () => clearSearch() },
@@ -167,9 +209,10 @@ const COMMANDS = [
   { id: 'fields', label: 'Fields', fkey: 'F8', where: ['browse', 'view'], bar: true, run: () => go('fields') },
   { id: 'import', label: 'Import', key: 'i', fkey: 'F9', where: ['home', 'browse', 'view'], bar: true, run: () => pickFiles(startImport) },
   { id: 'export', label: 'Export', key: 'x', fkey: 'F10', where: ['browse', 'view'], bar: true, run: () => go('export') },
+  { id: 'backup', label: 'Backup: save a copy as a file', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, run: () => backupDb() },
   { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
   { id: 'close', label: 'Close database', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
-  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'print', 'import', 'export', 'help'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
+  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'print', 'import', 'export', 'help', 'newdb'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
   { id: 'help', label: 'Help', key: '?', fkey: 'F1', where: ['home', 'browse', 'view', 'sort', 'fields', 'print', 'import', 'export'], bar: true, run: () => go('help') },
   { id: 'theme', label: 'Light or dark screen', key: 'Alt+t', where: ['*'], run: () => cycleTheme() },
   { id: 'palette', label: 'Commands', key: 'Ctrl+k', where: ['*'], bar: true, run: () => openPalette() },
@@ -200,7 +243,7 @@ function runCommand(id) {
 function render() {
   document.body.dataset.mode = state.mode;
   renderTitle();
-  const views = { home: renderHome, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, print: renderPrint, import: renderImport, export: renderExport, help: renderHelp };
+  const views = { home: renderHome, newdb: renderNewDb, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, print: renderPrint, import: renderImport, export: renderExport, help: renderHelp };
   views[state.mode]();
   renderKeys();
   renderStatus();
@@ -229,12 +272,12 @@ function renderTitle() {
 function renderKeys() {
   const shown = COMMANDS.filter((c) => c.bar && available(c) && !(c.id === 'revert' && !recordChanged()));
   $('#keys').innerHTML = shown.map((c) => {
-    const k = keyLabel(c.key);
+    const k = keyLabel(c.barKey ?? c.key);
     return `<button type="button" data-cmd="${c.id}" title="${esc(c.label)}${k ? ` (${esc(k)})` : ''}"><span>${esc(barLabel(c))}</span>${k ? `<kbd>${esc(k)}</kbd>` : ''}</button>`;
   }).join('');
 }
 
-const SHORT = { newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort' };
+const SHORT = { newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
   return SHORT[c.id] ?? c.label;
 }
@@ -262,11 +305,12 @@ function renderHome() {
     </tr>`).join('');
   $('#main').innerHTML = `
     <div class="panel home">
-      <h2>Databases</h2>
+      <h2>Notebooks</h2>
       ${saved.length ? `<table class="grid"><thead><tr><th>Name</th><th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table>
         <p class="hint">Click a database to open it, or use ↑ ↓ and Enter.</p>`
-      : '<p>No databases yet. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import a file from Notebook II or another program, or <kbd>S</kbd> to try a sample.</p>'}
+      : '<p>No notebooks yet. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import a file from Notebook II or another program, or <kbd>S</kbd> to try a sample.</p>'}
       <p class="hint">Every command is on the bar at the bottom, and <kbd>${esc(keyLabel('Ctrl+k'))}</kbd> lists them all.</p>
+      <p class="warn">Notebooks are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a notebook, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>
       <h2>Bringing in your old files</h2>
       <p>Press <kbd>I</kbd> (Import) and choose a Notebook II database's files together: <code>NAME.DAT</code>, <code>NAME.DEF</code> and <code>NAME.IDX</code> (and <code>NAME.MSC</code> and print formats, <code>*.R00</code>, if you have them). Import also reads text that Notebook II or other programs wrote: delimited text (tab, comma, <code>|</code>, <code>~</code> or any character you name), tagged text (<code>Author: …</code> or <code>%Author:…</code> lines), and DOS characters (code page 437). Any other file can be opened with <em>Salvage</em>, which pulls out the readable text.</p>
     </div>`;
@@ -293,7 +337,8 @@ const PAGE = 200;
 
 function renderBrowse() {
   const db = state.db;
-  const cols = db.fields.slice(0, 4).map((f) => f.name);
+  let cols = db.fields.filter((f) => shownInList(db, f)).map((f) => f.name);
+  if (!cols.length) cols = [db.fields[0].name];
   const start = Math.floor(state.cursor / PAGE) * PAGE;
   const slice = state.list.slice(start, start + PAGE);
   const rows = slice.map((r, k) => {
@@ -317,9 +362,9 @@ function renderBrowse() {
 // click goes back to the order the records were entered.
 function sortByColumn(field) {
   const k = state.sortKeys[0];
-  if (k?.field !== field) state.sortKeys = [{ field, descending: false }];
-  else if (!k.descending) state.sortKeys = [{ field, descending: true }];
-  else state.sortKeys = [];
+  if (k?.field !== field) setSort([{ field, descending: false }]);
+  else if (!k.descending) setSort([{ field, descending: true }]);
+  else setSort([]);
   const id = current()?.id;
   refreshList();
   state.cursor = Math.max(0, state.list.findIndex((r) => r.id === id));
@@ -410,8 +455,9 @@ function renderView() {
     <form class="record" id="recordform" autocomplete="off">
       ${state.db.fields.map(({ name }, i) => `
         <label class="field"><span class="fname">${esc(name)}</span>
-          <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
-      <p class="hint">Click a field to change it; changes are saved as you type. <kbd>Esc</kbd> leaves a field, then goes back to the list. <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies ${esc(copyList())} from ${state.copySource ? 'the previous record' : 'the previous record (there is none here)'} into blank fields, <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> just the field you are in.</p>
+          <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)" style="min-height: calc(${fieldLines(state.db.fields[i])} * 1.4em + 2px)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
+      <p class="hint">Fields can be any length, and changes are saved as you type. <kbd>F5</kbd> copies ${esc(copyList())} from ${state.copySource ? 'the previous record' : 'the previous record (there is none here)'} into blank fields; <kbd>F6</kbd> copies just the field you are in. <kbd>Tab</kbd> moves between fields, <kbd>Esc</kbd> leaves a field and then goes back to the list.</p>
+      <p class="meta">${recordMeta(rec)}</p>
     </form>`;
   $$('#recordform textarea').forEach((t, i) => {
     growField(t);
@@ -421,13 +467,40 @@ function renderView() {
       const name = state.db.fields[i].name;
       const wasChanged = recordChanged();
       rec.values[name] = t.value;
-      state.db.modified = new Date().toISOString();
+      touchRecord(state.db, rec);
       persistSoon();
       if (wasChanged !== recordChanged()) renderKeys();
     });
     t.addEventListener('focus', () => { state.editField = i; });
   });
   $('#recordform').addEventListener('submit', (e) => e.preventDefault());
+}
+
+function recordMeta(rec) {
+  const when = (iso) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : null);
+  const bits = [`Record ${rec.id}`];
+  if (rec.created) bits.push(`created ${when(rec.created)}`);
+  if (rec.modified && when(rec.modified) !== when(rec.created)) bits.push(`changed ${when(rec.modified)}`);
+  return esc(bits.join(' · '));
+}
+
+// Changes are saved as you type; F10 or Ctrl+S saves at once and says so.
+function saveRecord() {
+  clearTimeout(persistTimer);
+  persist();
+  say('Saved.');
+}
+
+// Ctrl+Home and Ctrl+End: the start of the first field, the end of the last.
+function recordEdge(end) {
+  const areas = $$('#recordform textarea');
+  const t = end ? areas[areas.length - 1] : areas[0];
+  if (!t) return;
+  t.focus();
+  const at = end ? t.value.length : 0;
+  t.setSelectionRange(at, at);
+  t.scrollIntoView({ block: end ? 'end' : 'start' });
+  if (!end) $('#main').scrollTop = 0;
 }
 
 // Fields grow to fit their text, and fit again when the window changes width.
@@ -551,7 +624,7 @@ function renderSort() {
   $('#sortform').addEventListener('submit', (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
-    state.sortKeys = [0, 1, 2].map((i) => ({ field: f.get(`f${i}`), descending: !!f.get(`d${i}`) })).filter((k) => k.field);
+    setSort([0, 1, 2].map((i) => ({ field: f.get(`f${i}`), descending: !!f.get(`d${i}`) })).filter((k) => k.field));
     refreshList();
     state.cursor = 0;
     go('browse');
@@ -564,24 +637,29 @@ function renderFields() {
   $('#main').innerHTML = `
     <div class="panel" id="fields">
       <h2>Fields</h2>
-      <table class="grid"><thead><tr><th class="num">#</th><th>Name</th><th>Copy previous</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
+      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Copy with F5</th><th>Lines</th><th>In list</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
         <tr><td class="num">${i + 1}</td>
           <td><input data-rename="${esc(name)}" value="${esc(name)}" aria-label="Field name"></td>
-          <td><label class="check"><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''}> from previous</label></td>
+          <td><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''} aria-label="Copy ${esc(name)} with F5"></td>
+          <td><input type="number" min="1" max="40" data-lines="${esc(name)}" value="${fieldLines(field)}" aria-label="Lines shown for ${esc(name)}"></td>
+          <td><input type="checkbox" data-list="${esc(name)}" ${shownInList(db, field) ? 'checked' : ''} aria-label="Show ${esc(name)} in the list"></td>
           <td class="buttons">
             <button type="button" data-move="${esc(name)}" data-d="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
             <button type="button" data-move="${esc(name)}" data-d="1" ${i < db.fields.length - 1 ? '' : 'disabled'} title="Move down">↓</button>
             <button type="button" data-del="${esc(name)}">Delete</button></td></tr>`; }).join('')}
-      </tbody></table>
+      </tbody></table></div>
       <form id="addfield" class="row"><input name="name" placeholder="New field name" aria-label="New field name"><button type="submit">Add field</button></form>
-      <h2>Database name</h2>
-      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Database name"></div>
-      <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter.</p>
-      <p class="hint">"Copy previous" marks the fields that describe a source, such as Author, Title and Year. On a record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies those fields from the previous record into the ones still blank, so a new note on the same book needs only the note.</p>
+      <h2>Notebook name</h2>
+      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Notebook name"></div>
+      <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text (a date written <code>1938-03-17</code> sorts in date order, and <code>1938-03-17 (approx.)</code> still does).</p>
+      <p class="hint"><strong>Copy with F5</strong>: on a record, <kbd>F5</kbd> copies these fields from the previous record into the ones still blank, so a new note from the same source needs only the note. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way. <strong>In list</strong>: shown as a column in the list of records.</p>
+      <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
     </div>`;
   const done = (fn) => { try { fn(); persist(); refreshList(); render(); } catch (e) { say(e.message, true); } };
   $$('[data-rename]').forEach((inp) => inp.addEventListener('change', () => done(() => renameField(db, inp.dataset.rename, inp.value))));
   $$('[data-copy]').forEach((c) => c.addEventListener('change', () => done(() => setFieldCopy(db, c.dataset.copy, c.checked))));
+  $$('[data-lines]').forEach((c) => c.addEventListener('change', () => done(() => setFieldOption(db, c.dataset.lines, 'lines', c.value))));
+  $$('[data-list]').forEach((c) => c.addEventListener('change', () => done(() => setFieldOption(db, c.dataset.list, 'list', c.checked))));
   $$('[data-move]').forEach((b) => b.addEventListener('click', () => done(() => moveField(db, b.dataset.move, +b.dataset.d))));
   $$('[data-del]').forEach((b) => b.addEventListener('click', () => {
     const n = db.records.filter((r) => (r.values[b.dataset.del] ?? '').trim()).length;
@@ -771,6 +849,7 @@ function renderExport() {
       <h2>Export</h2>
       <div class="row"><label>Format</label><select name="format">
         <option value="json">Notebook file (.json) — keeps fields, print forms, everything</option>
+        <option value="vertical">Vertical text — one record after another, for reading (.txt)</option>
         <option value="csv">Comma-separated (.csv)</option>
         <option value="tab">Tab-delimited (.txt)</option>
         <option value="tagged">Tagged text — Field: value (.txt)</option>
@@ -808,7 +887,10 @@ function renderExport() {
     const base = safeName(db.name);
     const enc = form.encoding.value;
     switch (form.format.value) {
-      case 'json': return download(`${base}.nb2.json`, toBytes(exportJson(db, recs)), 'application/json');
+      case 'json':
+        if (recs.length === db.records.length) { db.lastBackup = new Date().toISOString(); persist(); }
+        return download(`${base}.nb2.json`, toBytes(exportJson(db, recs)), 'application/json');
+      case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(f, recs), enc), 'text/plain');
       case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(f, recs), enc), 'text/csv');
       case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, { fieldDelim: '\t' }), enc), 'text/plain');
       case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(f, recs), enc), 'text/plain');
@@ -831,13 +913,31 @@ function renderHelp() {
 
 // ---------- commands that need more than one line ----------
 
-function newDatabase() {
-  const name = prompt('Name of the new database:', 'Notes');
-  if (!name) return;
-  const fields = prompt('Field names, separated by commas:', 'Author, Title, Year, Keywords, Notes');
-  if (fields === null) return;
-  const list = [...new Set(fields.split(',').map((s) => s.trim()).filter(Boolean))];
-  openDb(createDatabase(name.trim(), list.length ? list : ['Text']));
+// A new notebook starts from one of a few layouts, then opens on Fields so the
+// fields can be named and set up before the first record.
+function renderNewDb() {
+  $('#main').innerHTML = `
+    <form class="panel" id="newdbform">
+      <h2>New notebook</h2>
+      <div class="row"><label for="nbname">Name</label><input id="nbname" name="name" value="Notes" required></div>
+      <h2>Start with</h2>
+      ${LAYOUTS.map((l, i) => `
+        <label class="check layout"><input type="radio" name="layout" value="${l.id}" ${i ? '' : 'checked'}>
+          <span><strong>${esc(l.name)}</strong><br><span class="hint">${l.fields.map((f) => esc(f.name)).join(' · ')}</span></span></label>`).join('')}
+      <p class="hint">Every field holds text of any length. You can rename, add, remove and reorder fields on the next screen, and at any time later.</p>
+      <div class="buttons"><button type="submit">Make notebook</button></div>
+    </form>`;
+  const form = $('#newdbform');
+  form.name.focus();
+  form.name.select();
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const layout = LAYOUTS.find((l) => l.id === form.layout.value) ?? LAYOUTS[0];
+    const name = form.name.value.trim() || 'Notes';
+    openDb(createDatabase(name, layout.fields));
+    go('fields');
+    say(`Notebook "${name}" made. Set up its fields here, then press Esc to start adding notes.`);
+  });
 }
 
 function deleteCurrent() {
@@ -878,7 +978,7 @@ function paletteItems() {
     .map((c) => ({ label: c.label, hint: keyLabel(c.key) || c.fkey || '', run: c.run }));
   if (state.db && ['browse', 'view'].includes(state.mode)) {
     for (const { name } of state.db.fields) {
-      items.push({ label: `Sort by ${name}`, hint: '', run: () => { if (state.mode === 'view') go('browse'); state.sortKeys = []; sortByColumn(name); } });
+      items.push({ label: `Sort by ${name}`, hint: '', run: () => { if (state.mode === 'view') go('browse'); setSort([]); sortByColumn(name); } });
       items.push({ label: `Find in ${name}…`, hint: '', run: () => { const s = $('#search'); focusSearch(); s.value = `${/\s/.test(name) ? `"${name}"` : name}:`; } });
     }
   }
@@ -945,6 +1045,7 @@ $('#palette').addEventListener('click', (e) => { if (e.target.id === 'palette') 
 function keyName(e) {
   const ctrl = e.ctrlKey || e.metaKey;
   if (e.altKey && !ctrl && /^Key[A-Z]$/.test(e.code)) return `Alt+${e.code.slice(3).toLowerCase()}`;
+  if (e.altKey && !ctrl && (e.key === 'PageUp' || e.key === 'PageDown')) return `Alt+${e.key}`;
   if (ctrl) return `Ctrl+${e.shiftKey ? 'Shift+' : ''}${e.key.toLowerCase()}`;
   if (e.altKey) return null;
   return e.key;
@@ -956,7 +1057,9 @@ function onKey(key, e) {
   const inRecordField = target?.closest?.('#recordform');
   const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 
-  if (key === 'Ctrl+s') { persist(); say('Saved.'); return; }
+  if (key === 'Ctrl+s') return saveRecord();
+  if (m === 'view' && (key === 'Alt+PageUp' || key === 'Alt+PageDown')) return moveRecord(key === 'Alt+PageUp' ? -1 : 1);
+  if (m === 'view' && (key === 'Ctrl+home' || key === 'Ctrl+end')) return recordEdge(key === 'Ctrl+end');
 
   // Old F-keys: the command that had it on this screen.
   if (/^F\d+$/.test(key)) {
@@ -969,8 +1072,6 @@ function onKey(key, e) {
   if (typing && !modified) {
     if (inRecordField) {
       if (key === 'Escape') { target.blur(); say('Esc again goes back to the list.'); return; }
-      if (key === 'PageUp') return moveRecord(-1);
-      if (key === 'PageDown') return moveRecord(1);
       return false;
     }
     if (key === 'Escape') return runCommand('dback');
@@ -1009,7 +1110,8 @@ document.addEventListener('keydown', (e) => {
   const key = keyName(e);
   if (!key) return;
   // Leave browser and text-editing shortcuts alone (copy, paste, undo …).
-  if (key.startsWith('Ctrl+') && !['Ctrl+s', 'Ctrl+k', 'Ctrl+d', 'Ctrl+Shift+d'].includes(key)) return;
+  if (key.startsWith('Ctrl+') && !['Ctrl+s', 'Ctrl+Shift+s', 'Ctrl+k', 'Ctrl+d', 'Ctrl+Shift+d', 'Ctrl+home', 'Ctrl+end'].includes(key)) return;
+  if ((key === 'Ctrl+home' || key === 'Ctrl+end') && state.mode !== 'view') return;
   if (onKey(key, e) !== false) e.preventDefault();
 });
 

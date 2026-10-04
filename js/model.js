@@ -1,13 +1,35 @@
 // A Notebook II-style database: named fields, variable-length records.
-// Every field of every record is free text of any length.
+// Every field of every record is free text of any length; the program never
+// interprets it. A field also carries a few display settings:
+//   copy   copied from the previous record by F5 (see copiesFromPrevious)
+//   lines  how many lines it shows when a record opens (see fieldLines)
+//   list   shown as a column in the list of records (see shownInList)
+// Each record keeps its id (which is also the order it was entered in) and
+// when it was created and last changed.
 
+// Starting layouts offered for a new notebook. Fields can be changed later.
+export const LAYOUTS = [
+  { id: 'research', name: 'Research notes', fields: [
+    { name: 'Author', copy: true }, { name: 'Title', copy: true }, { name: 'Year', copy: true },
+    { name: 'Keywords', copy: false }, { name: 'Notes', copy: false, lines: 10 }] },
+  { id: 'archive', name: 'Archive notes', fields: [
+    { name: 'Header', copy: false }, { name: 'Note', copy: false, lines: 10 },
+    { name: 'Citation', copy: true }, { name: 'Date', copy: false }] },
+  { id: 'sources', name: 'Archive sources', fields: [
+    { name: 'Country', copy: true }, { name: 'Archive', copy: true }, { name: 'Reference', copy: true },
+    { name: 'Document', copy: false, lines: 10 }, { name: 'Keywords', copy: false }, { name: 'Date', copy: false }] },
+  { id: 'blank', name: 'One field to start with', fields: [{ name: 'Text', copy: false, lines: 10 }] },
+];
+
+// fieldNames: names, or { name, copy, lines, list } objects.
 export function createDatabase(name, fieldNames = ['Text']) {
+  const fields = fieldNames.map((f) => (typeof f === 'string' ? { name: f } : { ...f }));
   return {
     name,
-    fields: fieldNames.map((n) => ({ name: n })),
+    fields,
     records: [],
     nextId: 1,
-    printForms: [defaultPrintForm(fieldNames)],
+    printForms: [defaultPrintForm(fields.map((f) => f.name))],
     created: new Date().toISOString(),
     modified: new Date().toISOString(),
   };
@@ -28,7 +50,8 @@ export function fieldNames(db) {
 }
 
 export function addRecord(db, values = {}) {
-  const rec = { id: db.nextId++, values: {} };
+  const now = new Date().toISOString();
+  const rec = { id: db.nextId++, created: now, modified: now, values: {} };
   for (const f of db.fields) rec.values[f.name] = values[f.name] ?? '';
   db.records.push(rec);
   touch(db);
@@ -39,8 +62,13 @@ export function updateRecord(db, id, values) {
   const rec = db.records.find((r) => r.id === id);
   if (!rec) throw new Error(`No record ${id}`);
   for (const f of db.fields) if (f.name in values) rec.values[f.name] = values[f.name];
-  touch(db);
+  touchRecord(db, rec);
   return rec;
+}
+
+export function touchRecord(db, rec) {
+  rec.modified = new Date().toISOString();
+  touch(db);
 }
 
 export function deleteRecords(db, ids) {
@@ -74,6 +102,7 @@ export function renameField(db, oldName, newName) {
     r.values[newName] = r.values[oldName] ?? '';
     delete r.values[oldName];
   }
+  for (const k of db.sortKeys ?? []) if (k.field === oldName) k.field = newName;
   for (const form of db.printForms) {
     const esc = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     form.template = form.template.replace(new RegExp(`\\{${esc}(:\\d+)?\\}`, 'g'), (_, w) => `{${newName}${w ?? ''}}`);
@@ -84,6 +113,7 @@ export function renameField(db, oldName, newName) {
 export function deleteField(db, name) {
   if (db.fields.length === 1) throw new Error('A database needs at least one field');
   db.fields = db.fields.filter((f) => f.name !== name);
+  if (db.sortKeys) db.sortKeys = db.sortKeys.filter((k) => k.field !== name);
   for (const r of db.records) delete r.values[name];
   touch(db);
 }
@@ -107,9 +137,30 @@ export function copiesFromPrevious(field) {
 }
 
 export function setFieldCopy(db, name, copy) {
+  setFieldOption(db, name, 'copy', !!copy);
+}
+
+// Long-text fields open taller; any field can be set from 1 to 40 lines.
+const LONG = /note|comment|text|abstract|summar|document|excerpt|quot|remark|transcri|description/i;
+
+export function fieldLines(field) {
+  return field.lines ?? (LONG.test(field.name) ? 8 : 1);
+}
+
+// Until chosen, the list shows the first four fields.
+export function shownInList(db, field) {
+  return field.list ?? db.fields.indexOf(field) < 4;
+}
+
+export function setFieldOption(db, name, key, value) {
   const field = db.fields.find((f) => f.name === name);
   if (!field) throw new Error(`No field called ${name}`);
-  field.copy = !!copy;
+  if (key === 'lines') value = Math.max(1, Math.min(40, Math.round(+value) || 1));
+  if (key === 'list' && !value && !db.fields.some((f) => f !== field && shownInList(db, f))) {
+    throw new Error('The list needs at least one field');
+  }
+  if (key === 'list') db.fields.forEach((f) => { f.list = shownInList(db, f); });
+  field[key] = value;
   touch(db);
 }
 
