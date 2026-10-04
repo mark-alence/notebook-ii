@@ -14,23 +14,26 @@ then go to http://localhost:8080. Opening `index.html` straight from disk won't 
 
 To put it online, turn on GitHub Pages once (Settings > Pages > Source: **GitHub Actions**). After that, `.github/workflows/pages.yml` runs the tests and publishes the app on every push to `main`. Pages for a private repository needs a paid GitHub plan, and the site itself is public. Databases stay in each visitor's own browser and are never uploaded.
 
-Databases are saved in the browser as you work. **F10 Export > Notebook file** makes a `.nb2.json` copy for backups or for moving to another computer.
+Databases are saved in the browser as you work. **Export > Notebook file** makes a `.nb2.json` copy for backups or for moving to another computer.
 
-## Keys
+## Using it
+
+Every command is on the bar at the bottom of the screen, labelled, with its key beside it, so you can click, tap or type. **Ctrl+K** (⌘K on a Mac) opens a list of all commands: type part of a name (`exp` for Export, `sort year`, `find author`) and press Enter.
 
 | Key | Does | Key | Does |
 |---|---|---|---|
-| F1 | Help | F6 | Sort by up to three fields |
-| F2 | Edit record | F7 | Print forms and printing |
-| F3 | Add record | F8 | Add, rename, reorder fields |
-| F4 or `/` | Find | F9 | Import a file |
-| F5 | Show all records | F10 | Export (Save while editing) |
-| Enter | Show whole record | Del | Delete record |
-| PgUp / PgDn | Previous / next | Esc | Back, or close the database |
+| `/` or F | Find: jump to the search box | N | New note |
+| Click or Enter | Open a record | S | Sort by up to three fields |
+| Column heading | Sort by it (again: Z to A, again: off) | P | Print |
+| Esc | Back: out of a field, the record, the database | X / I | Export / Import |
+| PgUp / PgDn | Previous / next record | Del | Delete record |
+| Ctrl+D | Copy the source from the previous record | ? | Help |
 
-Every command is also on the bar at the bottom of the screen for mouse and touch.
+The search box in the title bar filters as you type; Enter or ↓ moves to the list and Esc clears it. The original F-keys still work: F2 edit, F3 new, F4 find, F5 show all, F6 sort, F7 print, F8 fields, F9 import, F10 export.
 
-While editing a record, **F5** copies the previous record's source fields (Author, Title, Year and the like) into the ones still blank, so a new note on the same book only needs the note itself. **F6** copies just the field the cursor is in. Which fields F5 copies is a checkbox per field under **F8 Fields**; until you change it, fields with names like Notes, Comments, Pages or Keywords are left out.
+A record opens ready to read and to change: click a field and type, and changes are saved as you go. **Revert** on the command bar puts the record back as it was when you opened it. A new note left blank is dropped when you leave it.
+
+On a record, **Ctrl+D** copies the previous record's source fields (Author, Title, Year and the like) into the ones still blank, so a new note on the same book only needs the note itself; **Ctrl+Shift+D** copies just the field the cursor is in. "Previous" is the record you were on when you pressed N, or for an existing record the one before it in the list. Which fields are copied is a checkbox per field under **Fields**; until you change it, fields with names like Notes, Comments, Pages or Keywords are left out.
 
 The screen follows the computer's light or dark setting. The word at the right of the title bar, or **Alt+T**, switches between Auto, Light and Dark.
 
@@ -59,10 +62,10 @@ A print form is a text template filled in for each record. `{Field}` puts in a f
 
 ## Your old Notebook II files
 
-**F9 Import** reads Notebook II's own database files and the text files it and other programs wrote:
+**Import** (I) reads Notebook II's own database files and the text files it and other programs wrote:
 
 - **Notebook II databases.** A database called NAME is several files: choose `NAME.DAT`, `NAME.DEF` and `NAME.IDX` together, plus `NAME.MSC` and any custom print formats (`*.R00`) if you have them. File names can be in any case. Records marked deleted are left out unless you tick *Include records marked deleted* (they then get a `Deleted` field saying `yes`), and print formats become print forms. `NAME.DAT` on its own is recognized too, but without the `.IDX` every saved copy of an edited record comes in, and without the `.DEF` the fields are called Field 1, Field 2 … The format is described in [docs/notebook-ii-format.md](docs/notebook-ii-format.md).
-- **Notebook II import text.** `%Start:`, `%Author:…` lines and `%End:`, the "Notebook format" that Notebook II's own Import read. **F10 Export > Notebook II import text** writes it, in code page 437, so a database can go back to the DOS program.
+- **Notebook II import text.** `%Start:`, `%Author:…` lines and `%End:`, the "Notebook format" that Notebook II's own Import read. **Export > Notebook II import text** writes it, in code page 437, so a database can go back to the DOS program.
 - **Delimited text.** Fields split by any character (tab, comma, `|`, `~`, `^`, ASCII 30/31 …), records by line breaks or another character, with an optional marker for line breaks inside a field (the DOS `¶`, character 20, is recognized automatically). Quoted CSV works. The import guesses the delimiters and whether the first row holds field names, and you can change them while watching a preview.
 - **Tagged text.** `Field: value` lines, with records separated by blank lines or rule lines (`---`, `***`, form feeds). Indented lines continue the field above.
 - **DOS characters.** Files are read as code page 437 unless they are valid UTF-8, so accented letters and box-drawing characters come through. A Ctrl-Z end-of-file marker is ignored.
