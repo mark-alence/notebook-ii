@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Notebook II",
+  "version": "0.1.0",
+  "identifier": "io.github.markalence.notebookii",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "node scripts/build-web.mjs",
+    "beforeDevCommand": "node scripts/build-web.mjs"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Notebook II",
+        "width": 1100,
+        "height": 760,
+        "minWidth": 480,
+        "minHeight": 360
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "A text database for research notes",
+    "longDescription": "Notebook II keeps research notes and bibliographies as records with fields you name, each holding text of any length. It reads databases from the 1980s DOS program of the same name.",
+    "copyright": "Notebook II was a product of Pro/Tem Software, Inc. This is an independent recreation.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["nb2"],
+        "name": "Notebook II notebook",
+        "description": "Notebook II notebook",
+        "role": "Editor",
+        "mimeType": "application/x-notebook-ii"
+      }
+    ]
+  }
+}

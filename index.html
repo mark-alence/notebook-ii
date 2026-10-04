@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Notebook II</title>
   <meta name="description" content="A text database in the style of Notebook II from Pro/Tem Software">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 fill=%22%2300a%22/%3E%3Cpath d=%22M3 3h10v10H3z%22 fill=%22none%22 stroke=%22%230aa%22/%3E%3Cpath d=%22M5 6h6M5 8h6M5 10h4%22 stroke=%22%23fff%22/%3E%3C/svg%3E">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#00aaaa">
   <link rel="stylesheet" href="css/style.css">
   <script>try { var t = localStorage.getItem('nb2:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
@@ -23,6 +26,13 @@
     <nav id="keys" aria-label="Commands"></nav>
   </div>
   <pre id="print-area"></pre>
+  <div id="ask" class="overlay" hidden>
+    <div class="pbox" role="alertdialog" aria-labelledby="askmsg">
+      <p id="askmsg"></p>
+      <div class="buttons"><button type="button" id="askyes">Yes</button><button type="button" id="askno">Cancel</button></div>
+      <p class="hint"><kbd>Y</kbd> yes &nbsp; <kbd>N</kbd> or <kbd>Esc</kbd> no</p>
+    </div>
+  </div>
   <div id="palette" hidden>
     <div class="pbox" role="dialog" aria-label="Commands">
       <input id="pinput" autocomplete="off" spellcheck="false" placeholder="Type a command or a field name" aria-label="Command">
@@ -70,7 +80,8 @@
 
       <h2>Finding records</h2>
       <table class="keys-table">
-        <tr><td><code>smith</code></td><td>the word anywhere in the record</td></tr>
+        <tr><td><code>smith</code></td><td>anywhere in the record, also inside longer words (smithy, Goldsmith); <code>cott</code> finds cotton</td></tr>
+        <tr><td><code>"smith"</code></td><td>only the whole word</td></tr>
         <tr><td><code>author:smith</code></td><td>only in the Author field (the start of a field name is enough)</td></tr>
         <tr><td><code>"civil war"</code></td><td>a phrase</td></tr>
         <tr><td><code>hist*</code> &nbsp; <code>wom?n</code></td><td>any ending &nbsp;/&nbsp; any one letter</td></tr>
@@ -82,6 +93,8 @@
         <tr><td><code>"date of birth":1850</code></td><td>quote field names that have spaces</td></tr>
         <tr><td><code>title=the</code> &nbsp; <code>-title=the</code></td><td>Title begins / doesn't begin with "the"</td></tr>
         <tr><td><code>year&gt;1980</code> &nbsp; <code>author&lt;=m</code></td><td>the field begins later / the same or earlier in alphabetical or numerical order (also <code>&lt;</code> and <code>&gt;=</code>)</td></tr>
+        <tr><td><code>/colou?r/</code></td><td>a regular expression, anywhere in the record. Capitals don't matter unless you add <code>c</code> after it: <code>/Smith/c</code></td></tr>
+        <tr><td><code>citation:/^CO 9\d/</code></td><td>a regular expression in one field; mix it with any other terms, e.g. <code>/^19[34]\d/ -farmers</code></td></tr>
       </table>
       <p>Capitals and accents don't matter. Sorting and printing work on the records found.</p>
 
@@ -92,6 +105,7 @@
 
       <h2>Where your data is kept</h2>
       <p>Notebooks are saved in this browser as you work. They are not on your other devices, and clearing the browser's history or site data deletes them. <em>Backup</em> on the command bar (<kbd data-key-label="Ctrl+Shift+s">Ctrl+Shift+S</kbd>) saves a copy of the open notebook as a file; Import reads it back, on this computer or another. If a notebook has changed and has not been backed up for a week, it reminds you when you open it.</p>
+      <p>In the <strong>desktop app</strong> each notebook is instead a file on your computer (<code>.nb2</code>), saved as you type: back it up like any other document. File → Open (<kbd>O</kbd>) opens one, and Save As (<kbd data-key-label="Ctrl+Shift+s">Ctrl+Shift+S</kbd>) turns a notebook kept inside the app into a file.</p>
       <p>Export also writes <em>vertical text</em>: each record's fields one after another, long notes under their label. It is the most readable copy to keep, print or quote from, and Import can read it back. Exports follow the list's current order and search.</p>
     </div>
   </template>

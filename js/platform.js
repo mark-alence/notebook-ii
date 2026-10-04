@@ -1,0 +1,78 @@
+// What differs between the web page and the desktop app (Tauri). The desktop
+// app keeps each notebook as a file on disk and has native file dialogs and a
+// menu bar; the web page keeps notebooks in browser storage and downloads
+// files. Everything else in the program is the same code.
+const T = globalThis.__TAURI__;
+export const desktop = !!T;
+
+const invoke = (cmd, args) => T.core.invoke(cmd, args);
+
+export const NOTEBOOK_FILTERS = [{ name: 'Notebook', extensions: ['nb2', 'json'] }];
+
+// Save bytes the user asked for (an export, a backup). Web: a download.
+// Desktop: a Save dialog. Returns the path or file name, or null if cancelled.
+export async function saveBytes(name, bytes, type = 'application/octet-stream') {
+  if (desktop) {
+    const ext = /\.([^.]+)$/.exec(name)?.[1];
+    const path = await invoke('pick_save', { title: 'Save', defaultName: name, filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : [] });
+    if (!path) return null;
+    await invoke('write_bytes', { path, bytes: Array.from(bytes) });
+    return path;
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return name;
+}
+
+export async function pickNotebookToOpen() {
+  return invoke('pick_open', { title: 'Open notebook', filters: NOTEBOOK_FILTERS });
+}
+
+export async function pickNotebookPath(name) {
+  return invoke('pick_save', { title: 'Save notebook as', defaultName: `${name}.nb2`, filters: NOTEBOOK_FILTERS });
+}
+
+export const readText = (path) => invoke('read_text', { path });
+
+// The desktop side writes to a temporary file and renames it, so a crash or
+// power cut mid-save never leaves half a notebook.
+export const writeText = (path, text) => invoke('write_text', { path, text });
+
+// A notebook file the app was opened with (double-clicked in the file manager).
+export const launchFile = () => (desktop ? invoke('launch_file') : Promise.resolve(null));
+
+export function onMenu(handler) {
+  if (desktop) T.event.listen('menu', (e) => handler(e.payload));
+}
+
+export function onOpenFile(handler) {
+  if (desktop) T.event.listen('open-file', (e) => handler(e.payload));
+}
+
+export function setTitle(text) {
+  document.title = text;
+  if (desktop) T.window.getCurrentWindow().setTitle(text).catch(() => {});
+}
+
+// Runs fn (which may return a promise) before the window closes.
+export function beforeClose(fn) {
+  if (!desktop) return;
+  const win = T.window.getCurrentWindow();
+  win.onCloseRequested(async (e) => {
+    e.preventDefault();
+    try { await fn(); } finally { await win.destroy(); }
+  });
+}
+
+// Asks the window to close, so beforeClose runs first.
+export function closeWindow() {
+  if (desktop) return T.window.getCurrentWindow().close();
+}
+
+export function fileName(path) {
+  return path.split(/[\\/]/).pop();
+}

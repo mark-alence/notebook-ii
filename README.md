@@ -16,6 +16,13 @@ To put it online, turn on GitHub Pages once (Settings > Pages > Source: **GitHub
 
 Notebooks are saved in the browser as you work; see [Keeping your notebooks safe](#keeping-your-notebooks-safe).
 
+### As an app
+
+- **Install from the browser.** In Chrome or Edge, open the site and choose *Install* in the address bar (or the ⋮ menu → *Install Notebook II*). In Safari on a Mac, *File → Add to Dock*. It then opens in its own window and works without an internet connection. Notebooks are still kept in that browser.
+- **Desktop app.** A real program for macOS, Windows and Linux, from the repository's *Releases* page. Each notebook is a file on your computer (`.nb2`), saved as you type, that you can back up, copy or keep in a synced folder like any document; double-clicking one opens it. It has a menu bar (File, Edit, Search, View, Help) alongside the command bar.
+
+The desktop app is the same code wrapped with [Tauri](https://tauri.app). To build it yourself you need Node 20 and Rust (plus, on Linux, `libwebkit2gtk-4.1-dev`): `npm install`, then `npm run desktop` to run it or `npm run desktop:build` to make an installer. The **Desktop app** workflow on GitHub builds installers for all three systems: run it from the Actions tab, or push a tag such as `v0.2.0`, and a draft release appears with the installers attached. The apps are not code-signed yet, so the first launch shows a warning: on a Mac right-click the app and choose *Open*; on Windows choose *More info* → *Run anyway*.
+
 ## Using it
 
 Every command is on the bar at the bottom of the screen, labelled, with its key beside it, so you can click, tap or type. **Ctrl+K** (⌘K on a Mac) opens a list of all commands: type part of a name (`exp` for Export, `sort year`, `find author`) and press Enter.
@@ -60,7 +67,8 @@ The screen follows the computer's light or dark setting. The word at the right o
 ## Finding records
 
 ```
-smith                 the word anywhere
+smith                 anywhere, also inside words (smithy, Goldsmith)
+"smith"               only the whole word
 author:smith          only in the Author field
 "civil war"           a phrase
 hist*   wom?n         wildcards
@@ -72,9 +80,11 @@ notes:   notes:*      Notes blank / not blank
 "date of birth":1850  field names with spaces
 title=the  -title=the Title begins / doesn't begin with "the"
 year>1980  author<=m  begins later / the same or earlier (also < and >=)
+/colou?r/             a regular expression (add c after it to match capitals: /Smith/c)
+citation:/^CO 9\d/    a regular expression in one field
 ```
 
-Search ignores capitals and accents. The last two lines are Notebook II's Select conditions (begins with, greater/less than); numbers compare as numbers.
+Search ignores capitals and accents (regular expressions ignore capitals but not accents). The last two lines are Notebook II's Select conditions (begins with, greater/less than); numbers compare as numbers.
 
 ## Print forms
 
@@ -105,6 +115,9 @@ js/exporters.js   writers
 js/printform.js   print form templates
 js/cp437.js       DOS character set
 js/storage.js     saving in the browser
+js/platform.js    what differs in the desktop app (files, dialogs, menu)
+src-tauri/        the desktop app shell (Rust, Tauri 2)
+sw.js             offline copy for the installed web app
 js/app.js         the screen and keys
 ```
 

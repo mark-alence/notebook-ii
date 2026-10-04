@@ -48,3 +48,33 @@ export function removeDb(key) {
     // nothing to do
   }
 }
+
+// Desktop app: notebook files opened recently, newest first. Only the list is
+// kept here; the notebooks themselves are files on disk.
+const RECENT = 'nb2:recent';
+
+export function listRecent() {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function addRecent(entry) {
+  try {
+    const list = listRecent().filter((r) => r.path !== entry.path);
+    list.unshift(entry);
+    localStorage.setItem(RECENT, JSON.stringify(list.slice(0, 20)));
+  } catch {
+    // The list is a convenience; the file itself is saved.
+  }
+}
+
+export function removeRecent(path) {
+  try {
+    localStorage.setItem(RECENT, JSON.stringify(listRecent().filter((r) => r.path !== path)));
+  } catch {
+    // nothing to do
+  }
+}

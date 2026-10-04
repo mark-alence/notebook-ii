@@ -271,8 +271,8 @@ table.browse th:first-child { width: 6ch; }
 
 /* ---------- command palette, drawn like a DOS dialog box ---------- */
 
-#palette { position: fixed; inset: 0; z-index: 10; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 0; background: color-mix(in srgb, var(--black) 35%, transparent); }
-#palette .pbox {
+#palette, .overlay { position: fixed; inset: 0; z-index: 10; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 0; background: color-mix(in srgb, var(--black) 35%, transparent); }
+#palette .pbox, .overlay .pbox {
   width: min(64ch, 100%);
   background: var(--bg);
   color: var(--fg);
@@ -310,3 +310,5 @@ table.browse th:first-child { width: 6ch; }
   #print-area .page { break-after: page; }
   #print-area .page:last-child { break-after: auto; }
 }
+#main .where { color: var(--hint); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grid tr.cur td.where { color: inherit; }
