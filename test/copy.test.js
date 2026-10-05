@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDatabase, addRecord, carryOver, copiesFromPrevious, setFieldCopy, renameField } from '../js/model.js';
+import { createDatabase, addRecord, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, renameField } from '../js/model.js';
 
 const db = () => {
   const d = createDatabase('t', ['Author', 'Title', 'Year', 'Pages', 'Keywords', 'Notes']);
@@ -41,4 +41,21 @@ test('the fields F5 copies can be chosen, and survive a rename', () => {
   renameField(d, 'Keywords', 'Subjects');
   assert.deepEqual(d.fields.filter(copiesFromPrevious).map((f) => f.name), ['Author', 'Title', 'Subjects']);
   assert.throws(() => setFieldCopy(d, 'Nope', true), /No field/);
+});
+
+test('copy previous: text already there is replaced only when asked', () => {
+  const d = createDatabase('t', ['Author', 'Title', 'Notes']);
+  const from = addRecord(d, { Author: 'Darnton', Title: 'Cat Massacre', Notes: 'x' });
+  const values = { Author: 'Ginzburg', Title: '', Notes: 'mine' };
+  assert.deepEqual(copyClashes(d, from, values), ['Author']);
+  assert.deepEqual(copyClashes(d, from, { Author: 'Darnton', Title: '' }), []);
+  assert.deepEqual(copyClashes(d, from, values, 'Notes'), ['Notes']);
+  assert.deepEqual(copyClashes(d, null, values), []);
+  const kept = { ...values };
+  assert.deepEqual(carryOver(d, from, kept), ['Title']);
+  assert.equal(kept.Author, 'Ginzburg');
+  const replaced = { ...values };
+  assert.deepEqual(carryOver(d, from, replaced, null, { overwrite: true }), ['Author', 'Title']);
+  assert.equal(replaced.Author, 'Darnton');
+  assert.equal(replaced.Notes, 'mine');
 });
