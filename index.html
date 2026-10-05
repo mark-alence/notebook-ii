@@ -71,8 +71,8 @@
       <h2>On a record</h2>
       <p>A record opens ready to read and to change: click a field and type. Fields can be any length; a long note simply scrolls. Changes are saved as you go. <em>Revert</em> on the command bar puts the record back as it was when you opened it.</p>
       <table class="keys-table">
-        <tr><td><kbd>F5</kbd> or <kbd data-key-label="Ctrl+d">Ctrl+D</kbd></td><td>Copy previous: fills the fields ticked "Copy with F5" in Fields (say Author, Title and Year) from the previous record, where they are still blank, and leaves the note alone</td></tr>
-        <tr><td><kbd>F6</kbd> or <kbd data-key-label="Ctrl+Shift+d">Ctrl+Shift+D</kbd></td><td>Copy just the field the cursor is in from the previous record</td></tr>
+        <tr><td><kbd>F5</kbd> or <kbd data-key-label="Ctrl+d">Ctrl+D</kbd></td><td>Copy previous: fills the fields ticked "Copy with F5" in Fields (say Author, Title and Year) from the previous record (see below) and leaves the note alone. If one of them already has different text, it asks before replacing it.</td></tr>
+        <tr><td><kbd>F6</kbd> or <kbd data-key-label="Ctrl+Shift+d">Ctrl+Shift+D</kbd></td><td>Copy just the field the cursor is in from the previous record, asking first if that would replace text</td></tr>
         <tr><td><kbd>F10</kbd> or <kbd data-key-label="Ctrl+s">Ctrl+S</kbd></td><td>Save now (it saves as you type anyway)</td></tr>
         <tr><td><kbd>Tab</kbd> <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Next / previous field. Inside a field, ↑ ↓ PgUp PgDn move through the text.</td></tr>
         <tr><td><kbd data-key-label="Ctrl+Home">Ctrl+Home</kbd> <kbd data-key-label="Ctrl+End">Ctrl+End</kbd></td><td>Start / end of the whole record</td></tr>
@@ -81,7 +81,7 @@
         <tr><td><kbd data-key-label="Ctrl+f">Ctrl+F</kbd>, <kbd>F4</kbd> or <kbd>/</kbd></td><td>Find in this record, in the box in the title bar: type text or a <code>/pattern/</code>; every match is highlighted, Enter goes to the next and Shift+Enter the previous, Esc puts the cursor on the match. The words stay as you page to other records with PgUp/PgDn. (<kbd>/</kbd> only when you are not typing in a field.)</td></tr>
         <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>F2</kbd></td><td>Start a block, as in Emacs: move the cursor with the arrows, Home, End, PgUp or PgDn (Ctrl for whole words) and the block follows. Ctrl+C copies it, Ctrl+X cuts it, Delete or typing replaces it, Esc or Ctrl+Space again cancels it. On a Mac, if Ctrl+Space switches keyboard languages, use Ctrl+F2.</td></tr>
       </table>
-      <p>"Previous record" means, for a new note, the record you were on when you made it, so after one note you can press <kbd>N</kbd> and then <kbd>F5</kbd> for the next note from the same source. For an existing record it is the one before it in the list.</p>
+      <p>The "previous record" is the record you had open just before this one. For a new note it is the record you were on when you pressed <kbd>N</kbd> (open, or highlighted in the list), so after one note you can press <kbd>N</kbd> and then <kbd>F5</kbd> for the next note from the same source. To copy into an existing record, open the record to copy from first, then the one to fill in. Until you have opened another record, it is the record made just before. The note under the record names it, e.g. "F5 copies Author, Title and Year from <strong>#125 (Darnton, Robert)</strong>".</p>
 
       <h2>Fields</h2>
       <p>A notebook is whatever fields you give it, and every field holds plain text of any length. Dates and numbers are typed as text too: <code>1938-03-17</code> sorts in date order, and so does <code>1938-03-17 (approx.)</code>. In Fields you can rename, add, remove and reorder fields, tick which ones <kbd>F5</kbd> copies, set how many lines each one shows when a record opens, and choose which appear as columns in the list. The list remembers how you last sorted it.</p>

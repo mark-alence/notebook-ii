@@ -4,7 +4,7 @@
 // work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, orderRecords, previousEntered, withRecordNumbers, recordNumbersIn, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
+  moveField, orderRecords, previousEntered, withRecordNumbers, recordNumbersIn, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
 } from './model.js';
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
 import { FONTS, SPACING, SIZE, LIST_ROWS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
@@ -39,6 +39,7 @@ const state = {
   viewIsNew: false,
   editField: 0, // the field that last had the cursor on the record screen
   copySource: null, // the record "Copy previous" copies from
+  lastViewedId: null, // the record open before this one
   formIndex: 0,
   exp: null, // the Export screen's choices, kept while the notebook is open
   imp: null,
@@ -128,6 +129,8 @@ function openDb(db, key = newKey(), path = null) {
   state.cursor = 0;
   state.formIndex = 0;
   state.exp = null;
+  state.copySource = null;
+  state.lastViewedId = null;
   $('#search').value = '';
   refreshList();
   if (path) addRecent({ path, name: db.name, records: db.records.length, modified: db.modified });
@@ -588,18 +591,32 @@ function openRecord(rec = current(), { isNew = false, focus = false } = {}) {
   state.viewId = rec.id;
   state.viewSnapshot = { ...rec.values };
   state.viewIsNew = isNew;
-  if (!isNew) state.copySource = previousInList(rec);
+  const last = isNew ? null : lastViewed(rec);
+  const reopened = state.lastViewedId === rec.id && state.copySource && state.copySource.id !== rec.id && state.db.records.includes(state.copySource);
+  if (last) {
+    state.copySource = last;
+    state.copyWhy = 'open';
+  } else if (!isNew && !reopened) {
+    state.copySource = previousEntered(state.db.records, rec);
+    state.copyWhy = 'made';
+  }
+  state.lastViewedId = rec.id;
   go('view');
   if (focus) focusField(isNew ? 0 : state.editField);
 }
 
-// "Previous" for an existing record: the one before it when the list is sorted
-// by a field, otherwise the one made just before it, whichever way the list
-// runs.
-function previousInList(rec) {
-  if (!state.sortKeys.length || !state.list?.some((r) => r.id === rec.id)) return previousEntered(state.db.records, rec);
-  const i = state.list.findIndex((r) => r.id === rec.id);
-  return i > 0 ? state.list[i - 1] : null;
+// "Previous" (what F5 and F6 copy from) for an existing record: the record
+// that was open before it; until another record has been opened, the one
+// made just before it.
+function lastViewed(rec) {
+  if (!state.lastViewedId || state.lastViewedId === rec.id) return null;
+  return state.db.records.find((r) => r.id === state.lastViewedId) ?? null;
+}
+
+// How a record is named on screen: #125 (Darnton, Robert).
+function recordLabel(rec) {
+  const first = state.db.fields.map(({ name }) => (rec.values[name] ?? '').trim()).find(Boolean);
+  return `#${rec.id}${first ? ` (${preview(first, 40)})` : ''}`;
 }
 
 function newRecord() {
@@ -608,8 +625,9 @@ function newRecord() {
   leaveRecord();
   const rec = addRecord(state.db, {});
   state.copySource = from;
+  state.copyWhy = 'new';
   openRecord(rec, { isNew: true, focus: true });
-  say(from ? `New note. ${keyLabel('Ctrl+d')} fills in ${copyList()} from the previous one.` : 'New note.');
+  say(from ? `New note. F5 or ${keyLabel('Ctrl+d')} fills in ${copyList()} from ${recordLabel(from)}.` : 'New note.');
 }
 
 function editRecord() {
@@ -662,7 +680,7 @@ function renderView() {
       ${state.db.fields.map(({ name }, i) => `
         <label class="field"><span class="fname">${esc(name)}</span>
           <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)" style="min-height: calc(${fieldLines(state.db.fields[i])} * var(--lh, 1.4) * 1em + 2px)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
-      <p class="hint">Fields can be any length, and changes are saved as you type. <kbd>F5</kbd> copies ${esc(copyList())} from ${state.copySource ? 'the previous record' : 'the previous record (there is none here)'} into blank fields; <kbd>F6</kbd> copies just the field you are in. <kbd>Tab</kbd> moves between fields, <kbd>Esc</kbd> leaves a field and then goes back to the list.</p>
+      <p class="hint">Fields can be any length, and changes are saved as you type. ${state.copySource ? `<kbd>F5</kbd> copies ${esc(copyList())} from <strong>${esc(recordLabel(state.copySource))}</strong>, ${{ open: 'the record you had open before this one', made: 'the record made just before this one (no other record has been open yet)', new: 'the record you were on when you made this note' }[state.copyWhy]}; <kbd>F6</kbd> copies just the field you are in. Text already in a field is replaced only after you say OK.` : '<kbd>F5</kbd> and <kbd>F6</kbd> copy from the record you had open before this one; there is none yet.'} <kbd>Tab</kbd> moves between fields, <kbd>Esc</kbd> leaves a field and then goes back to the list.</p>
       <p class="meta">${recordMeta(rec)}</p>
     </form>`;
   $$('#recordform textarea').forEach((t, i) => {
@@ -732,20 +750,30 @@ function revertRecord() {
   say('Changes to this record undone.');
 }
 
+// Author, Title and Year
+const andList = (names) => (names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+
 function copyList() {
   const names = state.db.fields.filter(copiesFromPrevious).map((f) => f.name);
-  if (!names.length) return 'no fields (choose them in Fields)';
-  return names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return names.length ? andList(names) : 'no fields (choose them in Fields)';
 }
 
-function copyFromPrevious(onlyCurrentField) {
+async function copyFromPrevious(onlyCurrentField) {
   const from = state.copySource;
-  if (!from) return say('There is no previous record to copy from.', true);
+  if (!from) return say('There is no previous record to copy from: open the record to copy from first, then this one.', true);
   const areas = $$('#recordform textarea');
   const values = {};
   state.db.fields.forEach(({ name }, i) => { values[name] = areas[i].value; });
   const field = state.db.fields[state.editField];
-  const copied = carryOver(state.db, from, values, onlyCurrentField ? field?.name : null);
+  const only = onlyCurrentField ? field?.name : null;
+  // Replacing text that is already there needs an OK.
+  const clashes = copyClashes(state.db, from, values, only);
+  let overwrite = false;
+  if (clashes.length) {
+    if (!(await ask(`${andList(clashes)} already ${clashes.length === 1 ? 'has' : 'have'} text. Replace it with the text from ${recordLabel(from)}?`, 'OK'))) return say('Nothing copied.');
+    overwrite = true;
+  }
+  const copied = carryOver(state.db, from, values, only, { overwrite });
   state.db.fields.forEach(({ name }, i) => {
     if (!copied.includes(name)) return;
     areas[i].value = values[name];
@@ -753,9 +781,9 @@ function copyFromPrevious(onlyCurrentField) {
   });
   const firstBlank = areas.findIndex((a) => !a.value.trim());
   areas[onlyCurrentField || firstBlank < 0 ? state.editField : firstBlank]?.focus();
-  if (copied.length) return say(`Copied ${copied.join(', ')} from the previous record.`);
-  if (onlyCurrentField) return say(`The previous record's ${field?.name ?? 'field'} is blank or the same.`);
-  say('Nothing to copy: those fields are already filled in or blank in the previous record.');
+  if (copied.length) return say(`Copied ${andList(copied)} from ${recordLabel(from)}.`);
+  if (onlyCurrentField) return say(`${recordLabel(from)} has the same ${field?.name ?? 'field'}, or it is blank there.`);
+  say(`Nothing to copy: ${recordLabel(from)} has the same text in those fields, or they are blank there.`);
 }
 
 // ---------- search box ----------

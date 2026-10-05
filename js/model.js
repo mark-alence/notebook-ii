@@ -187,14 +187,26 @@ export function setFieldOption(db, name, key, value) {
 // values: the record being edited, { field: text }. Copies from the record
 // `from` into the copied fields that are still blank, or into the one field
 // `only` whatever it holds. Returns the names of the fields filled in.
-export function carryOver(db, from, values, only = null) {
+// Fields that copying would change from text already there to other text.
+export function copyClashes(db, from, values, only = null) {
+  if (!from) return [];
+  const targets = only ? db.fields.filter((f) => f.name === only) : db.fields.filter(copiesFromPrevious);
+  return targets.map((f) => f.name).filter((name) => {
+    const v = from.values[name] ?? '';
+    return v.trim() && (values[name] ?? '').trim() && v !== values[name];
+  });
+}
+
+// Copy into values (only one field, or the "Copy with F5" fields); text
+// already there is kept unless overwrite is set (the default for one field).
+export function carryOver(db, from, values, only = null, { overwrite = !!only } = {}) {
   const copied = [];
   if (!from) return copied;
   const targets = only ? db.fields.filter((f) => f.name === only) : db.fields.filter(copiesFromPrevious);
   for (const { name } of targets) {
     const v = from.values[name] ?? '';
     if (!v.trim() || v === values[name]) continue;
-    if (!only && (values[name] ?? '').trim()) continue;
+    if (!overwrite && (values[name] ?? '').trim()) continue;
     values[name] = v;
     copied.push(name);
   }
