@@ -47,14 +47,13 @@ In a new note, **F5** (or Ctrl+D) copies the source fields (Author, Title, Year 
 
 ## Fields
 
-A notebook is whatever fields you give it, and every field holds plain text of any length. There are no date or number types: `1938-03-17` sorts in date order as text, and `1938-03-17 (approx.)` still does. A new notebook starts from a layout (research notes, archive notes, archive sources, or one field) and opens on **Fields**, where each field has:
+A notebook is whatever fields you give it, and every field holds plain text of any length. There are no date or number types: `1938-03-17` sorts in date order as text, and `1938-03-17 (approx.)` still does. A new notebook starts from a layout (research notes, archive notes, archive sources, or one field) and opens on **Fields**, where each field has the settings below. Under them, **Columns in the list** sets which fields the list of records shows and in what order (▲ ▼, Remove, Add column), apart from the order of the fields in a record; the first four until changed. Column widths follow the contents: a short field such as Year gets a narrow column and the others share the rest in proportion to how long their entries usually are.
 
 | Setting | |
 |---|---|
 | Name, order | rename, add, delete, move up and down |
 | Copy with F5 | copied from the previous record by F5; until changed, fields named like Notes, Comments, Pages or Keywords are not |
 | Lines | room it gets when a record opens (1–40); it grows as you type either way |
-| In list | shown as a column in the list; the first four until changed |
 
 Every record has a number of its own, shown as `#127` in the list's first column and at the top of the record. It is given when the record is made and never changes or gets reused, so it can be used to refer to the record. Clicking the `#` heading switches between newest and oldest first.
 

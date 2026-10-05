@@ -201,6 +201,8 @@ table.grid { border-collapse: collapse; width: 100%; }
 .grid td { padding: 0 1ch; vertical-align: top; }
 .grid .num { text-align: right; width: 1%; white-space: nowrap; }
 .grid tbody tr { cursor: pointer; }
+.grid.fields tbody tr { cursor: default; }
+.grid.fields tbody tr:hover:not(.cur) td { background: none; }
 .sorthead { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
 .sorthead:hover:not(:disabled), .sorthead:focus-visible { background: none; text-decoration: underline; }
 .grid tr.cur td { background: var(--sel-bg); color: var(--sel-fg); }

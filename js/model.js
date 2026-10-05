@@ -5,7 +5,8 @@ import { upgradeForm } from './printform.js';
 // interprets it. A field also carries a few display settings:
 //   copy   copied from the previous record by F5 (see copiesFromPrevious)
 //   lines  how many lines it shows when a record opens (see fieldLines)
-//   list   shown as a column in the list of records (see shownInList)
+//   list   shown in the list of records (older notebooks; the list's columns
+//          are now db.listColumns, see listColumns)
 // Each record keeps its id (which is also the order it was entered in) and
 // when it was created and last changed.
 
@@ -123,6 +124,7 @@ export function renameField(db, oldName, newName) {
     delete r.values[oldName];
   }
   for (const k of db.sortKeys ?? []) if (k.field === oldName) k.field = newName;
+  if (db.listColumns) db.listColumns = db.listColumns.map((n) => (n === oldName ? newName : n));
   for (const form of db.printForms) {
     const esc = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     form.template = form.template.replace(new RegExp(`\\{${esc}(:\\d+)?\\}`, 'g'), (_, w) => `{${newName}${w ?? ''}}`);
@@ -134,6 +136,7 @@ export function deleteField(db, name) {
   if (db.fields.length === 1) throw new Error('A database needs at least one field');
   db.fields = db.fields.filter((f) => f.name !== name);
   if (db.sortKeys) db.sortKeys = db.sortKeys.filter((k) => k.field !== name);
+  if (db.listColumns) db.listColumns = db.listColumns.filter((n) => n !== name);
   for (const r of db.records) delete r.values[name];
   touch(db);
 }
@@ -170,6 +173,32 @@ export function fieldLines(field) {
 // Until chosen, the list shows the first four fields.
 export function shownInList(db, field) {
   return field.list ?? db.fields.indexOf(field) < 4;
+}
+
+// The list's columns, left to right. Once chosen they are db.listColumns, in
+// their own order, apart from the order of the fields in a record; until then
+// the fields marked "In list" (older notebooks) or the first four.
+export function listColumns(db) {
+  const names = new Set(db.fields.map((f) => f.name));
+  const cols = [...new Set(db.listColumns ?? db.fields.filter((f) => shownInList(db, f)).map((f) => f.name))].filter((n) => names.has(n));
+  return cols.length ? cols : [db.fields[0].name];
+}
+
+export function setListColumns(db, names) {
+  const known = new Set(db.fields.map((f) => f.name));
+  const cols = [...new Set(names)].filter((n) => known.has(n));
+  if (!cols.length) throw new Error('The list needs at least one column');
+  db.listColumns = cols;
+  touch(db);
+}
+
+export function moveListColumn(db, name, delta) {
+  const cols = listColumns(db);
+  const i = cols.indexOf(name);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= cols.length) return;
+  [cols[i], cols[j]] = [cols[j], cols[i]];
+  setListColumns(db, cols);
 }
 
 export function setFieldOption(db, name, key, value) {
