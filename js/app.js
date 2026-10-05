@@ -1073,6 +1073,7 @@ const EXPORT_KEY = 'nb2:export';
 const REMEMBERED = {
   paper: (v) => v in PAPERS,
   fontSize: (v) => FONT_SIZES.includes(v),
+  pdfFont: (v) => v in PDF_FONTS,
 };
 
 function rememberedExport() {
