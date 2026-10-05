@@ -262,6 +262,12 @@ table.browse th:first-child { width: 6ch; }
 .exportwide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2ch; max-width: none; }
 .exportmain textarea { width: 100%; white-space: pre; overflow-wrap: normal; }
 .formlabel { display: block; color: var(--label); margin-top: 0.5em; }
+.formatlist { border: 0; padding: 0; margin: 0.5em 0; display: grid; gap: 0.35em; }
+.formatlist legend { color: var(--bright); padding: 0; margin-bottom: 0.3em; text-transform: uppercase; }
+.formatlist label.check { align-items: flex-start; }
+.formatlist input { margin-top: 0.3em; }
+.formatlist .kind { color: var(--label); }
+.exportsettings { margin: 0.25em 0 1em 3ch; padding-left: 1.5ch; border-left: 2px solid var(--border); }
 .printpreview pre {
   margin: 0;
   padding: 0.5em 1ch;
