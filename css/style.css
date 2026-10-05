@@ -211,7 +211,8 @@ table.grid { border-collapse: collapse; width: 100%; }
    a list of thousands draws and scrolls quickly. */
 .browse .brow { display: grid; grid-template-columns: var(--cols); }
 .browse .brow > span { padding: 0 1ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.browse .bbody .brow { cursor: pointer; content-visibility: auto; contain-intrinsic-size: auto calc(var(--lh, 1.4) * 1em); }
+.browse .bbody .brow { cursor: pointer; }
+.browse .bblock { content-visibility: auto; contain-intrinsic-size: auto calc(100 * var(--lh, 1.4) * 1em); }
 .browse .num { text-align: right; }
 .browse .brow > .mk { padding: 0; text-align: center; color: var(--label); font-weight: bold; }
 .browse .brow.cur { background: var(--sel-bg); color: var(--sel-fg); }

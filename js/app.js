@@ -480,7 +480,13 @@ const pageOf = (i) => Math.floor(i / pageSize());
 // the cursor at once, the rest in the background, so the screen and the
 // search box never wait for thousands of rows to be laid out.
 const FIRST_ROWS = 300;
+// The rest are drawn only while the browser has nothing else to do, so keys
+// pressed meanwhile are never kept waiting.
+const whenIdle = globalThis.requestIdleCallback ? (f) => requestIdleCallback(f, { timeout: 1000 }) : (f) => setTimeout(f, 30);
 const MORE_ROWS = 400;
+// Rows come in blocks of 100 that the browser skips while off screen; it
+// keeps track of a hundred blocks more cheaply than of 10,000 rows.
+const BLOCK = 100;
 let drawToken = 0;
 
 function renderBrowse() {
@@ -494,8 +500,13 @@ function renderBrowse() {
     const i = start + k;
     return `<div role="row" data-i="${i}" class="brow${i === state.cursor ? ' cur' : ''}${r.marked ? ' marked' : ''}"><span role="cell" class="mk" title="${r.marked ? 'Marked: click or press M to unmark' : 'Click or press M to mark'}">${r.marked ? '✓' : ''}</span><span role="cell" class="num">#${r.id}</span>${cols.map((c) => `<span role="cell">${esc(preview(r.values[c]))}</span>`).join('')}</div>`;
   };
-  let drawn = Math.min(slice.length, Math.max(FIRST_ROWS, state.cursor - start + 100));
-  const rows = slice.slice(0, drawn).map(rowHtml).join('');
+  const blocks = (from, to) => {
+    let html = '';
+    for (let b = from; b < to; b += BLOCK) html += `<div class="bblock">${slice.slice(b, Math.min(to, b + BLOCK)).map((r, k) => rowHtml(r, b + k)).join('')}</div>`;
+    return html;
+  };
+  let drawn = Math.min(slice.length, Math.ceil(Math.max(FIRST_ROWS, state.cursor - start + 100) / BLOCK) * BLOCK);
+  const rows = blocks(0, drawn);
   const more = state.list.length > page ? `<p class="hint">Showing ${start + 1}–${start + slice.length} of ${state.list.length}; moving past the end shows the next ${page}. Appearance (in the command list) sets how many show at once, or all.</p>` : '';
   const sortMark = (c) => {
     const k = state.sortKeys[0];
@@ -525,11 +536,11 @@ function renderBrowse() {
   const drawMore = () => {
     if (token !== drawToken || !body?.isConnected || drawn >= slice.length) return;
     const end = Math.min(slice.length, drawn + MORE_ROWS);
-    body.insertAdjacentHTML('beforeend', slice.slice(drawn, end).map((r, k) => rowHtml(r, drawn + k)).join(''));
+    body.insertAdjacentHTML('beforeend', blocks(drawn, end));
     drawn = end;
-    setTimeout(drawMore, 0);
+    whenIdle(drawMore);
   };
-  if (drawn < slice.length) setTimeout(drawMore, 0);
+  if (drawn < slice.length) whenIdle(drawMore);
 }
 
 // A column heading sorts by that field; clicking again reverses, then a third
@@ -1455,7 +1466,7 @@ function renderAppearance() {
       <h2>Line spacing</h2>
       <div class="row">${Object.keys(SPACING).map((k) => `<label class="check"><input type="radio" name="spacing" value="${k}" ${a.spacing === k ? 'checked' : ''}> ${k[0].toUpperCase() + k.slice(1)}</label>`).join('')}</div>
       <h2>Records in the list</h2>
-      <div class="row">${LIST_ROWS.map((n) => `<label class="check"><input type="radio" name="listRows" value="${n}" ${+a.listRows === n ? 'checked' : ''}> ${n ? n.toLocaleString() + ' at a time' : 'All'}</label>`).join('')}</div>
+      <div class="row">${LIST_ROWS.map((n) => `<label class="check"><input type="radio" name="listRows" value="${n}" ${+a.listRows === n ? 'checked' : ''}> ${n ? n.toLocaleString() + ' at a time' : 'All <span class="hint">(the default)</span>'}</label>`).join('')}</div>
       <h2>Light or dark</h2>
       <div class="row">${THEMES.map((t) => `<label class="check"><input type="radio" name="theme" value="${t}" ${theme === t ? 'checked' : ''}> ${{ auto: 'Follow the computer', light: 'Light', dark: 'Dark' }[t]}</label>`).join('')}</div>
       <p class="hint">Changes show at once and are kept on this ${platform.desktop ? 'computer' : 'browser'}. A font has to be installed on the computer to be used; if it isn't, the DOS screen font shows instead.</p>
