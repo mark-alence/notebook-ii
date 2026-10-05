@@ -10,7 +10,15 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#00aaaa">
   <link rel="stylesheet" href="css/style.css">
-  <script>try { var t = localStorage.getItem('nb2:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+  <script>
+    // Light or dark, and the Appearance settings, before the page first draws.
+    try {
+      var t = localStorage.getItem('nb2:theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      var v = (JSON.parse(localStorage.getItem('nb2:appearance')) || {}).vars || {};
+      for (var k in v) document.documentElement.style.setProperty(k, v[k]);
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <div class="app">
@@ -22,6 +30,12 @@
       <button type="button" class="theme" id="themebtn" title="Light or dark screen (Alt+T)"></button>
     </header>
     <main id="main" tabindex="-1"></main>
+    <form id="recfind" hidden>
+      <label for="recfindinput">Find in this record:</label>
+      <input id="recfindinput" autocomplete="off" spellcheck="false" placeholder="text or /pattern/">
+      <span id="recfindcount" role="status"></span>
+      <span class="hint">Enter next · Shift+Enter previous · Esc close</span>
+    </form>
     <div id="status" role="status"></div>
     <nav id="keys" aria-label="Commands"></nav>
   </div>
@@ -48,10 +62,10 @@
       <h2>Getting around</h2>
       <p>Every command is on the bar at the bottom of the screen: click or tap it, or press the key shown on it. <kbd data-key-label="Ctrl+k">Ctrl+K</kbd> opens a list of every command; type part of a name (<code>exp</code> for Export, <code>sort year</code> to sort by Year) and press Enter.</p>
       <table class="keys-table">
-        <tr><td><kbd>/</kbd> or <kbd>F</kbd></td><td>Find: jump to the search box in the title bar. Results update as you type; Enter or ↓ goes to the list, Esc clears it.</td></tr>
+        <tr><td><kbd>/</kbd> <kbd>F</kbd> or <kbd data-key-label="Ctrl+f">Ctrl+F</kbd></td><td>Find. In the list: the search box in the title bar narrows the list to the records that match; results update as you type, Enter or ↓ goes to the list, Esc clears it. On a record: finds inside that record (see below).</td></tr>
         <tr><td><kbd>N</kbd></td><td>New note</td></tr>
         <tr><td>Click, or <kbd>Enter</kbd></td><td>Open a record</td></tr>
-        <tr><td>Column heading</td><td>Sort by that field; click again for Z to A, a third time for the order entered. <kbd>S</kbd> sorts by up to three fields.</td></tr>
+        <tr><td>Column heading</td><td>Sort by that field; click again for Z to A, a third time to go back to date order. <kbd>S</kbd> sorts by up to three fields.</td></tr>
         <tr><td><kbd>P</kbd> &nbsp; <kbd>X</kbd> &nbsp; <kbd>I</kbd></td><td>Print, Export, Import</td></tr>
         <tr><td><kbd>Del</kbd></td><td>Delete the record</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Back: leaves a field, then the record, then closes the database</td></tr>
@@ -69,14 +83,17 @@
         <tr><td><kbd data-key-label="Ctrl+Home">Ctrl+Home</kbd> <kbd data-key-label="Ctrl+End">Ctrl+End</kbd></td><td>Start / end of the whole record</td></tr>
         <tr><td><kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Previous / next record, when you are not in a field (also ← →). In a field, <kbd>Alt</kbd>+<kbd>PgUp</kbd> / <kbd>PgDn</kbd>.</td></tr>
         <tr><td><kbd>E</kbd> or <kbd>Enter</kbd></td><td>Start typing in the record</td></tr>
+        <tr><td><kbd data-key-label="Ctrl+f">Ctrl+F</kbd>, <kbd>F4</kbd> or <kbd>/</kbd></td><td>Find in this record: type text or a <code>/pattern/</code>; every match is marked, Enter goes to the next and Shift+Enter the previous, Esc closes the bar with the cursor on the match. (<kbd>/</kbd> only when you are not typing in a field.)</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd> or <kbd>Ctrl</kbd>+<kbd>F2</kbd></td><td>Start a block, as in Emacs: move the cursor with the arrows, Home, End, PgUp or PgDn (Ctrl for whole words) and the block follows. Ctrl+C copies it, Ctrl+X cuts it, Delete or typing replaces it, Esc or Ctrl+Space again cancels it. On a Mac, if Ctrl+Space switches keyboard languages, use Ctrl+F2.</td></tr>
       </table>
       <p>"Previous record" means, for a new note, the record you were on when you made it, so after one note you can press <kbd>N</kbd> and then <kbd>F5</kbd> for the next note from the same source. For an existing record it is the one before it in the list.</p>
 
       <h2>Fields</h2>
       <p>A notebook is whatever fields you give it, and every field holds plain text of any length. Dates and numbers are typed as text too: <code>1938-03-17</code> sorts in date order, and so does <code>1938-03-17 (approx.)</code>. In Fields you can rename, add, remove and reorder fields, tick which ones <kbd>F5</kbd> copies, set how many lines each one shows when a record opens, and choose which appear as columns in the list. The list remembers how you last sorted it.</p>
+      <p>Unless sorted by a field, the list shows the newest records first, in the order they were made. To see the oldest first, choose <em>Oldest first</em> on the Sort screen (<kbd>S</kbd>) or in the command list (<kbd data-key-label="Ctrl+k">Ctrl+K</kbd>); the notebook remembers it.</p>
 
-      <h2>Light or dark</h2>
-      <p>The screen follows your computer's light or dark setting. Click the word at the right of the title bar, or press <kbd>Alt</kbd>+<kbd>T</kbd>, to switch between Auto, Light and Dark. This browser remembers the choice.</p>
+      <h2>Appearance</h2>
+      <p><em>Appearance</em> in the command list (<kbd data-key-label="Ctrl+k">Ctrl+K</kbd>, or View → Appearance in the desktop app) sets the font (the DOS screen font, a modern monospace, sans-serif, serif, or any font installed on your computer), the text size and the line spacing, and light or dark. The screen follows your computer's light or dark setting until you choose; the word at the right of the title bar, or <kbd>Alt</kbd>+<kbd>T</kbd>, also switches between Auto, Light and Dark. The choices are kept on this computer.</p>
 
       <h2>Finding records</h2>
       <table class="keys-table">

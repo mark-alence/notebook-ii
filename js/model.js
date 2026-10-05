@@ -183,8 +183,9 @@ export function carryOver(db, from, values, only = null) {
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-// keys: [{ field, descending }]. Empty values always sort last.
-export function sortRecords(records, keys) {
+// keys: [{ field, descending }]. Empty values always sort last; ties keep
+// the order the records were entered in (newest first unless told otherwise).
+export function sortRecords(records, keys, { newestFirst = false } = {}) {
   return [...records].sort((a, b) => {
     for (const { field, descending } of keys) {
       const x = (a.values[field] ?? '').trim();
@@ -195,8 +196,23 @@ export function sortRecords(records, keys) {
       const c = collator.compare(x, y);
       if (c) return descending ? -c : c;
     }
-    return a.id - b.id;
+    return newestFirst ? b.id - a.id : a.id - b.id;
   });
+}
+
+// The list's order: by the sort fields if there are any, otherwise by when the
+// records were made. db.order is 'newest' (the default) or 'oldest'.
+export function orderRecords(records, sortKeys, order = 'newest') {
+  const newestFirst = order !== 'oldest';
+  if (sortKeys?.length) return sortRecords(records, sortKeys, { newestFirst });
+  return [...records].sort((a, b) => (newestFirst ? b.id - a.id : a.id - b.id));
+}
+
+// The record made just before this one (record ids grow as records are made).
+export function previousEntered(records, rec) {
+  let best = null;
+  for (const r of records) if (r.id < rec.id && (!best || r.id > best.id)) best = r;
+  return best;
 }
 
 // Build a database from imported rows ({ fields, records: [ {name: value} ] }).
