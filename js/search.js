@@ -20,6 +20,8 @@
 //   /colou?r/             a regular expression, anywhere in any field; ignores
 //                         capitals unless the flag c is added (/Smith/c)
 //   citation:/^CO 9\d/    a regular expression in one field
+//   #127  #120-140        records by number: one, a range, a list
+//   #12,15,31  #500-      (#500- is 500 and up), with any other terms
 
 export function tokenizeQuery(q) {
   const tokens = [];
@@ -33,6 +35,14 @@ export function tokenizeQuery(q) {
     let field = null;
     let text;
     let phrase = false;
+    // #127, #120-140, #12,15,31, #500-: record numbers.
+    const ids = /^#([\d,-]+)(?=[\s()]|$)/.exec(q.slice(i));
+    if (ids) {
+      i += ids[0].length;
+      if (neg) tokens.push({ type: 'NOT' });
+      tokens.push({ type: 'term', field: null, text: ids[0], phrase: false, op: ':', ids: parseIdRanges(ids[1]) });
+      continue;
+    }
     // /pattern/ or field:/pattern/ — read whole, since a pattern may hold
     // spaces, brackets and quotes.
     const fieldRegex = /^([^\s()"/:<>=]+):\//.exec(q.slice(i));
@@ -78,6 +88,23 @@ export function tokenizeQuery(q) {
 }
 
 const FIELD_OP = /^(>=|<=|>|<|=|:)/;
+
+// "12-40, 55, #61, 500-" -> [[12, 40], [55, 55], [61, 61], [500, Infinity]]
+export function parseIdRanges(text) {
+  const parts = String(text).split(/[\s,]+/).map((p) => p.replace(/^#/, '')).filter(Boolean);
+  if (!parts.length) throw new Error('Give record numbers like #12, #12-40 or #500-');
+  return parts.map((p) => {
+    const m = /^(\d*)(?:(-)(\d*))?$/.exec(p);
+    if (!m || (!m[1] && !m[3])) throw new Error(`"${p}" is not a record number or range: use #12, #12-40, #500- or #-40`);
+    const a = m[1] ? +m[1] : 0;
+    const b = m[2] ? (m[3] ? +m[3] : Infinity) : a;
+    return a <= b ? [a, b] : [b, a];
+  });
+}
+
+export function inIdRanges(id, ranges) {
+  return ranges.some(([a, b]) => id >= a && id <= b);
+}
 
 // q[i] is the opening /. The pattern runs to the next / that is not escaped
 // (\/) or inside [ ]; flags follow it.
@@ -153,7 +180,7 @@ export function parseQuery(q) {
       if (next()?.type !== ')') throw new Error('Missing )');
       return e;
     }
-    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase, compare: t.op === ':' ? null : t.op, regex: t.regex ?? null };
+    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase, compare: t.op === ':' ? null : t.op, regex: t.regex ?? null, ids: t.ids ?? null };
     throw new Error(`Unexpected ${t.type}`);
   }
 
@@ -178,6 +205,7 @@ function wordPattern(w) {
 }
 
 function compileTerm(node, fields) {
+  if (node.ids) return (rec) => inIdRanges(rec.id, node.ids);
   let targets = null;
   if (node.field !== null) {
     const want = fold(node.field).replace(/_/g, ' ');
@@ -296,7 +324,7 @@ export function highlightPatterns(q) {
     const out = [];
     const walk = (n, neg) => {
       if (!n) return;
-      if (n.op === 'term' && !neg && !n.compare) {
+      if (n.op === 'term' && !neg && !n.compare && !n.ids) {
         if (n.regex) out.push(makeRegex(n.regex.source, n.regex.flags, 'g'));
         else for (const w of words(n.text.replace(/[*?]/g, ' '))) out.push(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu'));
       }

@@ -8,6 +8,7 @@
 //   {Field:20}     exactly 20 characters of the field, cut off or padded with
 //                  spaces (Notebook II's "fixed" fields)
 //   {#}            the record's position in the output (1, 2, 3 ...)
+//   {#id}          the record's own number, as #127
 //   [[ ... ]]      a line that is left out when every field in it is empty
 //
 // In the header and footer (once per page):
@@ -58,6 +59,7 @@ export function renderRecord(template, record, fields, { index = 1, width = 76 }
     const fixedKey = fixed && fieldKey(fields, fixed[1]);
     if (fixedKey) return (record.values[fixedKey] ?? '').replace(/\s*\n\s*/g, ' ').slice(0, +fixed[2]).padEnd(+fixed[2]);
     if (name === '#') return String(index);
+    if (name.trim().toLowerCase() === '#id') return record.id ? `#${record.id}` : '';
     return `{${name}}`;
   };
   const out = [];

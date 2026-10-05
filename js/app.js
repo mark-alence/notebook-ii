@@ -4,9 +4,9 @@
 // work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, orderRecords, previousEntered, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
+  moveField, orderRecords, previousEntered, withRecordNumbers, recordNumbersIn, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
 } from './model.js';
-import { compileQuery, highlightPatterns, findInTexts } from './search.js';
+import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
 import { FONTS, SPACING, SIZE, getAppearance, setAppearance, resetAppearance } from './appearance.js';
 import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportNotebookText, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
@@ -472,7 +472,7 @@ function renderBrowse() {
   const slice = state.list.slice(start, start + PAGE);
   const rows = slice.map((r, k) => {
     const i = start + k;
-    return `<tr data-i="${i}" class="${i === state.cursor ? 'cur' : ''}"><td class="num">${i + 1}</td>${cols.map((c) => `<td>${esc(preview(r.values[c]))}</td>`).join('')}</tr>`;
+    return `<tr data-i="${i}" class="${i === state.cursor ? 'cur' : ''}"><td class="num">#${r.id}</td>${cols.map((c) => `<td>${esc(preview(r.values[c]))}</td>`).join('')}</tr>`;
   }).join('');
   const more = state.list.length > PAGE ? `<p class="hint">Showing ${start + 1}–${start + slice.length} of ${state.list.length}. PgUp/PgDn moves a page.</p>` : '';
   const sortMark = (c) => {
@@ -480,10 +480,16 @@ function renderBrowse() {
     return k?.field === c ? (k.descending ? ' ▼' : ' ▲') : '';
   };
   $('#main').innerHTML = state.list.length
-    ? `<table class="grid browse"><thead><tr><th class="num">#</th>${cols.map((c) => `<th><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>${more}`
+    ? `<table class="grid browse"><thead><tr><th class="num" style="width: ${String(Math.max(0, db.nextId - 1)).length + 5}ch"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></th>${cols.map((c) => `<th><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>${more}`
     : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This database is empty. Press <kbd>N</kbd> for a new note or <kbd>I</kbd> to import some.'}</p></div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => { state.cursor = +tr.dataset.i; openRecord(); }));
   $$('#main [data-sort]').forEach((b) => b.addEventListener('click', () => sortByColumn(b.dataset.sort)));
+  // The # heading: date-entered order, newest first, then oldest first.
+  $('#ordernum')?.addEventListener('click', () => {
+    const order = !state.sortKeys.length && db.order !== 'oldest' ? 'oldest' : 'newest';
+    setSort([]);
+    setOrder(order);
+  });
   $('#main tr.cur')?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -634,7 +640,7 @@ function renderView() {
 
 function recordMeta(rec) {
   const when = (iso) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : null);
-  const bits = [`Record ${rec.id}`];
+  const bits = [`#${rec.id}`];
   if (rec.created) bits.push(`created ${when(rec.created)}`);
   if (rec.modified && when(rec.modified) !== when(rec.created)) bits.push(`changed ${when(rec.modified)}`);
   return esc(bits.join(' · '));
@@ -892,6 +898,7 @@ function renderImport() {
       ${r?.format === 'salvage' ? `<div class="row"><label>Shortest piece</label><input type="number" min="1" data-num="minLength" value="${o.minLength}"><label>Join pieces closer than</label><input type="number" min="0" data-num="mergeGap" value="${o.mergeGap}"> bytes</div>` : ''}
       ${imp.error ? `<p class="error">${esc(imp.error)}</p>` : ''}
       ${(r?.warnings ?? []).map((w) => `<p class="warn">${esc(w)}</p>`).join('')}
+      ${r ? importNumbersNote(r) : ''}
       ${r ? `<p>${r.records.length} record${r.records.length === 1 ? '' : 's'}, ${r.fields.length} field${r.fields.length === 1 ? '' : 's'}: ${r.fields.map((f) => `<code>${esc(f)}</code>`).join(' ')}</p>
       <div class="scrollx"><table class="grid"><thead><tr>${r.fields.map((f) => `<th>${esc(f)}</th>`).join('')}</tr></thead><tbody>
         ${shown.map((rec) => `<tr>${r.fields.map((f) => `<td>${esc(preview(rec[f], 60))}</td>`).join('')}</tr>`).join('')}
@@ -925,6 +932,16 @@ function renderImport() {
   $('#doimport')?.addEventListener('click', finishImport);
 }
 
+// A Record# column (from Export) holds record numbers.
+function importNumbersNote(r) {
+  const numbers = recordNumbersIn(r);
+  if (!numbers) return '';
+  if (!numbers.ids) return `<p class="warn">The ${esc(numbers.field)} column cannot be used as record numbers (${esc(numbers.problem)}), so it comes in as an ordinary field.</p>`;
+  const lo = Math.min(...numbers.ids);
+  const hi = Math.max(...numbers.ids);
+  return `<p class="hint">The ${esc(numbers.field)} column holds record numbers (#${lo}–#${hi}). A new notebook keeps them; records added to an open notebook get new numbers, so they cannot clash.</p>`;
+}
+
 function finishImport() {
   const { result: r, target, dbName } = state.imp;
   if (target === 'append' && state.db) {
@@ -942,7 +959,7 @@ function finishImport() {
   if (r.database && dbName.trim()) db.name = dbName.trim();
   state.imp = null;
   openDb(db);
-  say(`Imported ${db.records.length} records.`);
+  say(`Imported ${db.records.length} records${recordNumbersIn(r)?.ids ? ', keeping their record numbers' : ''}.`);
 }
 
 // ---------- export ----------
@@ -966,12 +983,14 @@ const EXPORT_GROUPS = [
   ]],
 ];
 const PAGED = ['vertical', 'form']; // formats that can also be a PDF
+const NUMBERED = ['vertical', 'csv', 'tab', 'tagged', 'custom']; // can carry a Record# column
 
 function exportState() {
   state.exp ??= {
     format: 'vertical', output: 'text', encoding: 'utf-8', which: 'list',
     paper: /^en-(US|CA)|^es-(MX|US)/.test(navigator.language) ? 'letter' : 'a4', fontSize: 10,
     fieldDelim: '|', recordDelim: '\\r\\n', newlineMarker: '\\x14', header: true,
+    numbers: true, ids: '',
   };
   return state.exp;
 }
@@ -1020,7 +1039,10 @@ function renderExport() {
         <div class="row"><label>Records</label><select name="which">
           ${opt('list', `${state.query ? `The ${n} found` : `All ${total}`}, in the list's order`, x.which)}
           ${state.query ? opt('all', `All ${total}`, x.which) : ''}
-        </select></div>
+          ${opt('ids', 'These record numbers…', x.which)}
+        </select>
+        ${x.which === 'ids' ? `<input name="ids" value="${esc(x.ids)}" placeholder="e.g. 12-40, 55, 500-" size="22" aria-label="Record numbers"> <span id="idcount" class="hint"></span>` : ''}</div>
+        ${NUMBERED.includes(x.format) ? `<div class="row"><label class="check"><input type="checkbox" name="numbers" ${x.numbers ? 'checked' : ''}> <span>Include record numbers (a <code>Record#</code> ${x.format === 'vertical' ? 'line' : 'column'}; importing into a new notebook keeps them)</span></label></div>` : ''}
         <div class="buttons"><button type="submit">${pdf ? 'Save as PDF' : 'Save file'}</button></div>
         ${isForm ? formEditor(form, pdf) : ''}
         </div>`;
@@ -1046,8 +1068,12 @@ function renderExport() {
     x[t.name] = t.type === 'checkbox' ? t.checked : t.name === 'fontSize' ? +t.value : t.value;
     if (t.name === 'format' && t.value === 'notebook') x.encoding = 'cp437';
     if (['format', 'output', 'paper', 'fontSize', 'which'].includes(t.name)) render();
+    else if (t.name === 'numbers') updateExportPreview();
   });
-  el.addEventListener('input', (e) => { if (['fieldDelim', 'recordDelim', 'newlineMarker'].includes(e.target.name)) x[e.target.name] = e.target.value; });
+  el.addEventListener('input', (e) => {
+    if (['fieldDelim', 'recordDelim', 'newlineMarker', 'ids'].includes(e.target.name)) x[e.target.name] = e.target.value;
+    if (e.target.name === 'ids') updateExportPreview();
+  });
   if (isForm) wireFormEditor(form);
   updateExportPreview();
   el.addEventListener('submit', (e) => { e.preventDefault(); saveExport(); });
@@ -1097,15 +1123,35 @@ function wireFormEditor(form) {
   for (const id of ['#template', '#formheader', '#formfooter', '#formname']) $(id).addEventListener('keydown', (e) => e.stopPropagation());
 }
 
+// The records to export: those in the list, all of them, or those with the
+// numbers given (in the list's order).
 function exportRecords() {
-  return state.exp.which === 'all' ? state.db.records : state.list;
+  const x = state.exp;
+  if (x.which === 'all') return orderRecords(state.db.records, state.sortKeys, state.db.order);
+  if (x.which !== 'ids') return state.list;
+  let ranges;
+  try {
+    ranges = parseIdRanges(x.ids);
+  } catch (e) {
+    x.idsError = x.ids.trim() ? e.message : 'Type the record numbers to export, e.g. 12-40, 55, 500-';
+    return [];
+  }
+  x.idsError = '';
+  return orderRecords(state.db.records.filter((r) => inIdRanges(r.id, ranges)), state.sortKeys, state.db.order);
+}
+
+// Fields and records as exported, with a Record# column if asked for.
+function exportShape(recs) {
+  const fields = fieldNames(state.db);
+  return NUMBERED.includes(state.exp.format) && state.exp.numbers ? withRecordNumbers(fields, recs) : { fields, records: recs };
 }
 
 // One text per record, for a form or vertical text.
 function exportBlocks(recs, width) {
   const f = fieldNames(state.db);
   if (state.exp.format === 'form') return renderBlocks(currentForm(), recs, f, width ? { width } : {});
-  return verticalBlocks(f, recs);
+  const shape = exportShape(recs);
+  return verticalBlocks(shape.fields, shape.records);
 }
 
 function pdfOptions() {
@@ -1123,8 +1169,16 @@ function updateExportPreview() {
   let text;
   if (x.output === 'pdf') text = previewPdf(exportBlocks(recs), pdfOptions());
   else if (x.format === 'form') text = renderReport(currentForm(), recs, fieldNames(state.db)).replace(/\f/g, `${'─'.repeat(currentForm().width)}\n`);
-  else text = exportVertical(fieldNames(state.db), recs).replace(/\r/g, '');
+  else {
+    const shape = exportShape(recs);
+    text = exportVertical(shape.fields, shape.records).replace(/\r/g, '');
+  }
   out.textContent = text + (all.length > recs.length ? `\n… and ${all.length - recs.length} more records (all are saved).\n` : '');
+  const count = $('#idcount');
+  if (count) {
+    count.textContent = x.idsError || `${all.length} record${all.length === 1 ? '' : 's'}`;
+    count.classList.toggle('error', !!x.idsError);
+  }
 }
 
 // The PDF maker and its font load the first time a PDF is saved.
@@ -1151,7 +1205,9 @@ async function saveExport() {
   const db = state.db;
   const x = state.exp;
   const recs = exportRecords();
+  if (x.which === 'ids' && !recs.length) return say(x.idsError || 'No records have those numbers.', true);
   const f = fieldNames(db);
+  const shape = exportShape(recs);
   const base = safeName(db.name);
   const enc = x.encoding;
   if (PAGED.includes(x.format) && x.output === 'pdf') {
@@ -1171,13 +1227,13 @@ async function saveExport() {
     case 'json':
       if (recs.length === db.records.length) { db.lastBackup = new Date().toISOString(); persist(); }
       return download(`${base}.nb2.json`, toBytes(exportJson(db, recs)), 'application/json');
-    case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(f, recs), enc), 'text/plain');
+    case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(shape.fields, shape.records), enc), 'text/plain');
     case 'form': return download(`${base}-${safeName(currentForm().name)}.txt`, toBytes(renderReport(currentForm(), recs, f, { title: db.name }).replace(/\n/g, '\r\n'), enc), 'text/plain');
-    case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(f, recs), enc), 'text/csv');
-    case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, { fieldDelim: '\t' }), enc), 'text/plain');
-    case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(f, recs), enc), 'text/plain');
+    case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(shape.fields, shape.records), enc), 'text/csv');
+    case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(shape.fields, shape.records, { fieldDelim: '\t' }), enc), 'text/plain');
+    case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(shape.fields, shape.records), enc), 'text/plain');
     case 'notebook': return download(`${base.slice(0, 8)}.txt`, toBytes(exportNotebookText(f, recs), enc), 'text/plain');
-    case 'custom': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, {
+    case 'custom': return download(`${base}.txt`, toBytes(exportDelimited(shape.fields, shape.records, {
       fieldDelim: readDelim(x.fieldDelim) || '|',
       recordDelim: readDelim(x.recordDelim) || '\r\n',
       newlineMarker: readDelim(x.newlineMarker),

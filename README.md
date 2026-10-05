@@ -56,6 +56,8 @@ A notebook is whatever fields you give it, and every field holds plain text of a
 | Lines | room it gets when a record opens (1–40); it grows as you type either way |
 | In list | shown as a column in the list; the first four until changed |
 
+Every record has a number of its own, shown as `#127` in the list's first column and at the top of the record. It is given when the record is made and never changes or gets reused, so it can be used to refer to the record. Clicking the `#` heading switches between newest and oldest first.
+
 Unless it is sorted by a field, the list shows the newest records first; *Oldest first* on the Sort screen or in the command list turns it round. The notebook remembers its sort and its order; clicking a column heading a third time goes back to date order.
 
 **Appearance** (in the command list, or View → Appearance in the desktop app) sets the font (DOS screen, modern monospace, sans-serif, serif, or any installed font), text size, line spacing, and light or dark, kept on that computer.
@@ -64,7 +66,7 @@ Unless it is sorted by a field, the list shows the newest records first; *Oldest
 
 Notebooks are saved in the browser as you work. They are not on your other devices, and clearing the browser's history or site data deletes them. **Backup** (Ctrl+Shift+S) saves the open notebook as a `.nb2.json` file, which Import reads back. The app reminds you when a notebook has changed and not been backed up for a week, and asks the browser to keep its storage.
 
-Export also writes **vertical text**: each record's fields one after another, short values beside their label and long notes below it, records separated by a rule. It is the most readable copy to keep or quote from, and Import reads it back. Exports follow the list's current order and search.
+Export also writes **vertical text**: each record's fields one after another, short values beside their label and long notes below it, records separated by a rule. It is the most readable copy to keep or quote from, and Import reads it back. Exports follow the list's current order and search, or take all records, or **These record numbers** (`12-40, 55, 500-`). Vertical text, CSV, tab-separated, tagged and custom-delimited exports can include a `Record#` line or column. Importing such a file into a **new** notebook keeps the record numbers (if every record has a different one); adding it to an existing notebook gives the records new numbers, since the old ones may already be taken. A `Record#` column that cannot be used comes in as an ordinary field, so nothing is lost.
 
 The screen follows the computer's light or dark setting. The word at the right of the title bar, or **Alt+T**, switches between Auto, Light and Dark.
 
@@ -86,13 +88,16 @@ title=the  -title=the Title begins / doesn't begin with "the"
 year>1980  author<=m  begins later / the same or earlier (also < and >=)
 /colou?r/             a regular expression (add c after it to match capitals: /Smith/c)
 citation:/^CO 9\d/    a regular expression in one field
+#127                  record number 127 (Enter opens it)
+#120-140  #12,15,31   a range or list of record numbers
+#500-                 number 500 and later; mix with other terms: #1-200 -farmers
 ```
 
 Search ignores capitals and accents (regular expressions ignore capitals but not accents). The last two lines are Notebook II's Select conditions (begins with, greater/less than); numbers compare as numbers.
 
 ## Custom forms and PDFs
 
-**Export → Custom form** (or P) lays records out your own way, with a live preview. A form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{Field:20}` gives exactly 20 characters of it, cut off or padded (Notebook II's fixed fields). `{#}` is the record's number in the output. A line written as `[[ … ]]` is dropped when all its fields are blank. A name that is not a field stays visible as `{Name}`, so a misspelling shows.
+**Export → Custom form** (or P) lays records out your own way, with a live preview. A form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{Field:20}` gives exactly 20 characters of it, cut off or padded (Notebook II's fixed fields). `{#}` is the record's place in the output (1, 2, 3 …) and `{#id}` its own record number (`#127`). A line written as `[[ … ]]` is dropped when all its fields are blank. A name that is not a field stays visible as `{Name}`, so a misspelling shows.
 
 A form can have a page header and footer, like Notebook II's custom formats. In them `{@page}`, `{@pages}`, `{@date}` and `{@time}` give the page number, the number of pages, today's date and the time; the `@` keeps them apart from fields, so `{Date}` is always a field called Date. (Forms made before this used `{Page}`, `{Date}` and `{Time}` in headers and footers and are converted when the notebook opens.) Forms are saved with the notebook.
 
