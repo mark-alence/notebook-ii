@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDatabase, addRecord, updateRecord, fieldLines, shownInList, setFieldOption, renameField, deleteField, LAYOUTS, copiesFromPrevious } from '../js/model.js';
+import { createDatabase, addRecord, updateRecord, fieldLines, shownInList, setFieldOption, listColumns, setListColumns, moveListColumn, renameField, deleteField, LAYOUTS, copiesFromPrevious } from '../js/model.js';
 import { exportVertical } from '../js/exporters.js';
 import { importFile } from '../js/importers.js';
 
@@ -65,4 +65,30 @@ test('vertical text: readable, keeps paragraphs, and reads back in', () => {
   const back = importFile(new TextEncoder().encode(text));
   assert.deepEqual(back.fields, fields);
   assert.deepEqual(back.records, records.map((r) => r.values));
+});
+
+test('list columns: own order, apart from the fields; older notebooks keep theirs', () => {
+  const db = createDatabase('t', ['A', 'B', 'C', 'D', 'E']);
+  assert.deepEqual(listColumns(db), ['A', 'B', 'C', 'D']); // until chosen: the first four
+  setFieldOption(db, 'A', 'list', false); // an older notebook's "In list" ticks
+  setFieldOption(db, 'E', 'list', true);
+  assert.deepEqual(listColumns(db), ['B', 'C', 'D', 'E']);
+  setListColumns(db, ['E', 'B']);
+  assert.deepEqual(listColumns(db), ['E', 'B']);
+  assert.deepEqual(db.fields.map((f) => f.name), ['A', 'B', 'C', 'D', 'E']); // record order untouched
+  moveListColumn(db, 'B', -1);
+  assert.deepEqual(listColumns(db), ['B', 'E']);
+  moveListColumn(db, 'B', -1); // already first
+  assert.deepEqual(listColumns(db), ['B', 'E']);
+  renameField(db, 'E', 'Year');
+  assert.deepEqual(listColumns(db), ['B', 'Year']);
+  deleteField(db, 'B');
+  assert.deepEqual(listColumns(db), ['Year']);
+  assert.throws(() => setListColumns(db, []), /at least one column/);
+  assert.throws(() => setListColumns(db, ['Nope']), /at least one column/);
+  setListColumns(db, ['Year', 'A', 'A', 'Nope']);
+  assert.deepEqual(listColumns(db), ['Year', 'A']);
+  deleteField(db, 'Year');
+  deleteField(db, 'A');
+  assert.deepEqual(listColumns(db), ['C']); // never empty: falls back to the first field
 });

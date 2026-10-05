@@ -4,7 +4,7 @@
 // work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, orderRecords, withRecordNumbers, recordNumbersIn, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
+  moveField, orderRecords, withRecordNumbers, recordNumbersIn, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, listColumns, setListColumns, moveListColumn, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
 } from './model.js';
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
 import { FONTS, SPACING, SIZE, LIST_ROWS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
@@ -484,6 +484,21 @@ const pageOf = (i) => Math.floor(i / pageSize());
 // A long list is drawn a few hundred rows at a time: the rows up to just past
 // the cursor at once, the rest in the background, so the screen and the
 // search box never wait for thousands of rows to be laid out.
+// Column widths follow what the columns hold: a field whose entries are short
+// (a year, a page number) gets a column just wide enough for them, and the
+// rest share the width in proportion to how long their entries usually are.
+// Judged from the longest entry of most records (90th percentile), up to 1,000
+// records, so one long entry does not widen a column.
+function columnWidths(db, cols) {
+  const sample = db.records.length > 1000 ? db.records.filter((_, i) => i % Math.ceil(db.records.length / 1000) === 0) : db.records;
+  return cols.map((c) => {
+    const lengths = sample.map((r) => preview(r.values[c] ?? '').length).sort((a, b) => a - b);
+    const typical = lengths.length ? lengths[Math.floor((lengths.length - 1) * 0.9)] : 0;
+    const w = Math.max(typical, c.length + 2, 3);
+    return w <= 16 ? `${w + 2}ch` : `minmax(12ch, ${Math.min(w, 80)}fr)`;
+  }).join(' ');
+}
+
 const FIRST_ROWS = 300;
 // The rest are drawn only while the browser has nothing else to do, so keys
 // pressed meanwhile are never kept waiting.
@@ -496,8 +511,7 @@ let drawToken = 0;
 
 function renderBrowse() {
   const db = state.db;
-  let cols = db.fields.filter((f) => shownInList(db, f)).map((f) => f.name);
-  if (!cols.length) cols = [db.fields[0].name];
+  const cols = listColumns(db);
   const page = pageSize();
   const start = pageOf(state.cursor) * page;
   const slice = state.list.slice(start, start + page);
@@ -518,7 +532,7 @@ function renderBrowse() {
     return k?.field === c ? (k.descending ? ' ▼' : ' ▲') : '';
   };
   $('#main').innerHTML = state.list.length
-    ? `<div class="browse" role="table" style="--cols: 3ch ${String(Math.max(0, db.nextId - 1)).length + 5}ch repeat(${cols.length}, minmax(0, 1fr))"><div class="brow bhead" role="row"><span role="columnheader" class="mk" title="Marked records (M marks one; @marked finds them)">✓</span><span role="columnheader" class="num"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></span>${cols.map((c) => `<span role="columnheader"><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></span>`).join('')}</div><div class="bbody" role="rowgroup">${rows}</div></div>${more}`
+    ? `<div class="browse" role="table" style="--cols: 3ch ${String(Math.max(0, db.nextId - 1)).length + 5}ch ${columnWidths(db, cols)}"><div class="brow bhead" role="row"><span role="columnheader" class="mk" title="Marked records (M marks one; @marked finds them)">✓</span><span role="columnheader" class="num"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></span>${cols.map((c) => `<span role="columnheader"><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></span>`).join('')}</div><div class="bbody" role="rowgroup">${rows}</div></div>${more}`
     : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This database is empty. Press <kbd>N</kbd> for a new note or <kbd>I</kbd> to import some.'}</p></div>`;
   const body = $('#main .bbody');
   body?.addEventListener('click', (e) => {
@@ -877,29 +891,44 @@ function renderFields() {
   $('#main').innerHTML = `
     <div class="panel" id="fields">
       <h2>Fields</h2>
-      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Copy with F5</th><th>Lines</th><th>In list</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
+      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Copy with F5</th><th>Lines</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
         <tr><td class="num">${i + 1}</td>
           <td><input data-rename="${esc(name)}" value="${esc(name)}" aria-label="Field name"></td>
           <td><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''} aria-label="Copy ${esc(name)} with F5"></td>
           <td><input type="number" min="1" max="40" data-lines="${esc(name)}" value="${fieldLines(field)}" aria-label="Lines shown for ${esc(name)}"></td>
-          <td><input type="checkbox" data-list="${esc(name)}" ${shownInList(db, field) ? 'checked' : ''} aria-label="Show ${esc(name)} in the list"></td>
           <td class="buttons">
             <button type="button" data-move="${esc(name)}" data-d="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
             <button type="button" data-move="${esc(name)}" data-d="1" ${i < db.fields.length - 1 ? '' : 'disabled'} title="Move down">↓</button>
             <button type="button" data-del="${esc(name)}">Delete</button></td></tr>`; }).join('')}
       </tbody></table></div>
       <form id="addfield" class="row"><input name="name" placeholder="New field name" aria-label="New field name"><button type="submit">Add field</button></form>
+      <h2>Columns in the list</h2>
+      ${(() => {
+        const cols = listColumns(db);
+        const others = db.fields.map((f) => f.name).filter((n) => !cols.includes(n));
+        return `<table class="grid fields listcols"><tbody>${cols.map((c, i) => `
+        <tr><td class="num">${i + 1}</td><td>${esc(c)}</td>
+          <td class="buttons">
+            <button type="button" data-colmove="${esc(c)}" data-d="-1" ${i ? '' : 'disabled'} title="Move left">↑</button>
+            <button type="button" data-colmove="${esc(c)}" data-d="1" ${i < cols.length - 1 ? '' : 'disabled'} title="Move right">↓</button>
+            <button type="button" data-colremove="${esc(c)}" ${cols.length > 1 ? '' : 'disabled'} title="Remove from the list">Remove</button></td></tr>`).join('')}
+        </tbody></table>
+        ${others.length ? `<div class="row"><select id="addcol" aria-label="Field to add as a column">${others.map((n) => `<option>${esc(n)}</option>`).join('')}</select><button type="button" id="addcolbtn">Add column</button></div>` : '<p class="hint">Every field is a column.</p>'}`;
+      })()}
+      <p class="hint">The list of records shows these fields as columns, left to right (top to bottom here), in their own order: it need not follow the order of the fields in a record. Widths follow the contents, so a short field such as Year gets a narrow column.</p>
       <h2>Notebook name</h2>
       <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Notebook name"></div>
       <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text (a date written <code>1938-03-17</code> sorts in date order, and <code>1938-03-17 (approx.)</code> still does).</p>
-      <p class="hint"><strong>Copy with F5</strong>: on a record, <kbd>F5</kbd> copies these fields from the previous record into the ones still blank, so a new note from the same source needs only the note. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way. <strong>In list</strong>: shown as a column in the list of records.</p>
+      <p class="hint"><strong>Copy with F5</strong>: in a new note, <kbd>F5</kbd> copies these fields from the record you were on when you pressed <kbd>N</kbd>, so a new note from the same source needs only the note. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
     </div>`;
   const done = (fn) => { try { fn(); persist(); refreshList(); render(); } catch (e) { say(e.message, true); } };
   $$('[data-rename]').forEach((inp) => inp.addEventListener('change', () => done(() => renameField(db, inp.dataset.rename, inp.value))));
   $$('[data-copy]').forEach((c) => c.addEventListener('change', () => done(() => setFieldCopy(db, c.dataset.copy, c.checked))));
   $$('[data-lines]').forEach((c) => c.addEventListener('change', () => done(() => setFieldOption(db, c.dataset.lines, 'lines', c.value))));
-  $$('[data-list]').forEach((c) => c.addEventListener('change', () => done(() => setFieldOption(db, c.dataset.list, 'list', c.checked))));
+  $$('[data-colmove]').forEach((b) => b.addEventListener('click', () => done(() => moveListColumn(db, b.dataset.colmove, +b.dataset.d))));
+  $$('[data-colremove]').forEach((b) => b.addEventListener('click', () => done(() => setListColumns(db, listColumns(db).filter((n) => n !== b.dataset.colremove)))));
+  $('#addcolbtn')?.addEventListener('click', () => done(() => setListColumns(db, [...listColumns(db), $('#addcol').value])));
   $$('[data-move]').forEach((b) => b.addEventListener('click', () => done(() => moveField(db, b.dataset.move, +b.dataset.d))));
   $$('[data-del]').forEach((b) => b.addEventListener('click', () => {
     const n = db.records.filter((r) => (r.values[b.dataset.del] ?? '').trim()).length;
