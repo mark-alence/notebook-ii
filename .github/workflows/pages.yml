@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # The PDF tests need jsPDF from package-lock.json.
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm test
       - name: Collect the site files
         run: |
