@@ -132,7 +132,7 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &sep()?,
             &item("mark", "Mark or Unmark Note (M)", None)?,
             &item("markall", "Mark All Notes Found", None)?,
-            &item("clearmarks", "Clear All Marks", None)?,
+            &item("clearmarks", "Clear All Marks (Shift+M)", None)?,
             &item("delmarked", "Delete Marked Notes…", None)?,
             &sep()?,
             &PredefinedMenuItem::undo(app, None)?,
