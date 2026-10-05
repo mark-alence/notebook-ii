@@ -217,17 +217,60 @@ export function previousEntered(records, rec) {
   return best;
 }
 
+// ---------- record numbers ----------
+//
+// Every record has a number (rec.id), given when it is made and never reused,
+// shown as #127. Exports can carry it as a column called Record#, and an
+// import into a new notebook gives the records those numbers back.
+
+export const RECORD_FIELD = 'Record#';
+const isRecordField = (name) => /^record\s*#$/i.test(name.trim());
+
+// The fields and records to export, with Record# first (unless the notebook
+// has a field of that name itself).
+export function withRecordNumbers(fields, records) {
+  if (fields.some(isRecordField)) return { fields, records };
+  return {
+    fields: [RECORD_FIELD, ...fields],
+    records: records.map((r) => ({ ...r, values: { [RECORD_FIELD]: String(r.id), ...r.values } })),
+  };
+}
+
+// An imported Record# column: the numbers, if every record has a different
+// whole number there; otherwise why not.
+export function recordNumbersIn(imported) {
+  const field = imported.fields.find(isRecordField);
+  if (!field) return null;
+  const ids = imported.records.map((r) => (/^\s*#?\s*(\d+)\s*$/.exec(r[field] ?? '') || [])[1]).map((n) => (n ? +n : NaN));
+  const problem = ids.some((n) => !(n > 0)) ? 'some records have no number there'
+    : new Set(ids).size !== ids.length ? 'some numbers are used twice' : null;
+  return { field, ids: problem ? null : ids, problem };
+}
+
 // Build a database from imported rows ({ fields, records: [ {name: value} ] }).
 export function databaseFromImport(name, imported) {
-  const db = createDatabase(name, imported.fields.length ? imported.fields : ['Text']);
-  for (const values of imported.records) addRecord(db, values);
+  const numbers = recordNumbersIn(imported);
+  // Unusable numbers stay as an ordinary field, so nothing is lost.
+  const fields = numbers?.ids ? imported.fields.filter((f) => f !== numbers.field) : imported.fields;
+  const db = createDatabase(name, fields.length ? fields : ['Text']);
+  imported.records.forEach((values, i) => {
+    const rec = addRecord(db, values);
+    if (numbers?.ids) rec.id = numbers.ids[i];
+  });
+  if (numbers?.ids) db.nextId = Math.max(0, ...numbers.ids) + 1;
   // Print formats that came with a Notebook II database go first.
   if (imported.printForms?.length) db.printForms.unshift(...imported.printForms);
   return db;
 }
 
 // Append imported records to an existing database, adding any new fields.
+// Record numbers are not carried over (they could clash with this notebook's
+// own): the records get new numbers and the Record# column is dropped.
 export function appendImport(db, imported, fieldMap = null) {
+  const numbers = recordNumbersIn(imported);
+  if (numbers?.ids) {
+    fieldMap = { ...(fieldMap ?? Object.fromEntries(imported.fields.map((f) => [f, f]))), [numbers.field]: null };
+  }
   for (const src of imported.fields) {
     const dest = fieldMap ? fieldMap[src] : src;
     if (dest && !db.fields.some((f) => f.name === dest)) addField(db, dest);
