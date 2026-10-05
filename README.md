@@ -60,7 +60,7 @@ Every record has a number of its own, shown as `#127` in the list's first column
 
 Unless it is sorted by a field, the list shows the newest records first; *Oldest first* on the Sort screen or in the command list turns it round. The notebook remembers its sort and its order; clicking a column heading a third time goes back to date order.
 
-**Appearance** (in the command list, or View → Appearance in the desktop app) sets the font (DOS screen, modern monospace, sans-serif, serif, or any installed font), text size, line spacing, and light or dark, kept on that computer.
+**Appearance** (in the command list, or View → Appearance in the desktop app) sets the font (DOS screen, modern monospace, sans-serif, serif, or any installed font), text size, line spacing, light or dark, and how many records the list shows at a time (200, 500, 1,000 or all), kept on that computer. Even with all records shown, a list of thousands draws and scrolls quickly.
 
 ## Keeping your notebooks safe
 
@@ -117,7 +117,7 @@ A custom form, or vertical text, is saved either as a text file (UTF-8 or DOS co
 - **Delimited text.** Fields split by any character (tab, comma, `|`, `~`, `^`, ASCII 30/31 …), records by line breaks or another character, with an optional marker for line breaks inside a field (the DOS `¶`, character 20, is recognized automatically). Quoted CSV works. The import guesses the delimiters and whether the first row holds field names, and you can change them while watching a preview.
 - **Tagged text.** `Field: value` lines, with records separated by blank lines or rule lines (`---`, `***`, form feeds). Indented lines continue the field above.
 - **DOS characters.** Files are read as code page 437 unless they are valid UTF-8, so accented letters and box-drawing characters come through. A Ctrl-Z end-of-file marker is ignored.
-- **Salvage.** Choosing *Read as: Salvage* pulls every readable piece of text out of any file, one piece per record, so nothing is lost even from a damaged file.
+- **Salvage.** On the import preview screen (after choosing the file), *Read as → Salvage: readable text from any file* pulls every readable piece of text out of any file, one piece per record, so nothing is lost even from a damaged file. Files that are not text are salvaged automatically, and a file that cannot be read otherwise offers a *Try Salvage* button.
 
 `samples/` has two files to try: `bibliography-dos.txt` (tab-delimited, code page 437, DOS line ends) and `notes-tagged.txt`.
 
