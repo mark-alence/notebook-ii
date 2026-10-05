@@ -79,6 +79,24 @@ export function deleteRecords(db, ids) {
   touch(db);
 }
 
+// Marks: a hand-picked set of records (M), kept with the notebook. Marking
+// does not count as changing the record.
+export function setMarked(db, records, on) {
+  let n = 0;
+  for (const r of records) {
+    if (!!r.marked === on) continue;
+    if (on) r.marked = true;
+    else delete r.marked;
+    n++;
+  }
+  if (n) touch(db);
+  return n;
+}
+
+export function markedRecords(db) {
+  return db.records.filter((r) => r.marked);
+}
+
 export function addField(db, name) {
   name = name.trim();
   if (!name) throw new Error('Field name is empty');

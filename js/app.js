@@ -4,7 +4,7 @@
 // work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, orderRecords, previousEntered, withRecordNumbers, recordNumbersIn, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
+  moveField, orderRecords, previousEntered, withRecordNumbers, recordNumbersIn, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
 } from './model.js';
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
 import { FONTS, SPACING, SIZE, getAppearance, setAppearance, resetAppearance } from './appearance.js';
@@ -303,6 +303,12 @@ const COMMANDS = [
   { id: 'export', label: 'Export', key: 'x', fkey: 'F10', where: ['browse', 'view'], bar: true, run: () => go('export') },
   { id: 'saveas', label: 'Save notebook as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, desktop: true, run: () => saveAs() },
   { id: 'backup', label: platform.desktop ? 'Save a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
+  { id: 'mark', label: 'Mark or unmark this record', key: 'm', where: ['browse', 'view'], run: () => toggleMark() },
+  { id: 'showmarked', label: 'Show marked records', where: ['browse', 'view'], run: () => showMarked() },
+  { id: 'markall', label: 'Mark all records in the list', where: ['browse', 'view'], run: () => markList(true) },
+  { id: 'unmarkall', label: 'Unmark all records in the list', where: ['browse', 'view'], run: () => markList(false) },
+  { id: 'clearmarks', label: 'Clear all marks in the notebook', where: ['browse', 'view'], run: () => clearMarks() },
+  { id: 'delmarked', label: 'Delete marked records…', where: ['browse', 'view'], run: () => deleteMarked() },
   { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
   { id: 'close', label: 'Close database', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
   { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'import', 'export', 'help', 'newdb', 'appearance'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
@@ -355,6 +361,8 @@ function renderTitle() {
       const i = state.list.findIndex((r) => r.id === state.viewId);
       if (i >= 0) right = `${i + 1} of ${n}${state.query ? ' found' : ''}`;
     }
+    const marked = markedRecords(db).length;
+    if (marked) right += ` · ${marked} marked`;
   }
   $('#title .dbname').textContent = db?.name ?? '';
   $('#title .count').textContent = right;
@@ -472,7 +480,7 @@ function renderBrowse() {
   const slice = state.list.slice(start, start + PAGE);
   const rows = slice.map((r, k) => {
     const i = start + k;
-    return `<tr data-i="${i}" class="${i === state.cursor ? 'cur' : ''}"><td class="num">#${r.id}</td>${cols.map((c) => `<td>${esc(preview(r.values[c]))}</td>`).join('')}</tr>`;
+    return `<tr data-i="${i}" class="${i === state.cursor ? 'cur' : ''}${r.marked ? ' marked' : ''}"><td class="mk" title="${r.marked ? 'Marked: click or press M to unmark' : 'Click or press M to mark'}">${r.marked ? '✓' : ''}</td><td class="num">#${r.id}</td>${cols.map((c) => `<td>${esc(preview(r.values[c]))}</td>`).join('')}</tr>`;
   }).join('');
   const more = state.list.length > PAGE ? `<p class="hint">Showing ${start + 1}–${start + slice.length} of ${state.list.length}. PgUp/PgDn moves a page.</p>` : '';
   const sortMark = (c) => {
@@ -480,9 +488,13 @@ function renderBrowse() {
     return k?.field === c ? (k.descending ? ' ▼' : ' ▲') : '';
   };
   $('#main').innerHTML = state.list.length
-    ? `<table class="grid browse"><thead><tr><th class="num" style="width: ${String(Math.max(0, db.nextId - 1)).length + 5}ch"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></th>${cols.map((c) => `<th><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>${more}`
+    ? `<table class="grid browse"><thead><tr><th class="mk" title="Marked records (M marks one; @marked finds them)">✓</th><th class="num" style="width: ${String(Math.max(0, db.nextId - 1)).length + 5}ch"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></th>${cols.map((c) => `<th><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>${more}`
     : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This database is empty. Press <kbd>N</kbd> for a new note or <kbd>I</kbd> to import some.'}</p></div>`;
-  $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => { state.cursor = +tr.dataset.i; openRecord(); }));
+  $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', (e) => {
+    state.cursor = +tr.dataset.i;
+    if (e.target.closest('.mk')) return toggleMark();
+    openRecord();
+  }));
   $$('#main [data-sort]').forEach((b) => b.addEventListener('click', () => sortByColumn(b.dataset.sort)));
   // The # heading: date-entered order, newest first, then oldest first.
   $('#ordernum')?.addEventListener('click', () => {
@@ -641,6 +653,7 @@ function renderView() {
 function recordMeta(rec) {
   const when = (iso) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : null);
   const bits = [`#${rec.id}`];
+  if (rec.marked) bits.push('✓ marked');
   if (rec.created) bits.push(`created ${when(rec.created)}`);
   if (rec.modified && when(rec.modified) !== when(rec.created)) bits.push(`changed ${when(rec.modified)}`);
   return esc(bits.join(' · '));
@@ -1039,6 +1052,7 @@ function renderExport() {
         <div class="row"><label>Records</label><select name="which">
           ${opt('list', `${state.query ? `The ${n} found` : `All ${total}`}, in the list's order`, x.which)}
           ${state.query ? opt('all', `All ${total}`, x.which) : ''}
+          ${markedRecords(db).length || x.which === 'marked' ? opt('marked', `The ${markedRecords(db).length} marked`, x.which) : ''}
           ${opt('ids', 'These record numbers…', x.which)}
         </select>
         ${x.which === 'ids' ? `<input name="ids" value="${esc(x.ids)}" placeholder="e.g. 12-40, 55, 500-" size="22" aria-label="Record numbers"> <span id="idcount" class="hint"></span>` : ''}</div>
@@ -1128,6 +1142,7 @@ function wireFormEditor(form) {
 function exportRecords() {
   const x = state.exp;
   if (x.which === 'all') return orderRecords(state.db.records, state.sortKeys, state.db.order);
+  if (x.which === 'marked') return orderRecords(markedRecords(state.db), state.sortKeys, state.db.order);
   if (x.which !== 'ids') return state.list;
   let ranges;
   try {
@@ -1206,6 +1221,7 @@ async function saveExport() {
   const x = state.exp;
   const recs = exportRecords();
   if (x.which === 'ids' && !recs.length) return say(x.idsError || 'No records have those numbers.', true);
+  if (x.which === 'marked' && !recs.length) return say('No records are marked. Press M on a record to mark it.', true);
   const f = fieldNames(db);
   const shape = exportShape(recs);
   const base = safeName(db.name);
@@ -1284,6 +1300,64 @@ function renderNewDb() {
     go('fields');
     say(`Notebook "${name}" made. Set up its fields here, then press Esc to start adding notes.`);
   });
+}
+
+// ---------- marks ----------
+//
+// M marks a record, to collect a hand-picked set; @marked finds them again
+// and Export can take just those.
+
+const markCount = () => markedRecords(state.db).length;
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function toggleMark() {
+  const rec = state.mode === 'view' ? viewed() : current();
+  if (!rec) return;
+  setMarked(state.db, [rec], !rec.marked);
+  persistSoon();
+  say(`${rec.marked ? 'Marked' : 'Unmarked'} #${rec.id}. ${plural(markCount(), 'record')} marked.`);
+  if (state.mode !== 'view') return render();
+  // On a record, leave the fields (and any find) as they are.
+  renderTitle();
+  const meta = $('#recordform .meta');
+  if (meta) meta.innerHTML = recordMeta(rec);
+}
+
+function markList(on) {
+  const n = setMarked(state.db, state.list, on);
+  persistSoon();
+  say(`${on ? 'Marked' : 'Unmarked'} ${plural(n, 'record')}. ${plural(markCount(), 'record')} marked.`);
+  render();
+}
+
+function showMarked() {
+  if (!markCount()) return say('No records are marked. Press M on a record to mark it.', true);
+  if (state.mode !== 'browse') go('browse');
+  $('#search').value = '@marked';
+  applySearch('@marked');
+}
+
+async function clearMarks() {
+  const n = markCount();
+  if (!n) return say('No records are marked.');
+  if (n > 1 && !(await ask(`Unmark all ${n} marked records?`, 'Unmark'))) return;
+  setMarked(state.db, state.db.records, false);
+  persistSoon();
+  say('Marks cleared.');
+  render();
+}
+
+async function deleteMarked() {
+  const marked = markedRecords(state.db);
+  if (!marked.length) return say('No records are marked.', true);
+  if (!(await ask(`Delete the ${plural(marked.length, 'marked record')}? This cannot be undone.`, 'Delete'))) return;
+  if (state.mode === 'view' && viewed()?.marked) state.viewId = null;
+  deleteRecords(state.db, marked.map((r) => r.id));
+  persist();
+  refreshList();
+  state.cursor = Math.min(state.cursor, Math.max(0, state.list.length - 1));
+  go('browse');
+  say(`Deleted ${plural(marked.length, 'record')}.`);
 }
 
 async function deleteCurrent() {
@@ -1718,6 +1792,11 @@ const MENU = {
   copyprev: () => runCommand('copyprev'),
   copyfield: () => runCommand('copyfield'),
   delete: () => state.db && ['browse', 'view'].includes(state.mode) && deleteCurrent(),
+  mark: () => runCommand('mark'),
+  markall: () => runCommand('markall'),
+  clearmarks: () => runCommand('clearmarks'),
+  delmarked: () => runCommand('delmarked'),
+  showmarked: () => runCommand('showmarked'),
   find: () => state.db && focusSearch(),
   all: () => state.db && (state.mode === 'browse' || go('browse'), clearSearch()),
   sort: () => state.db && go('sort'),

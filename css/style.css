@@ -207,7 +207,10 @@ table.grid { border-collapse: collapse; width: 100%; }
 .grid tbody tr:hover:not(.cur) td { background: var(--row-hover); }
 
 table.browse { table-layout: fixed; }
-table.browse th:first-child { width: 6ch; }
+table.browse th.mk { width: 3ch; padding: 0; text-align: center; }
+.grid td.mk { padding: 0; text-align: center; color: var(--label); font-weight: bold; }
+.grid tr.marked:not(.cur) td:not(.mk) { color: var(--bright); }
+.grid tr.cur td.mk { color: var(--sel-fg); }
 .browse td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .scrollx { overflow-x: auto; max-width: 100%; }

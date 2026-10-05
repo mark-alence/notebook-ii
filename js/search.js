@@ -22,6 +22,7 @@
 //   citation:/^CO 9\d/    a regular expression in one field
 //   #127  #120-140        records by number: one, a range, a list
 //   #12,15,31  #500-      (#500- is 500 and up), with any other terms
+//   @marked               records marked with M (-@marked: not marked)
 
 export function tokenizeQuery(q) {
   const tokens = [];
@@ -41,6 +42,14 @@ export function tokenizeQuery(q) {
       i += ids[0].length;
       if (neg) tokens.push({ type: 'NOT' });
       tokens.push({ type: 'term', field: null, text: ids[0], phrase: false, op: ':', ids: parseIdRanges(ids[1]) });
+      continue;
+    }
+    // @marked: records marked with M.
+    const marked = /^@marked(?=[\s()]|$)/i.exec(q.slice(i));
+    if (marked) {
+      i += marked[0].length;
+      if (neg) tokens.push({ type: 'NOT' });
+      tokens.push({ type: 'term', field: null, text: marked[0], phrase: false, op: ':', marked: true });
       continue;
     }
     // /pattern/ or field:/pattern/ — read whole, since a pattern may hold
@@ -180,7 +189,7 @@ export function parseQuery(q) {
       if (next()?.type !== ')') throw new Error('Missing )');
       return e;
     }
-    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase, compare: t.op === ':' ? null : t.op, regex: t.regex ?? null, ids: t.ids ?? null };
+    if (t.type === 'term') return { op: 'term', field: t.field, text: t.text, phrase: t.phrase, compare: t.op === ':' ? null : t.op, regex: t.regex ?? null, ids: t.ids ?? null, marked: !!t.marked };
     throw new Error(`Unexpected ${t.type}`);
   }
 
@@ -206,6 +215,7 @@ function wordPattern(w) {
 
 function compileTerm(node, fields) {
   if (node.ids) return (rec) => inIdRanges(rec.id, node.ids);
+  if (node.marked) return (rec) => !!rec.marked;
   let targets = null;
   if (node.field !== null) {
     const want = fold(node.field).replace(/_/g, ' ');
@@ -324,7 +334,7 @@ export function highlightPatterns(q) {
     const out = [];
     const walk = (n, neg) => {
       if (!n) return;
-      if (n.op === 'term' && !neg && !n.compare && !n.ids) {
+      if (n.op === 'term' && !neg && !n.compare && !n.ids && !n.marked) {
         if (n.regex) out.push(makeRegex(n.regex.source, n.regex.flags, 'g'));
         else for (const w of words(n.text.replace(/[*?]/g, ' '))) out.push(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu'));
       }

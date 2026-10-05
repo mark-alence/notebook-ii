@@ -130,6 +130,11 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &item("copyfield", "Copy Field (F6)", None)?,
             &item("delete", "Delete Note", None)?,
             &sep()?,
+            &item("mark", "Mark or Unmark Note (M)", None)?,
+            &item("markall", "Mark All Notes Found", None)?,
+            &item("clearmarks", "Clear All Marks", None)?,
+            &item("delmarked", "Delete Marked Notes…", None)?,
+            &sep()?,
             &PredefinedMenuItem::undo(app, None)?,
             &PredefinedMenuItem::redo(app, None)?,
             &sep()?,
@@ -146,6 +151,7 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[
             &item("find", "Find (/)", None)?,
             &item("all", "Show All Notes", None)?,
+            &item("showmarked", "Show Marked Notes", None)?,
             &item("sort", "Sort…", None)?,
         ],
     )?;
