@@ -60,3 +60,12 @@ test('appearance: CSS for each choice, nothing for the defaults', () => {
   assert.equal(cssVars({ ...DEFAULTS, size: 18.4 })['--font-size'], '18px');
   assert.equal(cssVars({ ...DEFAULTS, spacing: 'relaxed' })['--lh'], '1.7');
 });
+
+test('sort by more than three fields', () => {
+  const d = createDatabase('t', ['A', 'B', 'C', 'D']);
+  for (const [a, b, c, x] of [['x', '1', 'p', '3'], ['x', '1', 'p', '1'], ['y', '0', 'q', '9'], ['x', '1', 'p', ''], ['x', '1', 'p', '2']]) addRecord(d, { A: a, B: b, C: c, D: x });
+  const keys = ['A', 'B', 'C', 'D'].map((field) => ({ field, descending: false }));
+  assert.deepEqual(orderRecords(d.records, keys).map((r) => r.values.D), ['1', '2', '3', '', '9']);
+  keys[3].descending = true;
+  assert.deepEqual(orderRecords(d.records, keys).map((r) => r.values.D), ['3', '2', '1', '', '9']);
+});

@@ -30,7 +30,7 @@ Every command is on the bar at the bottom of the screen, labelled, with its key 
 | Key | Does | Key | Does |
 |---|---|---|---|
 | `/`, F or Ctrl+F | Find: the box in the title bar finds records in the list, and text inside the record on a record | N | New note |
-| Click or Enter | Open a record | S | Sort by up to three fields |
+| Click or Enter | Open a record | S | Sort by as many fields as you like |
 | Column heading | Sort by it (again: Z to A, again: date order) | P | Export with a form / PDF |
 | Esc | Back: out of a field, the record, the database | X / I | Export / Import |
 | PgUp / PgDn | Previous / next record (outside a field) | Del | Delete record |
