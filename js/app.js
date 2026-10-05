@@ -4,7 +4,7 @@
 // work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, orderRecords, previousEntered, withRecordNumbers, recordNumbersIn, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
+  moveField, orderRecords, withRecordNumbers, recordNumbersIn, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
 } from './model.js';
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
 import { FONTS, SPACING, SIZE, LIST_ROWS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
@@ -39,8 +39,7 @@ const state = {
   viewSnapshot: null, // its values when it was opened, for Revert
   viewIsNew: false,
   editField: 0, // the field that last had the cursor on the record screen
-  copySource: null, // the record "Copy previous" copies from
-  lastViewedId: null, // the record open before this one
+  copySource: null, // what F5 and F6 copy from: the record you were on when you pressed N
   formIndex: 0,
   exp: null, // the Export screen's choices, kept while the notebook is open
   imp: null,
@@ -131,7 +130,6 @@ function openDb(db, key = newKey(), path = null) {
   state.formIndex = 0;
   state.exp = null;
   state.copySource = null;
-  state.lastViewedId = null;
   $('#search').value = '';
   refreshList();
   if (path) addRecent({ path, name: db.name, records: db.records.length, modified: db.modified });
@@ -292,8 +290,8 @@ const COMMANDS = [
   { id: 'next', label: 'Next record', key: 'PageDown', where: ['view'], bar: true, run: () => moveRecord(1) },
   { id: 'new', label: 'New note', key: 'n', fkey: 'F3', where: ['browse', 'view'], bar: true, run: () => newRecord() },
   { id: 'edit', label: 'Edit record', key: 'e', fkey: 'F2', where: ['browse', 'view'], run: () => editRecord() },
-  { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy with F5")', key: 'Ctrl+d', fkey: 'F5', barKey: 'F5', where: ['view'], bar: true, run: () => copyFromPrevious(false) },
-  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', fkey: 'F6', barKey: 'F6', where: ['view'], bar: true, run: () => copyFromPrevious(true) },
+  { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy with F5")', key: 'Ctrl+d', fkey: 'F5', barKey: 'F5', where: ['view'], newOnly: true, bar: true, run: () => copyFromPrevious(false) },
+  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', fkey: 'F6', barKey: 'F6', where: ['view'], newOnly: true, bar: true, run: () => copyFromPrevious(true) },
   { id: 'save', label: 'Save', key: 'Ctrl+s', fkey: 'F10', barKey: 'F10', where: ['view'], bar: true, run: () => saveRecord() },
   { id: 'revert', label: 'Revert changes to this record', where: ['view'], bar: true, run: () => revertRecord() },
   { id: 'find', label: 'Find (records in the list, or text in the record on screen)', key: '/', fkey: 'F4', where: ['browse', 'view'], bar: true, run: () => focusSearch() },
@@ -334,6 +332,7 @@ function available(c) {
   if (c.desktop && !platform.desktop) return false;
   if (!(c.where.includes('*') || c.where.includes(state.mode))) return false;
   if (['browse', 'view'].includes(state.mode) && !state.db) return false;
+  if (c.newOnly && !state.viewIsNew) return false;
   return true;
 }
 
@@ -594,26 +593,9 @@ function openRecord(rec = current(), { isNew = false, focus = false } = {}) {
   state.viewId = rec.id;
   state.viewSnapshot = { ...rec.values };
   state.viewIsNew = isNew;
-  const last = isNew ? null : lastViewed(rec);
-  const reopened = state.lastViewedId === rec.id && state.copySource && state.copySource.id !== rec.id && state.db.records.includes(state.copySource);
-  if (last) {
-    state.copySource = last;
-    state.copyWhy = 'open';
-  } else if (!isNew && !reopened) {
-    state.copySource = previousEntered(state.db.records, rec);
-    state.copyWhy = 'made';
-  }
-  state.lastViewedId = rec.id;
+  if (!isNew) state.copySource = null;
   go('view');
   if (focus) focusField(isNew ? 0 : state.editField);
-}
-
-// "Previous" (what F5 and F6 copy from) for an existing record: the record
-// that was open before it; until another record has been opened, the one
-// made just before it.
-function lastViewed(rec) {
-  if (!state.lastViewedId || state.lastViewedId === rec.id) return null;
-  return state.db.records.find((r) => r.id === state.lastViewedId) ?? null;
 }
 
 // How a record is named on screen: #125 (Darnton, Robert).
@@ -628,7 +610,6 @@ function newRecord() {
   leaveRecord();
   const rec = addRecord(state.db, {});
   state.copySource = from;
-  state.copyWhy = 'new';
   openRecord(rec, { isNew: true, focus: true });
   say(from ? `New note. F5 or ${keyLabel('Ctrl+d')} fills in ${copyList()} from ${recordLabel(from)}.` : 'New note.');
 }
@@ -683,7 +664,7 @@ function renderView() {
       ${state.db.fields.map(({ name }, i) => `
         <label class="field"><span class="fname">${esc(name)}</span>
           <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)" style="min-height: calc(${fieldLines(state.db.fields[i])} * var(--lh, 1.4) * 1em + 2px)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
-      <p class="hint">Fields can be any length, and changes are saved as you type. ${state.copySource ? `<kbd>F5</kbd> copies ${esc(copyList())} from <strong>${esc(recordLabel(state.copySource))}</strong>, ${{ open: 'the record you had open before this one', made: 'the record made just before this one (no other record has been open yet)', new: 'the record you were on when you made this note' }[state.copyWhy]}; <kbd>F6</kbd> copies just the field you are in. Text already in a field is replaced only after you say OK.` : '<kbd>F5</kbd> and <kbd>F6</kbd> copy from the record you had open before this one; there is none yet.'} <kbd>Tab</kbd> moves between fields, <kbd>Esc</kbd> leaves a field and then goes back to the list.</p>
+      <p class="hint">Fields can be any length, and changes are saved as you type. ${copyHint()} <kbd>Tab</kbd> moves between fields, <kbd>Esc</kbd> leaves a field and then goes back to the list.</p>
       <p class="meta">${recordMeta(rec)}</p>
     </form>`;
   $$('#recordform textarea').forEach((t, i) => {
@@ -761,9 +742,19 @@ function copyList() {
   return names.length ? andList(names) : 'no fields (choose them in Fields)';
 }
 
+// F5 and F6 copy into a new note only: from pressing N until you leave it.
+const NEW_ONLY = 'F5 and F6 copy into a new note only: press N for one.';
+
+function copyHint() {
+  if (!state.viewIsNew) return '';
+  if (!state.copySource) return '<kbd>F5</kbd> and <kbd>F6</kbd> copy from the record you were on when you pressed <kbd>N</kbd>; there was none.';
+  return `<kbd>F5</kbd> copies ${esc(copyList())} from <strong>${esc(recordLabel(state.copySource))}</strong>, the record you were on when you made this note; <kbd>F6</kbd> copies just the field you are in. Text already in a field is replaced only after you say OK.`;
+}
+
 async function copyFromPrevious(onlyCurrentField) {
+  if (!state.viewIsNew) return say(NEW_ONLY);
   const from = state.copySource;
-  if (!from) return say('There is no previous record to copy from: open the record to copy from first, then this one.', true);
+  if (!from) return say('There is no record to copy from: press N while on (or in) the record to copy from.', true);
   const areas = $$('#recordform textarea');
   const values = {};
   state.db.fields.forEach(({ name }, i) => { values[name] = areas[i].value; });
@@ -1864,6 +1855,8 @@ function onKey(key, e) {
   if (m === 'view' && (key === 'Alt+PageUp' || key === 'Alt+PageDown')) return moveRecord(key === 'Alt+PageUp' ? -1 : 1);
   if (m === 'view' && (key === 'Ctrl+home' || key === 'Ctrl+end')) return recordEdge(key === 'Ctrl+end');
 
+  if (m === 'view' && ['F5', 'F6', 'Ctrl+d', 'Ctrl+Shift+d'].includes(key) && !state.viewIsNew) return say(NEW_ONLY);
+
   // Old F-keys: the command that had it on this screen.
   if (/^F\d+$/.test(key)) {
     const c = COMMANDS.find((x) => x.fkey === key && available(x));
@@ -1939,8 +1932,8 @@ const MENU = {
   print: () => state.db && exportWith('form'),
   close: () => state.db && closeDb(),
   new: () => state.db && newRecord(),
-  copyprev: () => runCommand('copyprev'),
-  copyfield: () => runCommand('copyfield'),
+  copyprev: () => (state.mode === 'view' && !state.viewIsNew ? say(NEW_ONLY) : runCommand('copyprev')),
+  copyfield: () => (state.mode === 'view' && !state.viewIsNew ? say(NEW_ONLY) : runCommand('copyfield')),
   delete: () => state.db && ['browse', 'view'].includes(state.mode) && deleteCurrent(),
   mark: () => runCommand('mark'),
   markall: () => runCommand('markall'),
