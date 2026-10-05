@@ -1,5 +1,4 @@
 // Write a database (or a selection of its records) back out as text.
-import { encodeCp437 } from './cp437.js';
 
 function quoteCsv(v, delim) {
   return /["\n\r]/.test(v) || v.includes(delim) || /^\s|\s$/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
@@ -30,15 +29,6 @@ export function exportTagged(fields, records, { separator = '---' } = {}) {
         .join('\r\n'),
     )
     .join(`\r\n${separator}\r\n`) + '\r\n';
-}
-
-// Notebook II's own import text (Utilities > Import, "Notebook" format):
-// %Start:, a %Field:value line per field, %End:. Lines after the first
-// continue the field. Notebook II allowed 50 fields with 20-character names.
-export function exportNotebookText(fields, records) {
-  return records
-    .map((r) => ['%Start:', ...fields.map((f) => `%${f}:${(r.values[f] ?? '').replace(/\r?\n/g, '\r\n')}`), '%End:'].join('\r\n'))
-    .join('\r\n') + '\r\n';
 }
 
 // A readable rendering, one record after another, each field on its own:
@@ -83,6 +73,7 @@ export function exportJson(db, records = db.records) {
   return JSON.stringify({ ...db, records }, null, 2);
 }
 
-export function toBytes(text, encoding = 'utf-8') {
-  return encoding === 'cp437' ? encodeCp437(text) : new TextEncoder().encode(text);
+// Every text export is UTF-8.
+export function toBytes(text) {
+  return new TextEncoder().encode(text);
 }
