@@ -9,8 +9,9 @@ import {
 import { compileQuery, highlightPatterns, findInTexts } from './search.js';
 import { FONTS, SPACING, SIZE, getAppearance, setAppearance, resetAppearance } from './appearance.js';
 import { importFiles } from './importers.js';
-import { exportDelimited, exportTagged, exportNotebookText, exportVertical, exportJson, toBytes } from './exporters.js';
-import { renderReport } from './printform.js';
+import { exportDelimited, exportTagged, exportNotebookText, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
+import { renderReport, renderBlocks } from './printform.js';
+import { PAPERS, FONT_SIZES, makePdf, previewPdf } from './pdf.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent } from './storage.js';
 import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
@@ -39,6 +40,7 @@ const state = {
   editField: 0, // the field that last had the cursor on the record screen
   copySource: null, // the record "Copy previous" copies from
   formIndex: 0,
+  exp: null, // the Export screen's choices, kept while the notebook is open
   imp: null,
   message: '',
   messageIsError: false,
@@ -125,6 +127,7 @@ function openDb(db, key = newKey(), path = null) {
   state.sortKeys = (db.sortKeys ?? []).filter((k) => db.fields.some((f) => f.name === k.field));
   state.cursor = 0;
   state.formIndex = 0;
+  state.exp = null;
   $('#search').value = '';
   refreshList();
   if (path) addRecent({ path, name: db.name, records: db.records.length, modified: db.modified });
@@ -294,7 +297,7 @@ const COMMANDS = [
   { id: 'newest', label: 'Newest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('newest'); } },
   { id: 'oldest', label: 'Oldest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('oldest'); } },
   { id: 'sort', label: 'Sort…', key: 's', fkey: 'F6', where: ['browse'], bar: true, run: () => go('sort') },
-  { id: 'print', label: 'Print', key: 'p', fkey: 'F7', where: ['browse', 'view'], bar: true, run: () => go('print') },
+  { id: 'print', label: 'Export with a custom form, as text or PDF…', key: 'p', fkey: 'F7', where: ['browse', 'view'], run: () => exportWith('form') },
   { id: 'fields', label: 'Fields', fkey: 'F8', where: ['browse', 'view'], bar: true, run: () => go('fields') },
   { id: 'import', label: 'Import', key: 'i', fkey: 'F9', where: ['home', 'browse', 'view'], bar: true, run: () => pickFiles(startImport) },
   { id: 'export', label: 'Export', key: 'x', fkey: 'F10', where: ['browse', 'view'], bar: true, run: () => go('export') },
@@ -302,8 +305,8 @@ const COMMANDS = [
   { id: 'backup', label: platform.desktop ? 'Save a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
   { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
   { id: 'close', label: 'Close database', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
-  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'print', 'import', 'export', 'help', 'newdb', 'appearance'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
-  { id: 'help', label: 'Help', key: '?', fkey: 'F1', where: ['home', 'browse', 'view', 'sort', 'fields', 'print', 'import', 'export'], bar: true, run: () => go('help') },
+  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'import', 'export', 'help', 'newdb', 'appearance'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
+  { id: 'help', label: 'Help', key: '?', fkey: 'F1', where: ['home', 'browse', 'view', 'sort', 'fields', 'import', 'export', 'appearance'], bar: true, run: () => go('help') },
   { id: 'theme', label: 'Light or dark screen', key: 'Alt+t', where: ['*'], run: () => cycleTheme() },
   { id: 'appearance', label: 'Appearance: font, size, spacing, light or dark…', where: ['*'], run: () => go('appearance') },
   { id: 'palette', label: 'Commands', key: 'Ctrl+k', where: ['*'], bar: true, run: () => openPalette() },
@@ -335,7 +338,7 @@ function runCommand(id) {
 function render() {
   document.body.dataset.mode = state.mode;
   renderTitle();
-  const views = { home: renderHome, appearance: renderAppearance, newdb: renderNewDb, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, print: renderPrint, import: renderImport, export: renderExport, help: renderHelp };
+  const views = { home: renderHome, appearance: renderAppearance, newdb: renderNewDb, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, import: renderImport, export: renderExport, help: renderHelp };
   views[state.mode]();
   renderKeys();
   renderStatus();
@@ -379,7 +382,7 @@ function renderKeys() {
   }).join('');
 }
 
-const SHORT = { openfile: 'Open', saveas: 'Save as', newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort', backup: 'Backup' };
+const SHORT = { print: 'Form/PDF', openfile: 'Open', saveas: 'Save as', newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
   if (c.id === 'find') return state.mode === 'view' ? 'Find in record' : 'Find';
   return SHORT[c.id] ?? c.label;
@@ -827,61 +830,6 @@ function renderFields() {
   $('#dbname').addEventListener('change', (e) => done(() => { db.name = e.target.value.trim() || db.name; }));
 }
 
-function renderPrint() {
-  const db = state.db;
-  if (!db.printForms.length) db.printForms.push(defaultPrintForm(fieldNames(db)));
-  state.formIndex = Math.min(state.formIndex, db.printForms.length - 1);
-  const form = db.printForms[state.formIndex];
-  $('#main').innerHTML = `
-    <div class="panel print">
-      <div class="printform">
-        <h2>Print form</h2>
-        <div class="row"><select id="formsel" aria-label="Print form">${db.printForms.map((f, i) => `<option value="${i}" ${i === state.formIndex ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select>
-          <button type="button" id="newform">New form</button><button type="button" id="delform" ${db.printForms.length > 1 ? '' : 'disabled'}>Delete form</button></div>
-        <div class="row"><label>Name</label><input id="formname" value="${esc(form.name)}"><label>Width</label><input id="formwidth" type="number" min="20" max="250" value="${form.width}"></div>
-        <textarea id="template" spellcheck="false" rows="10">${esc(form.template)}</textarea>
-        <div class="row"><label>Page header</label><input id="formheader" value="${esc(form.header ?? '')}" placeholder="none" size="40"></div>
-        <div class="row"><label>Page footer</label><input id="formfooter" value="${esc(form.footer ?? '')}" placeholder="none" size="40"></div>
-        <p class="hint"><code>{Field}</code> puts in a field, <code>{Field:20}</code> exactly 20 characters of it. <code>{#}</code> is the record's number, <code>{Date}</code> today's date, <code>{Time}</code> the time. A line written as <code>[[ … ]]</code> is left out when its fields are blank. With a header or footer the printout is cut into pages of ${form.pageLines || 66} lines; <code>{Page}</code> is the page number. Fields: ${db.fields.map((f) => `<code>{${esc(f.name)}}</code>`).join(' ')}</p>
-        <div class="buttons"><button type="button" id="doprint">Print</button><button type="button" id="savetxt">Save as text</button>
-          <select id="txtenc" aria-label="Text encoding"><option value="utf-8">UTF-8</option><option value="cp437">DOS (code page 437)</option></select></div>
-      </div>
-      <div class="printpreview"><h2>Preview — ${state.list.length} record${state.list.length === 1 ? '' : 's'}</h2><pre id="printout"></pre></div>
-    </div>`;
-  const update = () => {
-    const text = renderReport(form, state.list.slice(0, 100), fieldNames(db)).replace(/\f/g, `${'─'.repeat(form.width)}\n`);
-    $('#printout').textContent = text + (state.list.length > 100 ? `\n… and ${state.list.length - 100} more (all are printed).\n` : '');
-  };
-  update();
-  $('#template').addEventListener('input', (e) => { form.template = e.target.value; update(); persistSoon(); });
-  $('#formname').addEventListener('input', (e) => { form.name = e.target.value; persistSoon(); });
-  for (const k of ['header', 'footer']) $(`#form${k}`).addEventListener('input', (e) => { form[k] = e.target.value; update(); persistSoon(); });
-  $('#formname').addEventListener('change', () => render());
-  $('#formwidth').addEventListener('input', (e) => { form.width = Math.max(20, Math.min(250, +e.target.value || 76)); update(); persistSoon(); });
-  $('#formsel').addEventListener('change', (e) => { state.formIndex = +e.target.value; render(); });
-  $('#newform').addEventListener('click', () => {
-    db.printForms.push({ ...defaultPrintForm(fieldNames(db)), name: `Form ${db.printForms.length + 1}` });
-    state.formIndex = db.printForms.length - 1;
-    persist();
-    render();
-  });
-  $('#delform').addEventListener('click', async () => {
-    if (!(await ask(`Delete the print form "${form.name}"?`, 'Delete form'))) return;
-    db.printForms.splice(state.formIndex, 1);
-    persist();
-    render();
-  });
-  const fullText = () => renderReport(form, state.list, fieldNames(db), { title: db.name });
-  $('#doprint').addEventListener('click', () => {
-    // One block per page so form feeds become page breaks.
-    $('#print-area').replaceChildren(...fullText().split('\f').map((page) => Object.assign(document.createElement('div'), { className: 'page', textContent: page })));
-    window.print();
-  });
-  $('#savetxt').addEventListener('click', () => {
-    const enc = $('#txtenc').value;
-    download(`${safeName(db.name)}.txt`, toBytes(fullText().replace(/\n/g, '\r\n'), enc), 'text/plain');
-  });
-}
 
 // ---------- import ----------
 
@@ -998,70 +946,229 @@ function finishImport() {
 }
 
 // ---------- export ----------
+//
+// Every way of getting records out. A custom form (what Notebook II called a
+// print format) and vertical text can be saved as a text file or as a PDF.
+
+const EXPORT_FORMATS = [
+  ['json', 'Notebook file (.nb2.json) — keeps fields, forms, everything'],
+  ['vertical', 'Vertical text — one record after another, for reading'],
+  ['form', 'Custom form — your own layout'],
+  ['csv', 'Comma-separated (.csv)'],
+  ['tab', 'Tab-delimited (.txt)'],
+  ['tagged', 'Tagged text — Field: value (.txt)'],
+  ['notebook', 'Notebook II import text — %Field:value (.txt), for the DOS program'],
+  ['custom', 'Delimited, my own characters (.txt)'],
+];
+const PAGED = ['vertical', 'form']; // formats that can also be a PDF
+
+function exportState() {
+  state.exp ??= {
+    format: 'json', output: 'text', encoding: 'utf-8', which: 'list',
+    paper: /^en-(US|CA)|^es-(MX|US)/.test(navigator.language) ? 'letter' : 'a4', fontSize: 10,
+    fieldDelim: '|', recordDelim: '\\r\\n', newlineMarker: '\\x14', header: true,
+  };
+  return state.exp;
+}
+
+function exportWith(format) {
+  if (state.mode === 'view') go('browse');
+  exportState().format = format;
+  go('export');
+}
+
+function currentForm() {
+  const db = state.db;
+  if (!db.printForms.length) db.printForms.push(defaultPrintForm(fieldNames(db)));
+  state.formIndex = Math.min(state.formIndex, db.printForms.length - 1);
+  return db.printForms[state.formIndex];
+}
 
 function renderExport() {
+  const db = state.db;
+  const x = exportState();
   const n = state.list.length;
-  const total = state.db.records.length;
+  const total = db.records.length;
+  const isForm = x.format === 'form';
+  const pdf = PAGED.includes(x.format) && x.output === 'pdf';
+  const form = isForm ? currentForm() : null;
+  const opt = (v, l, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`;
   $('#main').innerHTML = `
-    <form class="panel" id="exportform">
-      <h2>Export</h2>
-      <div class="row"><label>Format</label><select name="format">
-        <option value="json">Notebook file (.json) — keeps fields, print forms, everything</option>
-        <option value="vertical">Vertical text — one record after another, for reading (.txt)</option>
-        <option value="csv">Comma-separated (.csv)</option>
-        <option value="tab">Tab-delimited (.txt)</option>
-        <option value="tagged">Tagged text — Field: value (.txt)</option>
-        <option value="notebook">Notebook II import text — %Field:value (.txt), for the DOS program</option>
-        <option value="custom">Delimited, my own characters (.txt)</option>
-      </select></div>
-      <div class="row custom" hidden>
-        <label>Field delimiter</label><input name="fieldDelim" value="|" size="6">
-        <label>Record delimiter</label><input name="recordDelim" value="\\r\\n" size="6">
-        <label>Line break marker</label><input name="newlineMarker" value="\\x14" size="6">
-        <label class="check"><input type="checkbox" name="header" checked> Field names in first row</label>
+    <form class="panel ${isForm || x.format === 'vertical' ? 'exportwide' : ''}" id="exportform">
+      <div class="exportmain">
+        <h2>Export</h2>
+        <div class="row"><label>Format</label><select name="format">${EXPORT_FORMATS.map(([v, l]) => opt(v, l, x.format)).join('')}</select></div>
+        ${PAGED.includes(x.format) ? `
+        <div class="row"><label>Save as</label>
+          <label class="check"><input type="radio" name="output" value="text" ${pdf ? '' : 'checked'}> Text file</label>
+          <label class="check"><input type="radio" name="output" value="pdf" ${pdf ? 'checked' : ''}> PDF</label></div>` : ''}
+        ${pdf ? `
+        <div class="row"><label>Paper</label><select name="paper">${Object.entries(PAPERS).map(([v, p]) => opt(v, p.name, x.paper)).join('')}</select>
+          <label>Text size</label><select name="fontSize">${FONT_SIZES.map((s) => opt(String(s), `${s} pt`, String(x.fontSize))).join('')}</select></div>` : ''}
+        ${x.format === 'custom' ? `
+        <div class="row">
+          <label>Field delimiter</label><input name="fieldDelim" value="${esc(x.fieldDelim)}" size="6">
+          <label>Record delimiter</label><input name="recordDelim" value="${esc(x.recordDelim)}" size="6">
+          <label>Line break marker</label><input name="newlineMarker" value="${esc(x.newlineMarker)}" size="6">
+          <label class="check"><input type="checkbox" name="header" ${x.header ? 'checked' : ''}> Field names in first row</label>
+        </div>` : ''}
+        ${x.format !== 'json' && !pdf ? `<div class="row"><label>Characters</label><select name="encoding">${opt('utf-8', 'UTF-8 (modern programs)', x.encoding)}${opt('cp437', 'DOS (code page 437)', x.encoding)}</select></div>` : ''}
+        <div class="row"><label>Records</label><select name="which">
+          ${opt('list', `${state.query ? `The ${n} found` : `All ${total}`}, in the list's order`, x.which)}
+          ${state.query ? opt('all', `All ${total}`, x.which) : ''}
+        </select></div>
+        ${isForm ? formEditor(form, pdf) : ''}
+        <div class="buttons"><button type="submit">${pdf ? 'Save as PDF' : 'Save file'}</button></div>
       </div>
-      <div class="row"><label>Characters</label><select name="encoding"><option value="utf-8">UTF-8 (modern programs)</option><option value="cp437">DOS (code page 437)</option></select></div>
-      <div class="row"><label>Records</label><select name="which">
-        <option value="list">${state.query ? `The ${n} found` : `All ${total}`}${state.sortKeys.length ? ', in sorted order' : ''}</option>
-        ${state.query ? `<option value="all">All ${total}</option>` : ''}
-      </select></div>
-      <div class="buttons"><button type="submit">Save file</button></div>
+      ${isForm || x.format === 'vertical' ? `<div class="printpreview"><h2>Preview${pdf ? ' of the PDF pages' : ''}</h2><pre id="printout"></pre></div>` : ''}
     </form>`;
-  const form = $('#exportform');
-  const sync = () => {
-    $('.custom', form).hidden = form.format.value !== 'custom';
-    form.encoding.disabled = form.format.value === 'json';
-  };
-  form.format.addEventListener('change', () => {
-    if (form.format.value === 'notebook') form.encoding.value = 'cp437';
-    sync();
+  const el = $('#exportform');
+  // Choices that change what the screen shows redraw it; typing only updates the preview.
+  el.addEventListener('change', (e) => {
+    const t = e.target;
+    if (!t.name) return;
+    x[t.name] = t.type === 'checkbox' ? t.checked : t.name === 'fontSize' ? +t.value : t.value;
+    if (t.name === 'format' && t.value === 'notebook') x.encoding = 'cp437';
+    if (['format', 'output', 'paper', 'fontSize', 'which'].includes(t.name)) render();
   });
-  sync();
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const db = state.db;
-    const recs = form.which.value === 'all' ? db.records : state.list;
-    const f = fieldNames(db);
-    const base = safeName(db.name);
-    const enc = form.encoding.value;
-    switch (form.format.value) {
-      case 'json':
-        if (recs.length === db.records.length) { db.lastBackup = new Date().toISOString(); persist(); }
-        return download(`${base}.nb2.json`, toBytes(exportJson(db, recs)), 'application/json');
-      case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(f, recs), enc), 'text/plain');
-      case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(f, recs), enc), 'text/csv');
-      case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, { fieldDelim: '\t' }), enc), 'text/plain');
-      case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(f, recs), enc), 'text/plain');
-      case 'notebook': return download(`${base.slice(0, 8)}.txt`, toBytes(exportNotebookText(f, recs), enc), 'text/plain');
-      case 'custom': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, {
-        fieldDelim: readDelim(form.fieldDelim.value) || '|',
-        recordDelim: readDelim(form.recordDelim.value) || '\r\n',
-        newlineMarker: readDelim(form.newlineMarker.value),
-        header: form.header.checked,
-        quote: false,
-      }), enc), 'text/plain');
+  el.addEventListener('input', (e) => { if (['fieldDelim', 'recordDelim', 'newlineMarker'].includes(e.target.name)) x[e.target.name] = e.target.value; });
+  if (isForm) wireFormEditor(form);
+  updateExportPreview();
+  el.addEventListener('submit', (e) => { e.preventDefault(); saveExport(); });
+}
+
+function formEditor(form, pdf) {
+  const db = state.db;
+  return `
+    <h2>Form</h2>
+    <div class="row"><select id="formsel" aria-label="Form">${db.printForms.map((f, i) => `<option value="${i}" ${i === state.formIndex ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select>
+      <button type="button" id="newform">New form</button><button type="button" id="delform" ${db.printForms.length > 1 ? '' : 'disabled'}>Delete form</button></div>
+    <div class="row"><label>Name</label><input id="formname" value="${esc(form.name)}"><label>Width</label><input id="formwidth" type="number" min="20" max="250" value="${form.width}"> characters</div>
+    <label class="formlabel" for="template">Each record</label>
+    <textarea id="template" spellcheck="false" rows="8">${esc(form.template)}</textarea>
+    <p class="hint"><code>{Field}</code> puts in a field, <code>{Field:20}</code> exactly 20 characters of it, <code>{#}</code> the record's number. A line written as <code>[[ … ]]</code> is left out when its fields are blank. Fields: ${db.fields.map((f) => `<code>{${esc(f.name)}}</code>`).join(' ')}</p>
+    <div class="row"><label for="formheader">Page header</label><input id="formheader" value="${esc(form.header ?? '')}" placeholder="none" size="40"></div>
+    <div class="row"><label for="formfooter">Page footer</label><input id="formfooter" value="${esc(form.footer ?? '')}" placeholder="none" size="40"></div>
+    <p class="hint">In the header and footer: <code>{@page}</code> the page number, <code>{@pages}</code> how many pages, <code>{@date}</code> today's date, <code>{@time}</code> the time — for example <code>Notes, {@date}</code> and <code>Page {@page} of {@pages}</code>.${pdf ? ' They go on every page of the PDF.' : ''}</p>
+    ${pdf ? '' : `<div class="row"><label class="check"><input type="checkbox" id="textpages" ${form.textPages ? 'checked' : ''}> Cut the text file into pages of</label>
+      <input id="pagelines" type="number" min="10" max="255" value="${form.pageLines || 66}" ${form.textPages ? '' : 'disabled'}> lines, with the header and footer on each (otherwise they appear once, at the start and end)</div>`}`;
+}
+
+function wireFormEditor(form) {
+  const db = state.db;
+  const changed = () => { updateExportPreview(); persistSoon(); };
+  $('#template').addEventListener('input', (e) => { form.template = e.target.value; changed(); });
+  $('#formname').addEventListener('input', (e) => { form.name = e.target.value; persistSoon(); });
+  $('#formname').addEventListener('change', () => render());
+  for (const k of ['header', 'footer']) $(`#form${k}`).addEventListener('input', (e) => { form[k] = e.target.value; changed(); });
+  $('#formwidth').addEventListener('input', (e) => { form.width = Math.max(20, Math.min(250, +e.target.value || 76)); changed(); });
+  $('#textpages')?.addEventListener('change', (e) => { form.textPages = e.target.checked; $('#pagelines').disabled = !form.textPages; changed(); });
+  $('#pagelines')?.addEventListener('input', (e) => { form.pageLines = Math.max(10, Math.min(255, +e.target.value || 66)); changed(); });
+  $('#formsel').addEventListener('change', (e) => { state.formIndex = +e.target.value; render(); });
+  $('#newform').addEventListener('click', () => {
+    db.printForms.push({ ...defaultPrintForm(fieldNames(db)), name: `Form ${db.printForms.length + 1}` });
+    state.formIndex = db.printForms.length - 1;
+    persist();
+    render();
+  });
+  $('#delform').addEventListener('click', async () => {
+    if (!(await ask(`Delete the form "${form.name}"?`, 'Delete form'))) return;
+    db.printForms.splice(state.formIndex, 1);
+    persist();
+    render();
+  });
+  // Keep the screen's own keys out of the template and header boxes.
+  for (const id of ['#template', '#formheader', '#formfooter', '#formname']) $(id).addEventListener('keydown', (e) => e.stopPropagation());
+}
+
+function exportRecords() {
+  return state.exp.which === 'all' ? state.db.records : state.list;
+}
+
+// One text per record, for a form or vertical text.
+function exportBlocks(recs, width) {
+  const f = fieldNames(state.db);
+  if (state.exp.format === 'form') return renderBlocks(currentForm(), recs, f, width ? { width } : {});
+  return verticalBlocks(f, recs);
+}
+
+function pdfOptions() {
+  const x = state.exp;
+  const form = x.format === 'form' ? currentForm() : null;
+  return { paper: x.paper, fontSize: x.fontSize, header: form?.header ?? '', footer: form?.footer ?? '', title: form ? `${state.db.name}: ${form.name}` : state.db.name };
+}
+
+function updateExportPreview() {
+  const out = $('#printout');
+  if (!out) return;
+  const x = state.exp;
+  const all = exportRecords();
+  const recs = all.slice(0, 60);
+  let text;
+  if (x.output === 'pdf') text = previewPdf(exportBlocks(recs), pdfOptions());
+  else if (x.format === 'form') text = renderReport(currentForm(), recs, fieldNames(state.db)).replace(/\f/g, `${'─'.repeat(currentForm().width)}\n`);
+  else text = exportVertical(fieldNames(state.db), recs).replace(/\r/g, '');
+  out.textContent = text + (all.length > recs.length ? `\n… and ${all.length - recs.length} more records (all are saved).\n` : '');
+}
+
+// The PDF maker and its font load the first time a PDF is saved.
+let pdfKit = null;
+function loadPdfKit() {
+  pdfKit ??= (async () => {
+    if (!globalThis.jspdf) {
+      await new Promise((ok, fail) => {
+        const s = Object.assign(document.createElement('script'), { src: 'js/vendor/jspdf.umd.min.js', onload: ok, onerror: () => fail(new Error('Could not load the PDF maker.')) });
+        document.head.append(s);
+      });
     }
-  });
+    const res = await fetch('fonts/DejaVuSansMono.ttf');
+    if (!res.ok) throw new Error('Could not load the font for the PDF.');
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return { jsPDF: globalThis.jspdf.jsPDF, font: btoa(bin) };
+  })().catch((e) => { pdfKit = null; throw e; });
+  return pdfKit;
+}
+
+async function saveExport() {
+  const db = state.db;
+  const x = state.exp;
+  const recs = exportRecords();
+  const f = fieldNames(db);
+  const base = safeName(db.name);
+  const enc = x.encoding;
+  if (PAGED.includes(x.format) && x.output === 'pdf') {
+    say('Making the PDF…');
+    try {
+      const kit = await loadPdfKit();
+      const { bytes, pages } = makePdf(exportBlocks(recs), { ...kit, ...pdfOptions() });
+      const name = x.format === 'form' ? `${base}-${safeName(currentForm().name)}.pdf` : `${base}.pdf`;
+      if (await download(name, bytes, 'application/pdf')) say(`PDF saved: ${pages} page${pages === 1 ? '' : 's'}, ${recs.length} record${recs.length === 1 ? '' : 's'}.`);
+      else say('');
+    } catch (e) {
+      say(String(e.message ?? e), true);
+    }
+    return;
+  }
+  switch (x.format) {
+    case 'json':
+      if (recs.length === db.records.length) { db.lastBackup = new Date().toISOString(); persist(); }
+      return download(`${base}.nb2.json`, toBytes(exportJson(db, recs)), 'application/json');
+    case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(f, recs), enc), 'text/plain');
+    case 'form': return download(`${base}-${safeName(currentForm().name)}.txt`, toBytes(renderReport(currentForm(), recs, f, { title: db.name }).replace(/\n/g, '\r\n'), enc), 'text/plain');
+    case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(f, recs), enc), 'text/csv');
+    case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, { fieldDelim: '\t' }), enc), 'text/plain');
+    case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(f, recs), enc), 'text/plain');
+    case 'notebook': return download(`${base.slice(0, 8)}.txt`, toBytes(exportNotebookText(f, recs), enc), 'text/plain');
+    case 'custom': return download(`${base}.txt`, toBytes(exportDelimited(f, recs, {
+      fieldDelim: readDelim(x.fieldDelim) || '|',
+      recordDelim: readDelim(x.recordDelim) || '\r\n',
+      newlineMarker: readDelim(x.newlineMarker),
+      header: x.header,
+      quote: false,
+    }), enc), 'text/plain');
+  }
 }
 
 function renderHelp() {
@@ -1533,7 +1640,7 @@ const MENU = {
   saveas: () => state.db && saveAs(),
   import: () => pickFiles(startImport),
   export: () => state.db && go('export'),
-  print: () => state.db && go('print'),
+  print: () => state.db && exportWith('form'),
   close: () => state.db && closeDb(),
   new: () => state.db && newRecord(),
   copyprev: () => runCommand('copyprev'),

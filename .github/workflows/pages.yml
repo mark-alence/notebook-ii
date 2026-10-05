@@ -29,7 +29,7 @@ jobs:
           node-version: 20
       - run: npm test
       - name: Collect the site files
-        run: mkdir _site && cp -r index.html manifest.webmanifest sw.js css js icons _site/
+        run: mkdir _site && cp -r index.html manifest.webmanifest sw.js css js icons fonts _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
       - id: deployment

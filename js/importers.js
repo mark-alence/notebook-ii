@@ -503,7 +503,7 @@ export function parseReportFormat(bytes, fieldNames, fileName = 'FORMAT.R00') {
     }
     return out;
   };
-  const pageText = (b) => decode(b, { '#': '{Page}', '@': '{Date} {Time}' }).trimEnd();
+  const pageText = (b) => decode(b, { '#': '{@page}', '@': '{@date} {@time}' }).trimEnd();
   const body = [];
   let joinNext = false;
   for (const b of raw.slice(1, R_LINES - 1)) {
@@ -530,6 +530,7 @@ export function parseReportFormat(bytes, fieldNames, fileName = 'FORMAT.R00') {
     header: pageText(raw[0]),
     footer: pageText(raw[R_LINES - 1]),
     pageLines: pageLines >= 10 && pageLines <= 255 ? pageLines : 66,
+    textPages: true,
   };
 }
 

@@ -1,6 +1,6 @@
 # Notebook II
 
-A recreation of **Notebook II**, the text database Pro/Tem Software (Stanford, California) sold for MS-DOS in the late 1980s. Historians, librarians and writers used it to keep research notes and bibliographies. This version runs in a web browser and keeps the original's way of working: named fields of any length, word search across a whole database or one field, sorting, print forms, and full-screen keyboard control with function keys.
+A recreation of **Notebook II**, the text database Pro/Tem Software (Stanford, California) sold for MS-DOS in the late 1980s. Historians, librarians and writers used it to keep research notes and bibliographies. This version runs in a web browser and keeps the original's way of working: named fields of any length, word search across a whole database or one field, sorting, custom forms for text and PDF output, and full-screen keyboard control.
 
 ## Running it
 
@@ -31,13 +31,13 @@ Every command is on the bar at the bottom of the screen, labelled, with its key 
 |---|---|---|---|
 | `/`, F or Ctrl+F | Find: the box in the title bar finds records in the list, and text inside the record on a record | N | New note |
 | Click or Enter | Open a record | S | Sort by up to three fields |
-| Column heading | Sort by it (again: Z to A, again: date order) | P | Print |
+| Column heading | Sort by it (again: Z to A, again: date order) | P | Export with a form / PDF |
 | Esc | Back: out of a field, the record, the database | X / I | Export / Import |
 | PgUp / PgDn | Previous / next record (outside a field) | Del | Delete record |
 | F5 / F6 | Copy previous / copy this field | ? | Help |
 | Tab | Next field (inside a field, arrows and PgUp/PgDn move through the text) | Ctrl+Shift+S | Backup |
 
-The search box in the title bar filters as you type; Enter or ↓ moves to the list and Esc clears it. The original F-keys still work: F2 edit, F3 new, F4 find, F5 show all, F6 sort, F7 print, F8 fields, F9 import, F10 export.
+The search box in the title bar filters as you type; Enter or ↓ moves to the list and Esc clears it. The original F-keys still work: F2 edit, F3 new, F4 find, F5 show all, F6 sort, F7 export with a form, F8 fields, F9 import, F10 export.
 
 A record opens ready to read and to change: click a field and type, and changes are saved as you go (F10 or Ctrl+S saves at once). Fields can be any length; a long note just scrolls. **Revert** on the command bar puts the record back as it was when you opened it. A new note left blank is dropped when you leave it. Ctrl+Home and Ctrl+End go to the start and end of the record, and Alt+PgUp/PgDn moves to the previous or next record from inside a field.
 
@@ -64,7 +64,7 @@ Unless it is sorted by a field, the list shows the newest records first; *Oldest
 
 Notebooks are saved in the browser as you work. They are not on your other devices, and clearing the browser's history or site data deletes them. **Backup** (Ctrl+Shift+S) saves the open notebook as a `.nb2.json` file, which Import reads back. The app reminds you when a notebook has changed and not been backed up for a week, and asks the browser to keep its storage.
 
-Export also writes **vertical text**: each record's fields one after another, short values beside their label and long notes below it, records separated by a rule. It is the most readable copy to keep, print or quote from, and Import reads it back. Exports follow the list's current order and search.
+Export also writes **vertical text**: each record's fields one after another, short values beside their label and long notes below it, records separated by a rule. It is the most readable copy to keep or quote from, and Import reads it back. Exports follow the list's current order and search.
 
 The screen follows the computer's light or dark setting. The word at the right of the title bar, or **Alt+T**, switches between Auto, Light and Dark.
 
@@ -90,9 +90,13 @@ citation:/^CO 9\d/    a regular expression in one field
 
 Search ignores capitals and accents (regular expressions ignore capitals but not accents). The last two lines are Notebook II's Select conditions (begins with, greater/less than); numbers compare as numbers.
 
-## Print forms
+## Custom forms and PDFs
 
-A print form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{Field:20}` gives exactly 20 characters of it, cut off or padded (Notebook II's fixed fields). `{#}` is the record's number in the printout, `{Date}` today's date and `{Time}` the time. A line written as `[[ … ]]` is dropped when all its fields are blank. A form can have a page header and footer, like Notebook II's custom formats; then the printout is cut into 66-line pages with a form feed between them, and `{Page}` is the page number. Forms are saved with the database. Print goes to the printer, or you can save the output as a text file in UTF-8 or DOS code page 437.
+**Export → Custom form** (or P) lays records out your own way, with a live preview. A form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{Field:20}` gives exactly 20 characters of it, cut off or padded (Notebook II's fixed fields). `{#}` is the record's number in the output. A line written as `[[ … ]]` is dropped when all its fields are blank. A name that is not a field stays visible as `{Name}`, so a misspelling shows.
+
+A form can have a page header and footer, like Notebook II's custom formats. In them `{@page}`, `{@pages}`, `{@date}` and `{@time}` give the page number, the number of pages, today's date and the time; the `@` keeps them apart from fields, so `{Date}` is always a field called Date. (Forms made before this used `{Page}`, `{Date}` and `{Time}` in headers and footers and are converted when the notebook opens.) Forms are saved with the notebook.
+
+A custom form, or vertical text, is saved either as a text file (UTF-8 or DOS code page 437) or as a **PDF**. The PDF is made by the app itself, the same in every browser and in the desktop app: choose A4 or US Letter and a text size, and the pages are laid out to fit, with the header and footer on every page and no record split across pages when it fits on one. The text is set in DejaVu Sans Mono, built into the PDF, so every character prints and fixed-width columns line up. To print on paper, print the PDF. A text file has the header and footer once, at the start and end, or can be cut into pages of a set number of lines (66 by default) with form feeds, as Notebook II printed them.
 
 ## Your old Notebook II files
 
@@ -116,7 +120,8 @@ js/model.js       database, fields, records, sorting
 js/search.js      the search language
 js/importers.js   Notebook II database, delimited, tagged, JSON and salvage readers
 js/exporters.js   writers
-js/printform.js   print form templates
+js/printform.js   custom form templates
+js/pdf.js         PDF pages (jsPDF and DejaVu Sans Mono, in js/vendor and fonts)
 js/cp437.js       DOS character set
 js/storage.js     saving in the browser
 js/platform.js    what differs in the desktop app (files, dialogs, menu)

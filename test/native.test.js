@@ -102,9 +102,10 @@ test('native: custom print format (.R00) becomes a print form', () => {
     name: 'Cards',
     width: 65,
     template: '{#}. {Author:20} ({Year:20})\n[[Notes: {Title:20}]]',
-    header: 'Reading list {Date} {Time} page {Page}',
+    header: 'Reading list {@date} {@time} page {@page}',
     footer: 'End of list',
     pageLines: 66,
+    textPages: true,
   });
   const r = importFiles([...NOTES, fixture('CARDS.R00')]);
   assert.equal(r.printForms[0].name, 'Cards');
@@ -117,14 +118,14 @@ test('print forms: fixed-width fields and pages with header and footer', () => {
   const rec = { values: { Author: 'Davis, Natalie Zemon', Year: '1983' } };
   assert.equal(renderRecord('{#}. {Author:10}|{Year:6}|', rec, ['Author', 'Year']), '1. Davis, Nat|1983  |');
   const records = [1, 2, 3].map((n) => ({ values: { Author: `A${n}`, Year: '' } }));
-  const out = renderReport({ width: 40, template: '{Author}', header: 'Page {Page}', footer: 'end', pageLines: 10 }, records, ['Author', 'Year']);
+  const out = renderReport({ width: 40, template: '{Author}', header: 'Page {@page}', footer: 'end', pageLines: 10, textPages: true }, records, ['Author', 'Year']);
   const pages = out.split('\f');
   assert.equal(pages.length, 1);
   assert.deepEqual(pages[0].split('\n').slice(0, 7), ['Page 1', '', 'A1', '', 'A2', '', 'A3']);
   assert.equal(pages[0].split('\n').length, 11); // 10 lines and the final line end
   const four = [...records, { values: { Author: 'A4', Year: '' } }];
-  const many = renderReport({ width: 40, template: '{Author}', header: 'Page {Page}', pageLines: 6 }, four, ['Author', 'Year']);
-  assert.deepEqual(many.split('\f'), ['Page 1\n\nA1\n\nA2\n\nA3\n', 'Page 2\n\nA4\n']);
+  const many = renderReport({ width: 40, template: '{Author}', header: 'Page {@page} of {@pages}', pageLines: 6, textPages: true }, four, ['Author', 'Year']);
+  assert.deepEqual(many.split('\f'), ['Page 1 of 2\n\nA1\n\nA2\n\nA3\n', 'Page 2 of 2\n\nA4\n']);
 });
 
 test('rename field updates fixed-width placeholders too', () => {

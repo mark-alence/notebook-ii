@@ -87,7 +87,7 @@ From the help screen and from printing with the real program:
 | `* … *` | hanging indent (AutoIndent option) |
 | `_ … _` | underlined |
 
-The importer turns field references into `{Name}` or `{Name:20}`, `#` into `{#}` or `{Page}`, `@` into `{Date} {Time}`, a line wrapped in `~ ~` into a `[[ … ]]` line, and drops the underline and indent markers.
+The importer turns field references into `{Name}` or `{Name:20}`, `#` into `{#}` or `{@page}`, `@` into `{@date} {@time}`, a line wrapped in `~ ~` into a `[[ … ]]` line, and drops the underline and indent markers.
 
 ## Standard ("Notebook format") printout
 
