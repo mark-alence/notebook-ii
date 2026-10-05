@@ -29,7 +29,7 @@ Every command is on the bar at the bottom of the screen, labelled, with its key 
 
 | Key | Does | Key | Does |
 |---|---|---|---|
-| `/`, F or Ctrl+F | Find: in the list, narrow it; on a record, find inside it | N | New note |
+| `/`, F or Ctrl+F | Find: the box in the title bar finds records in the list, and text inside the record on a record | N | New note |
 | Click or Enter | Open a record | S | Sort by up to three fields |
 | Column heading | Sort by it (again: Z to A, again: date order) | P | Print |
 | Esc | Back: out of a field, the record, the database | X / I | Export / Import |
@@ -41,7 +41,7 @@ The search box in the title bar filters as you type; Enter or ↓ moves to the l
 
 A record opens ready to read and to change: click a field and type, and changes are saved as you go (F10 or Ctrl+S saves at once). Fields can be any length; a long note just scrolls. **Revert** on the command bar puts the record back as it was when you opened it. A new note left blank is dropped when you leave it. Ctrl+Home and Ctrl+End go to the start and end of the record, and Alt+PgUp/PgDn moves to the previous or next record from inside a field.
 
-On a record, **Ctrl+F** (or F4) finds text or a `/pattern/` inside that record: every match is marked, Enter and Shift+Enter step through them, Esc leaves the cursor on the match. **Ctrl+Space** (or Ctrl+F2, the original's Mark key) starts a block as in Emacs: the arrow keys, Home, End and PgUp/PgDn stretch it, Ctrl+C or Ctrl+X copy or cut it, and Esc cancels it.
+On a record, the box in the title bar (**Ctrl+F**, F4 or `/`) finds text or a `/pattern/` inside that record: every match is highlighted, Enter and Shift+Enter step through them, Esc leaves the cursor on the match, and the words stay as you page through records. Back in the list, the box finds records again. **Ctrl+Space** (or Ctrl+F2, the original's Mark key) starts a block as in Emacs: the arrow keys, Home, End and PgUp/PgDn stretch it, Ctrl+C or Ctrl+X copy or cut it, and Esc cancels it.
 
 On a record, **F5** (or Ctrl+D) copies the previous record's source fields (Author, Title, Year and the like) into the ones still blank, so a new note from the same source only needs the note itself; **F6** (or Ctrl+Shift+D) copies just the field the cursor is in. "Previous" is the record you were on when you pressed N, or for an existing record the one before it in the list.
 

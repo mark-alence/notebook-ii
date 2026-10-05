@@ -257,7 +257,7 @@ function readDelim(s) {
 // ---------- navigation ----------
 
 function go(mode) {
-  if (state.mode === 'view' && mode !== 'view') { hideRecordFind(); leaveRecord(); }
+  if (state.mode === 'view' && mode !== 'view') { endRecordFind(); leaveRecord(); }
   if (mode !== state.mode && ['browse', 'view'].includes(state.mode)) state.back = state.mode;
   state.mode = mode;
   state.message = '';
@@ -289,8 +289,7 @@ const COMMANDS = [
   { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', fkey: 'F6', barKey: 'F6', where: ['view'], bar: true, run: () => copyFromPrevious(true) },
   { id: 'save', label: 'Save', key: 'Ctrl+s', fkey: 'F10', barKey: 'F10', where: ['view'], bar: true, run: () => saveRecord() },
   { id: 'revert', label: 'Revert changes to this record', where: ['view'], bar: true, run: () => revertRecord() },
-  { id: 'find', label: 'Find', key: '/', fkey: 'F4', where: ['browse', 'view'], bar: true, run: () => (state.mode === 'view' ? openRecordFind() : focusSearch()) },
-  { id: 'findlist', label: 'Find records (search the whole list)', where: ['view'], run: () => focusSearch() },
+  { id: 'find', label: 'Find (records in the list, or text in the record on screen)', key: '/', fkey: 'F4', where: ['browse', 'view'], bar: true, run: () => focusSearch() },
   { id: 'all', label: 'Show all records', fkey: 'F5', where: ['browse'], run: () => clearSearch() },
   { id: 'newest', label: 'Newest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('newest'); } },
   { id: 'oldest', label: 'Oldest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('oldest'); } },
@@ -356,9 +355,19 @@ function renderTitle() {
   }
   $('#title .dbname').textContent = db?.name ?? '';
   $('#title .count').textContent = right;
+  // One box, two jobs: in the list it finds records, on a record it finds
+  // text in that record. Each keeps its own words.
   const search = $('#search');
   search.hidden = !db;
-  search.placeholder = `Find (/)   e.g. smith  author:smith  year>1980`;
+  const job = state.mode === 'view' ? 'record' : 'list';
+  if (search.dataset.job !== job) {
+    search.dataset.job = job;
+    search.value = job === 'record' ? rf.query : state.query;
+    search.placeholder = job === 'record'
+      ? 'Find in this record (/)   text or /pattern/   Enter next, Shift+Enter back'
+      : 'Find records (/)   e.g. smith  author:smith  year>1980';
+    search.setAttribute('aria-label', job === 'record' ? 'Find in this record' : 'Find records');
+  }
   $('#themebtn').textContent = { auto: 'Auto', light: 'Light', dark: 'Dark' }[getTheme()];
 }
 
@@ -372,6 +381,7 @@ function renderKeys() {
 
 const SHORT = { openfile: 'Open', saveas: 'Save as', newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
+  if (c.id === 'find') return state.mode === 'view' ? 'Find in record' : 'Find';
   return SHORT[c.id] ?? c.label;
 }
 
@@ -611,6 +621,12 @@ function renderView() {
     t.addEventListener('focus', () => { state.editField = i; });
   });
   $('#recordform').addEventListener('submit', (e) => e.preventDefault());
+  if (rf.query.trim()) {
+    const r = findInTexts(state.db.fields.map(({ name }) => rec.values[name] ?? ''), rf.query);
+    rf.matches = r.matches ?? [];
+    rf.cur = 0;
+    if (!r.error) paintRecordFind();
+  }
 }
 
 function recordMeta(rec) {
@@ -707,7 +723,6 @@ function applySearch(q) {
     return false;
   }
   if (q === state.query) return true;
-  if (state.mode === 'view') go('browse');
   state.query = q;
   state.cursor = 0;
   refreshList();
@@ -720,9 +735,11 @@ function applySearch(q) {
 let searchTimer = null;
 $('#search').addEventListener('input', (e) => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => applySearch(e.target.value), 150);
+  if (state.mode === 'view') searchTimer = setTimeout(() => updateRecordFind(), 120);
+  else searchTimer = setTimeout(() => applySearch(e.target.value), 150);
 });
 $('#search').addEventListener('keydown', (e) => {
+  if (state.mode === 'view') return recordFindKeys(e);
   if (e.key === 'Escape') {
     e.preventDefault();
     e.stopPropagation();
@@ -1222,51 +1239,36 @@ document.addEventListener('mousedown', (e) => { if (mark && e.target === mark.ta
 
 // ---------- find in the record on screen ----------
 //
-// In the list, Find narrows the list. On a record it looks inside that record:
-// every match is marked, Enter goes to the next and Shift+Enter the previous,
-// Esc closes the bar and leaves the cursor on the match.
+// On a record the box in the title bar looks inside that record: every match
+// is marked, Enter goes to the next and Shift+Enter the previous, Esc puts the
+// cursor on the match. The words stay while you page through records and are
+// dropped when you go back to the list.
 
-const rf = { open: false, matches: [], cur: 0 };
+const rf = { query: '', matches: [], cur: 0 };
 
-function openRecordFind() {
-  const bar = $('#recfind');
-  rf.open = true;
-  bar.hidden = false;
-  const input = $('#recfindinput');
-  input.focus();
-  input.select();
-  if (input.value) updateRecordFind();
-}
-
-function hideRecordFind() {
-  if (!rf.open) return;
-  rf.open = false;
-  rf.matches = [];
-  $('#recfind').hidden = true;
-}
-
-function closeRecordFind() {
-  const m = rf.matches[rf.cur];
-  hideRecordFind();
-  renderView();
-  const t = $$('#recordform textarea')[m?.field ?? state.editField];
-  if (!t) return;
-  t.focus();
-  if (m) t.setSelectionRange(m.start, m.end);
-}
-
-function updateRecordFind(keepPlace = false) {
+function updateRecordFind() {
   const rec = viewed();
   if (!rec) return;
-  const texts = state.db.fields.map(({ name }) => rec.values[name] ?? '');
-  const r = findInTexts(texts, $('#recfindinput').value);
-  const count = $('#recfindcount');
-  if (r.error) { count.textContent = r.error; count.classList.add('error'); return; }
-  count.classList.remove('error');
+  const query = $('#search').value;
+  const changed = query !== rf.query;
+  rf.query = query;
+  if (!query.trim()) {
+    rf.matches = [];
+    renderView(); // back to the list's own marks, if any
+    return say('');
+  }
+  const r = findInTexts(state.db.fields.map(({ name }) => rec.values[name] ?? ''), query);
+  if (r.error) return say(r.error, true);
   rf.matches = r.matches;
-  if (!keepPlace) rf.cur = 0;
+  if (changed) rf.cur = 0;
   rf.cur = Math.min(rf.cur, Math.max(0, rf.matches.length - 1));
   paintRecordFind();
+}
+
+function endRecordFind() {
+  rf.query = '';
+  rf.matches = [];
+  rf.cur = 0;
 }
 
 function stepRecordFind(dir) {
@@ -1292,29 +1294,35 @@ function paintRecordFind() {
     wrap.insertAdjacentHTML('beforeend', `<span class="fmark" aria-hidden="true">${html}${esc(t.value.slice(at))}</span>`);
   });
   const n = rf.matches.length;
-  $('#recfindcount').textContent = $('#recfindinput').value.trim() ? (n ? `${rf.cur + 1} of ${n}` : 'Not in this record') : '';
+  say(n ? `Match ${rf.cur + 1} of ${n} in this record.` : 'Not in this record.', !n);
   $('#recordform mark.cur')?.scrollIntoView({ block: 'center' });
 }
 
-let recFindTimer = null;
-$('#recfindinput').addEventListener('input', () => {
-  clearTimeout(recFindTimer);
-  recFindTimer = setTimeout(() => updateRecordFind(), 120);
-});
-$('#recfindinput').addEventListener('keydown', (e) => {
+// Esc: into the field at the match, with the match selected.
+function goToMatch() {
+  const m = rf.matches[rf.cur];
+  const t = m && $$('#recordform textarea')[m.field];
+  if (!t) return $('#search').blur();
+  t.focus();
+  t.setSelectionRange(m.start, m.end);
+}
+
+function recordFindKeys(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
     e.stopPropagation();
-    clearTimeout(recFindTimer);
-    if (!rf.matches.length) updateRecordFind();
-    else stepRecordFind(e.shiftKey ? -1 : 1);
+    clearTimeout(searchTimer);
+    const fresh = rf.query !== e.target.value || !rf.matches.length;
+    updateRecordFind(); // also picks up any typing in the record since
+    if (!fresh) stepRecordFind(e.shiftKey ? -1 : 1);
   } else if (e.key === 'Escape') {
     e.preventDefault();
     e.stopPropagation();
-    closeRecordFind();
+    clearTimeout(searchTimer);
+    if (rf.query !== e.target.value) updateRecordFind();
+    goToMatch();
   }
-});
-$('#recfind').addEventListener('submit', (e) => e.preventDefault());
+}
 
 // ---------- yes / no questions ----------
 //
@@ -1365,7 +1373,7 @@ function paletteItems() {
   if (state.db && ['browse', 'view'].includes(state.mode)) {
     for (const { name } of state.db.fields) {
       items.push({ label: `Sort by ${name}`, hint: '', run: () => { if (state.mode === 'view') go('browse'); setSort([]); sortByColumn(name); } });
-      items.push({ label: `Find in ${name}…`, hint: '', run: () => { const s = $('#search'); focusSearch(); s.value = `${/\s/.test(name) ? `"${name}"` : name}:`; } });
+      items.push({ label: `Find records by ${name}…`, hint: '', run: () => { if (state.mode === 'view') go('browse'); const s = $('#search'); focusSearch(); s.value = `${/\s/.test(name) ? `"${name}"` : name}:`; } });
     }
   }
   return items;
@@ -1490,7 +1498,7 @@ function onKey(key, e) {
     if (key === 'ArrowRight') return moveRecord(1);
     if (key === 'ArrowLeft') return moveRecord(-1);
     if (key === 'Enter') return editRecord();
-    if (key === 'f' || key === 'F') return openRecordFind();
+    if (key === 'f' || key === 'F') return focusSearch();
   }
 
   const k = key.length === 1 ? key.toLowerCase() : key;
@@ -1531,7 +1539,7 @@ const MENU = {
   copyprev: () => runCommand('copyprev'),
   copyfield: () => runCommand('copyfield'),
   delete: () => state.db && ['browse', 'view'].includes(state.mode) && deleteCurrent(),
-  find: () => state.db && (state.mode === 'view' ? openRecordFind() : focusSearch()),
+  find: () => state.db && focusSearch(),
   all: () => state.db && (state.mode === 'browse' || go('browse'), clearSearch()),
   sort: () => state.db && go('sort'),
   fields: () => state.db && go('fields'),

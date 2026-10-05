@@ -253,7 +253,9 @@ table.browse th:first-child { width: 6ch; }
   color: transparent;
   pointer-events: none;
 }
-.record .fmark mark { color: transparent; background: color-mix(in srgb, var(--mark-bg) 55%, transparent); }
+/* A match is drawn like a highlighter: the overlay repeats the text exactly
+   over the field, so inside a mark the letters show dark on yellow. */
+.record .fmark mark { color: var(--mark-fg); background: var(--mark-bg); }
 
 /* ---------- print ---------- */
 
@@ -316,20 +318,7 @@ table.browse th:first-child { width: 6ch; }
 
 /* ---------- find in a record ---------- */
 
-#recfind {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 1ch;
-  padding: 0.2em 1ch;
-  background: var(--status-bg);
-  color: var(--status-fg);
-}
-#recfind label { font-weight: bold; }
-#recfindinput { flex: 1 1 24ch; max-width: 50ch; }
-#recfindcount { min-width: 10ch; }
-#recfindcount.error { color: var(--warn); }
-.record .fmark mark.cur { background: var(--mark-bg); outline: 2px solid var(--focus); }
+.record .fmark mark.cur { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 .fontsample { display: inline-block; margin-top: 0.2em; }
 #appearanceform input[type=range] { width: min(24ch, 50vw); }
