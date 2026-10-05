@@ -305,9 +305,8 @@ const COMMANDS = [
   { id: 'backup', label: platform.desktop ? 'Save a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
   { id: 'mark', label: 'Mark or unmark this record', key: 'm', where: ['browse', 'view'], run: () => toggleMark() },
   { id: 'showmarked', label: 'Show marked records', where: ['browse', 'view'], run: () => showMarked() },
-  { id: 'markall', label: 'Mark all records in the list', where: ['browse', 'view'], run: () => markList(true) },
-  { id: 'unmarkall', label: 'Unmark all records in the list', where: ['browse', 'view'], run: () => markList(false) },
-  { id: 'clearmarks', label: 'Clear all marks in the notebook', where: ['browse', 'view'], run: () => clearMarks() },
+  { id: 'markall', label: 'Mark all records in the list', where: ['browse', 'view'], run: () => markAll() },
+  { id: 'clearmarks', label: 'Clear all marks', key: 'Shift+m', where: ['browse', 'view'], run: () => clearMarks() },
   { id: 'delmarked', label: 'Delete marked records…', where: ['browse', 'view'], run: () => deleteMarked() },
   { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
   { id: 'close', label: 'Close database', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
@@ -1323,10 +1322,10 @@ function toggleMark() {
   if (meta) meta.innerHTML = recordMeta(rec);
 }
 
-function markList(on) {
-  const n = setMarked(state.db, state.list, on);
+function markAll() {
+  const n = setMarked(state.db, state.list, true);
   persistSoon();
-  say(`${on ? 'Marked' : 'Unmarked'} ${plural(n, 'record')}. ${plural(markCount(), 'record')} marked.`);
+  say(`Marked ${plural(n, 'record')}. ${plural(markCount(), 'record')} marked.`);
   render();
 }
 
@@ -1340,7 +1339,7 @@ function showMarked() {
 async function clearMarks() {
   const n = markCount();
   if (!n) return say('No records are marked.');
-  if (n > 1 && !(await ask(`Unmark all ${n} marked records?`, 'Unmark'))) return;
+  if (!(await ask(`Clear the marks on ${n === 1 ? 'the 1 marked record' : `all ${n} marked records`}?`, 'OK'))) return;
   setMarked(state.db, state.db.records, false);
   persistSoon();
   say('Marks cleared.');
@@ -1754,6 +1753,8 @@ function onKey(key, e) {
     if (key === 'f' || key === 'F') return focusSearch();
   }
 
+  // Shift+M: letters are matched without Shift, so name it here.
+  if (key === 'M' && e?.shiftKey) return runCommand('clearmarks');
   const k = key.length === 1 ? key.toLowerCase() : key;
   const c = COMMANDS.find((x) => x.key && (x.key.length === 1 ? x.key.toLowerCase() : x.key) === k && available(x));
   if (c) return c.run();
