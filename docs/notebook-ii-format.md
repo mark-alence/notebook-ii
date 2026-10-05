@@ -111,4 +111,4 @@ The Options screen has "Field Start Char" and "Field End Char", so `%` and `:` w
 
 - **Find / Select** looked for up to 20 contiguous characters, ignoring case, anywhere in a field or the whole record, or at the start of a field. Select could also take records where a field begins with something alphabetically later or earlier (`>`, `<`, `>=`, `<=`), with one AND/OR second condition. This program searches by words with wildcards, and now also has `field=text` (begins with) and the four comparisons.
 - **Reorder** sorted on the first 20 characters of one field, case sensitive or not. This program sorts on whole values, by up to three fields.
-- **Limits**: 50 headings of up to 20 characters. This program has no such limits; Export > Notebook II import text does not shorten names, so long names need renaming before going back to DOS.
+- **Limits**: 50 headings of up to 20 characters. This program has no such limits. (It imports from Notebook II but does not write files for it.)

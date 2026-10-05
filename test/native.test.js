@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { importFile, importFiles, parseNotebookDb, parseReportFormat, looksLikeNotebookDat } from '../js/importers.js';
-import { exportNotebookText } from '../js/exporters.js';
 import { encodeCp437 } from '../js/cp437.js';
 import { search } from '../js/search.js';
 import { createDatabase, addRecord, databaseFromImport, renameField } from '../js/model.js';
@@ -134,7 +133,7 @@ test('rename field updates fixed-width placeholders too', () => {
   assert.equal(db.printForms[0].template, '{B:10} {B}');
 });
 
-test('Notebook II import text: %Start: %Field: %End:, and export back', () => {
+test('Notebook II import text: %Start: %Field: %End:', () => {
   const text = '%Start:\r\n%Author:Brest, Paul\r\n%Title:Processes\r\n%Comments:Casebook for\r\na law course.\r\n%End:\r\n%Start:   \r\n%Author:Davis\r\n%End:\r\n\x1a\x1a';
   const r = importFile(encodeCp437(text));
   assert.equal(r.format, 'tagged');
@@ -143,10 +142,6 @@ test('Notebook II import text: %Start: %Field: %End:, and export back', () => {
     { Author: 'Brest, Paul', Title: 'Processes', Comments: 'Casebook for\na law course.' },
     { Author: 'Davis', Title: '', Comments: '' },
   ]);
-  const db = createDatabase('t', r.fields);
-  for (const v of r.records) addRecord(db, v);
-  const back = importFile(encodeCp437(exportNotebookText(r.fields, db.records)));
-  assert.deepEqual(back.records, r.records);
 });
 
 test('search: Notebook II Select conditions', () => {

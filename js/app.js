@@ -9,7 +9,7 @@ import {
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
 import { FONTS, SPACING, SIZE, LIST_ROWS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
 import { importFiles } from './importers.js';
-import { exportDelimited, exportTagged, exportNotebookText, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
+import { exportDelimited, exportTagged, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
 import { renderReport, renderBlocks } from './printform.js';
 import { PAPERS, FONT_SIZES, PDF_FONTS, makePdf, previewPdf } from './pdf.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent } from './storage.js';
@@ -1061,7 +1061,6 @@ const EXPORT_GROUPS = [
     ['tab', 'Tab-delimited', 'one record per line, fields separated by tabs', '.txt'],
     ['json', 'Notebook file', 'everything, to open in Notebook II on another computer (Import)', '.nb2.json'],
     ['tagged', 'Tagged text', 'Field: value lines', '.txt'],
-    ['notebook', 'Notebook II import text', '%Field:value, for the original DOS program', '.txt'],
     ['custom', 'Delimited, my own characters', 'choose the separators', '.txt'],
   ]],
 ];
@@ -1096,7 +1095,7 @@ function rememberExport(name, value) {
 
 function exportState() {
   state.exp ??= {
-    format: 'vertical', output: 'text', encoding: 'utf-8', which: 'list',
+    format: 'vertical', output: 'text', which: 'list',
     paper: /^en-(US|CA)|^es-(MX|US)/.test(navigator.language) ? 'letter' : 'a4', fontSize: 10, pdfFont: 'mono',
     fieldDelim: '|', recordDelim: '\\r\\n', newlineMarker: '\\x14', header: true,
     numbers: true, ids: '',
@@ -1147,7 +1146,6 @@ function renderExport() {
           <label>Line break marker</label><input name="newlineMarker" value="${esc(x.newlineMarker)}" size="6">
           <label class="check"><input type="checkbox" name="header" ${x.header ? 'checked' : ''}> Field names in first row</label>
         </div>` : ''}
-        ${x.format !== 'json' && !pdf ? `<div class="row"><label>Characters</label><select name="encoding">${opt('utf-8', 'UTF-8 (modern programs)', x.encoding)}${opt('cp437', 'DOS (code page 437)', x.encoding)}</select></div>` : ''}
         <div class="row"><label>Records</label><select name="which">
           ${opt('list', `${state.query ? `The ${n} found` : `All ${total}`}, in the list's order`, x.which)}
           ${state.query ? opt('all', `All ${total}`, x.which) : ''}
@@ -1180,7 +1178,6 @@ function renderExport() {
     if (!t.name) return;
     x[t.name] = t.type === 'checkbox' ? t.checked : t.name === 'fontSize' ? +t.value : t.value;
     rememberExport(t.name, x[t.name]);
-    if (t.name === 'format' && t.value === 'notebook') x.encoding = 'cp437';
     if (['format', 'output', 'paper', 'fontSize', 'pdfFont', 'which'].includes(t.name)) render();
     else if (t.name === 'numbers') updateExportPreview();
   });
@@ -1352,7 +1349,6 @@ async function saveExport() {
   const f = fieldNames(db);
   const shape = exportShape(recs);
   const base = safeName(db.name);
-  const enc = x.encoding;
   if (PAGED.includes(x.format) && x.output === 'pdf') {
     say('Making the PDF…');
     try {
@@ -1370,19 +1366,18 @@ async function saveExport() {
     case 'json':
       if (recs.length === db.records.length) { db.lastBackup = new Date().toISOString(); persist(); }
       return download(`${base}.nb2.json`, toBytes(exportJson(db, recs)), 'application/json');
-    case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(shape.fields, shape.records), enc), 'text/plain');
-    case 'form': return download(`${base}-${safeName(currentForm().name)}.txt`, toBytes(renderReport(currentForm(), recs, f, { title: db.name }).replace(/\n/g, '\r\n'), enc), 'text/plain');
-    case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(shape.fields, shape.records), enc), 'text/csv');
-    case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(shape.fields, shape.records, { fieldDelim: '\t' }), enc), 'text/plain');
-    case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(shape.fields, shape.records), enc), 'text/plain');
-    case 'notebook': return download(`${base.slice(0, 8)}.txt`, toBytes(exportNotebookText(f, recs), enc), 'text/plain');
+    case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(shape.fields, shape.records)), 'text/plain');
+    case 'form': return download(`${base}-${safeName(currentForm().name)}.txt`, toBytes(renderReport(currentForm(), recs, f, { title: db.name }).replace(/\n/g, '\r\n')), 'text/plain');
+    case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(shape.fields, shape.records)), 'text/csv');
+    case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(shape.fields, shape.records, { fieldDelim: '\t' })), 'text/plain');
+    case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(shape.fields, shape.records)), 'text/plain');
     case 'custom': return download(`${base}.txt`, toBytes(exportDelimited(shape.fields, shape.records, {
       fieldDelim: readDelim(x.fieldDelim) || '|',
       recordDelim: readDelim(x.recordDelim) || '\r\n',
       newlineMarker: readDelim(x.newlineMarker),
       header: x.header,
       quote: false,
-    }), enc), 'text/plain');
+    })), 'text/plain');
   }
 }
 
