@@ -231,8 +231,18 @@ body[data-mode="browse"] #main { scroll-padding-top: 1.6em; }
 
 /* ---------- a record ---------- */
 
-.record { max-width: 100ch; }
+.record { max-width: 100ch; container-type: inline-size; }
 .record .field { display: grid; grid-template-columns: minmax(10ch, 18ch) 1fr; gap: 0 2ch; margin: 0 0 0.6em; }
+/* Field names stay beside their text only while the record has its full
+   width (100 characters: up to 18 for the names, 80 for the text); in any
+   narrower window they go above the text, which then gets the whole width.
+   It is measured in characters, so a larger text size folds in a wider
+   window. Appearance can also fix them above or beside. */
+@container (max-width: 99.5ch) {
+  .record .field { grid-template-columns: 1fr; }
+}
+:root[data-labels="above"] .record .field { grid-template-columns: 1fr; }
+:root[data-labels="beside"] .record .field { grid-template-columns: minmax(10ch, 18ch) 1fr; }
 .record .fname { color: var(--label); overflow-wrap: anywhere; }
 .record .fval { color: var(--bright); white-space: pre-wrap; overflow-wrap: anywhere; }
 .record .fval.empty { color: var(--hint); opacity: 0.6; }
@@ -318,7 +328,6 @@ body[data-mode="browse"] #main { scroll-padding-top: 1.6em; }
 @media (max-width: 760px) {
   html, body { font-size: var(--font-size, 15px); }
   .exportwide { grid-template-columns: 1fr; }
-  .record .field { grid-template-columns: 1fr; }
   .browse { --cols: 3ch 8ch minmax(0, 1fr) !important; }
   .browse .brow > :nth-child(n+4) { display: none; }
   #title { flex-wrap: wrap; }

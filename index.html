@@ -15,8 +15,11 @@
     try {
       var t = localStorage.getItem('nb2:theme');
       if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-      var v = (JSON.parse(localStorage.getItem('nb2:appearance')) || {}).vars || {};
+      var a = JSON.parse(localStorage.getItem('nb2:appearance')) || {};
+      var v = a.vars || {};
       for (var k in v) document.documentElement.style.setProperty(k, v[k]);
+      var l = (a.settings || {}).labels;
+      if (l === 'above' || l === 'beside') document.documentElement.dataset.labels = l;
     } catch (e) {}
   </script>
 </head>
@@ -88,7 +91,7 @@
       <p>Unless sorted by a field, the list shows the newest records first, in the order they were made. Every record has a number of its own, shown as <code>#127</code> in the list's first column and at the top of the record: it is given when the record is made and never changes or gets reused, so you can note it down to refer to the record. Click the <code>#</code> heading to switch between newest and oldest first, or choose <em>Oldest first</em> on the Sort screen (<kbd>S</kbd>) or in the command list (<kbd data-key-label="Ctrl+k">Ctrl+K</kbd>); the notebook remembers it.</p>
 
       <h2>Appearance</h2>
-      <p><em>Appearance</em> in the command list (<kbd data-key-label="Ctrl+k">Ctrl+K</kbd>, or View → Appearance in the desktop app) sets the font (the DOS screen font, a modern monospace, sans-serif, serif, or any font installed on your computer), the text size and the line spacing, light or dark, and how many records the list shows: all of them (the default), or 200, 500 or 1,000 at a time for a very large notebook. The screen follows your computer's light or dark setting until you choose; the word at the right of the title bar, or <kbd>Alt</kbd>+<kbd>T</kbd>, also switches between Auto, Light and Dark. The choices are kept on this computer.</p>
+      <p><em>Appearance</em> in the command list (<kbd data-key-label="Ctrl+k">Ctrl+K</kbd>, or View → Appearance in the desktop app) sets the font (the DOS screen font, a modern monospace, sans-serif, serif, or any font installed on your computer), the text size and the line spacing, light or dark, where a record's field names go (<em>Automatic</em>: beside the text when the window is wide enough to show the whole record, above it otherwise, giving the text the full width; or always above, or always beside), and how many records the list shows: all of them (the default), or 200, 500 or 1,000 at a time for a very large notebook. The screen follows your computer's light or dark setting until you choose; the word at the right of the title bar, or <kbd>Alt</kbd>+<kbd>T</kbd>, also switches between Auto, Light and Dark. The choices are kept on this computer.</p>
 
       <h2>Finding records</h2>
       <table class="keys-table">
