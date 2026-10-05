@@ -1068,12 +1068,39 @@ const EXPORT_GROUPS = [
 const PAGED = ['vertical', 'form']; // formats that can also be a PDF
 const NUMBERED = ['vertical', 'csv', 'tab', 'tagged', 'custom']; // can carry a Record# column
 
+// Export choices kept on this computer for next time (in every notebook),
+// with the values each may take.
+const EXPORT_KEY = 'nb2:export';
+const REMEMBERED = {
+  paper: (v) => v in PAPERS,
+  fontSize: (v) => FONT_SIZES.includes(v),
+};
+
+function rememberedExport() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(EXPORT_KEY)) ?? {};
+    return Object.fromEntries(Object.entries(saved).filter(([k, v]) => REMEMBERED[k]?.(v)));
+  } catch {
+    return {};
+  }
+}
+
+function rememberExport(name, value) {
+  if (!REMEMBERED[name]?.(value)) return;
+  try {
+    localStorage.setItem(EXPORT_KEY, JSON.stringify({ ...rememberedExport(), [name]: value }));
+  } catch {
+    // Not kept, but used for this visit.
+  }
+}
+
 function exportState() {
   state.exp ??= {
     format: 'vertical', output: 'text', encoding: 'utf-8', which: 'list',
     paper: /^en-(US|CA)|^es-(MX|US)/.test(navigator.language) ? 'letter' : 'a4', fontSize: 10, pdfFont: 'mono',
     fieldDelim: '|', recordDelim: '\\r\\n', newlineMarker: '\\x14', header: true,
     numbers: true, ids: '',
+    ...rememberedExport(),
   };
   return state.exp;
 }
@@ -1152,6 +1179,7 @@ function renderExport() {
     const t = e.target;
     if (!t.name) return;
     x[t.name] = t.type === 'checkbox' ? t.checked : t.name === 'fontSize' ? +t.value : t.value;
+    rememberExport(t.name, x[t.name]);
     if (t.name === 'format' && t.value === 'notebook') x.encoding = 'cp437';
     if (['format', 'output', 'paper', 'fontSize', 'pdfFont', 'which'].includes(t.name)) render();
     else if (t.name === 'numbers') updateExportPreview();
