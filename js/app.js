@@ -859,26 +859,37 @@ function fieldOptions(selected, blank) {
     state.db.fields.map(({ name }) => `<option ${name === selected ? 'selected' : ''}>${esc(name)}</option>`).join('');
 }
 
+// As many sort fields as wanted: three to start with (or one more than are in
+// use), and another "Then by" appears whenever the last one is filled in.
 function renderSort() {
-  const keys = [0, 1, 2].map((i) => state.sortKeys[i] ?? { field: '', descending: false });
+  const db = state.db;
+  const most = db.fields.length;
+  const count = Math.min(most, Math.max(3, state.sortKeys.length + 1));
+  const row = (i, k = { field: '', descending: false }) => `
+        <div class="row" data-sortrow="${i}"><label>${i ? 'Then by' : 'First by'}</label>
+          <select name="f${i}">${fieldOptions(k.field, i ? '(nothing)' : '(date entered)')}</select>
+          <label class="check"><input type="checkbox" name="d${i}" ${k.descending ? 'checked' : ''}> Z to A</label></div>`;
   $('#main').innerHTML = `
     <form class="panel" id="sortform">
       <h2>Sort</h2>
-      ${keys.map((k, i) => `
-        <div class="row"><label>${['First by', 'Then by', 'Then by'][i]}</label>
-          <select name="f${i}">${fieldOptions(k.field, i ? '(nothing)' : '(date entered)')}</select>
-          <label class="check"><input type="checkbox" name="d${i}" ${k.descending ? 'checked' : ''}> Z to A</label></div>`).join('')}
+      <div id="sortrows">${Array.from({ length: count }, (_, i) => row(i, state.sortKeys[i])).join('')}</div>
       <div class="row"><label>Date entered</label>
-        <label class="check"><input type="radio" name="order" value="newest" ${state.db.order !== 'oldest' ? 'checked' : ''}> Newest first</label>
-        <label class="check"><input type="radio" name="order" value="oldest" ${state.db.order === 'oldest' ? 'checked' : ''}> Oldest first</label></div>
-      <p class="hint">With "(date entered)" the list runs in the order the records were made. Otherwise records are sorted by the fields chosen, and records alike in those fields follow the date-entered order. Numbers sort by value, so 9 comes before 10. Blank fields go last.</p>
+        <label class="check"><input type="radio" name="order" value="newest" ${db.order !== 'oldest' ? 'checked' : ''}> Newest first</label>
+        <label class="check"><input type="radio" name="order" value="oldest" ${db.order === 'oldest' ? 'checked' : ''}> Oldest first</label></div>
+      <p class="hint">With "(date entered)" the list runs in the order the records were made. Otherwise records are sorted by the fields chosen, in turn: records alike in the first are sorted by the second, and so on; another "Then by" appears when you fill in the last one. Records alike in all of them follow the date-entered order. Numbers sort by value, so 9 comes before 10. Blank fields go last.</p>
       <div class="buttons"><button type="submit">Sort</button></div>
     </form>`;
+  const rows = $('#sortrows');
+  rows.addEventListener('change', (e) => {
+    if (e.target.tagName !== 'SELECT') return;
+    const n = rows.children.length;
+    if (e.target.name === `f${n - 1}` && e.target.value && n < most) rows.insertAdjacentHTML('beforeend', row(n));
+  });
   $('#sortform').addEventListener('submit', (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
-    state.db.order = f.get('order') === 'oldest' ? 'oldest' : 'newest';
-    setSort([0, 1, 2].map((i) => ({ field: f.get(`f${i}`), descending: !!f.get(`d${i}`) })).filter((k) => k.field));
+    db.order = f.get('order') === 'oldest' ? 'oldest' : 'newest';
+    setSort(Array.from(rows.children, (_, i) => ({ field: f.get(`f${i}`), descending: !!f.get(`d${i}`) })).filter((k) => k.field));
     refreshList();
     state.cursor = 0;
     go('browse');
