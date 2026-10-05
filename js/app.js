@@ -15,6 +15,7 @@ import { PAPERS, FONT_SIZES, PDF_FONTS, makePdf, previewPdf } from './pdf.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent } from './storage.js';
 import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
+import { VERSION } from './version.js';
 import { THEMES, getTheme, setTheme, nextTheme } from './theme.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1360,6 +1361,7 @@ async function saveExport() {
 function renderHelp() {
   $('#main').innerHTML = $('#helptext').innerHTML;
   $$('#main [data-key-label]').forEach((el) => { el.textContent = keyLabel(el.dataset.keyLabel); });
+  $$('#main [data-version]').forEach((el) => { el.textContent = VERSION; });
 }
 
 // ---------- commands that need more than one line ----------
