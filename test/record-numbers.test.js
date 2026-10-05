@@ -72,7 +72,10 @@ test('record numbers: an unusable Record# column stays a field', () => {
   assert.deepEqual(withRecordNumbers(['Record#', 'A'], []).fields, ['Record#', 'A']);
 });
 
-test('record numbers: {#id} in a custom form', () => {
+test('record numbers: {Record#} and {#id} in a custom form', () => {
   const rec = { id: 127, values: { Title: 'X' } };
   assert.equal(renderRecord('{#}. {#id} {Title}', rec, ['Title'], { index: 3 }), '3. #127 X');
+  assert.equal(renderRecord('{Record#} [{record #:5}] {Title}', rec, ['Title']), '127 [127  ] X');
+  // A field of the notebook's own called Record# comes first.
+  assert.equal(renderRecord('{Record#}', { id: 5, values: { 'Record#': 'mine' } }, ['Record#']), 'mine');
 });
