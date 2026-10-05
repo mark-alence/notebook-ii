@@ -1076,6 +1076,7 @@ const REMEMBERED = {
   paper: (v) => v in PAPERS,
   fontSize: (v) => FONT_SIZES.includes(v),
   pdfFont: (v) => v in PDF_FONTS,
+  output: (v) => v === 'text' || v === 'pdf', // Save as: text file or PDF
 };
 
 function rememberedExport() {
