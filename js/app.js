@@ -7,7 +7,7 @@ import {
   moveField, orderRecords, previousEntered, withRecordNumbers, recordNumbersIn, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
 } from './model.js';
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
-import { FONTS, SPACING, SIZE, getAppearance, setAppearance, resetAppearance } from './appearance.js';
+import { FONTS, SPACING, SIZE, LIST_ROWS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
 import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportNotebookText, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
 import { renderReport, renderBlocks } from './printform.js';
@@ -469,31 +469,50 @@ function deleteSavedDb() {
   ask(`Delete the notebook "${d.name}" from ${platform.desktop ? 'the app' : 'this browser'}? Make a backup first if you want a copy.`, 'Delete').then((yes) => { if (yes) { removeDb(d.key); render(); } });
 }
 
-const PAGE = 200;
+// Records drawn at a time in the list (Appearance: 200, 500, 1000 or all).
+function pageSize() {
+  const n = +getAppearance().listRows;
+  return n > 0 ? n : Math.max(1, state.list.length);
+}
+const pageOf = (i) => Math.floor(i / pageSize());
+
+// A long list is drawn a few hundred rows at a time: the rows up to just past
+// the cursor at once, the rest in the background, so the screen and the
+// search box never wait for thousands of rows to be laid out.
+const FIRST_ROWS = 300;
+const MORE_ROWS = 400;
+let drawToken = 0;
 
 function renderBrowse() {
   const db = state.db;
   let cols = db.fields.filter((f) => shownInList(db, f)).map((f) => f.name);
   if (!cols.length) cols = [db.fields[0].name];
-  const start = Math.floor(state.cursor / PAGE) * PAGE;
-  const slice = state.list.slice(start, start + PAGE);
-  const rows = slice.map((r, k) => {
+  const page = pageSize();
+  const start = pageOf(state.cursor) * page;
+  const slice = state.list.slice(start, start + page);
+  const rowHtml = (r, k) => {
     const i = start + k;
-    return `<tr data-i="${i}" class="${i === state.cursor ? 'cur' : ''}${r.marked ? ' marked' : ''}"><td class="mk" title="${r.marked ? 'Marked: click or press M to unmark' : 'Click or press M to mark'}">${r.marked ? '✓' : ''}</td><td class="num">#${r.id}</td>${cols.map((c) => `<td>${esc(preview(r.values[c]))}</td>`).join('')}</tr>`;
-  }).join('');
-  const more = state.list.length > PAGE ? `<p class="hint">Showing ${start + 1}–${start + slice.length} of ${state.list.length}. PgUp/PgDn moves a page.</p>` : '';
+    return `<div role="row" data-i="${i}" class="brow${i === state.cursor ? ' cur' : ''}${r.marked ? ' marked' : ''}"><span role="cell" class="mk" title="${r.marked ? 'Marked: click or press M to unmark' : 'Click or press M to mark'}">${r.marked ? '✓' : ''}</span><span role="cell" class="num">#${r.id}</span>${cols.map((c) => `<span role="cell">${esc(preview(r.values[c]))}</span>`).join('')}</div>`;
+  };
+  let drawn = Math.min(slice.length, Math.max(FIRST_ROWS, state.cursor - start + 100));
+  const rows = slice.slice(0, drawn).map(rowHtml).join('');
+  const more = state.list.length > page ? `<p class="hint">Showing ${start + 1}–${start + slice.length} of ${state.list.length}; moving past the end shows the next ${page}. Appearance (in the command list) sets how many show at once, or all.</p>` : '';
   const sortMark = (c) => {
     const k = state.sortKeys[0];
     return k?.field === c ? (k.descending ? ' ▼' : ' ▲') : '';
   };
   $('#main').innerHTML = state.list.length
-    ? `<table class="grid browse"><thead><tr><th class="mk" title="Marked records (M marks one; @marked finds them)">✓</th><th class="num" style="width: ${String(Math.max(0, db.nextId - 1)).length + 5}ch"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></th>${cols.map((c) => `<th><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>${more}`
+    ? `<div class="browse" role="table" style="--cols: 3ch ${String(Math.max(0, db.nextId - 1)).length + 5}ch repeat(${cols.length}, minmax(0, 1fr))"><div class="brow bhead" role="row"><span role="columnheader" class="mk" title="Marked records (M marks one; @marked finds them)">✓</span><span role="columnheader" class="num"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></span>${cols.map((c) => `<span role="columnheader"><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></span>`).join('')}</div><div class="bbody" role="rowgroup">${rows}</div></div>${more}`
     : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This database is empty. Press <kbd>N</kbd> for a new note or <kbd>I</kbd> to import some.'}</p></div>`;
-  $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', (e) => {
-    state.cursor = +tr.dataset.i;
-    if (e.target.closest('.mk')) return toggleMark();
+  const body = $('#main .bbody');
+  body?.addEventListener('click', (e) => {
+    const tr = e.target.closest('[data-i]');
+    if (!tr) return;
+    const i = +tr.dataset.i;
+    if (e.target.closest('.mk')) { moveCursor(i - state.cursor); return toggleMark(); }
+    state.cursor = i;
     openRecord();
-  }));
+  });
   $$('#main [data-sort]').forEach((b) => b.addEventListener('click', () => sortByColumn(b.dataset.sort)));
   // The # heading: date-entered order, newest first, then oldest first.
   $('#ordernum')?.addEventListener('click', () => {
@@ -501,7 +520,16 @@ function renderBrowse() {
     setSort([]);
     setOrder(order);
   });
-  $('#main tr.cur')?.scrollIntoView({ block: 'nearest' });
+  $('#main .brow.cur')?.scrollIntoView({ block: 'nearest' });
+  const token = ++drawToken;
+  const drawMore = () => {
+    if (token !== drawToken || !body?.isConnected || drawn >= slice.length) return;
+    const end = Math.min(slice.length, drawn + MORE_ROWS);
+    body.insertAdjacentHTML('beforeend', slice.slice(drawn, end).map((r, k) => rowHtml(r, drawn + k)).join(''));
+    drawn = end;
+    setTimeout(drawMore, 0);
+  };
+  if (drawn < slice.length) setTimeout(drawMore, 0);
 }
 
 // A column heading sorts by that field; clicking again reverses, then a third
@@ -893,7 +921,7 @@ function renderImport() {
     <div class="panel" id="importer">
       <h2>Import ${esc(imp.name)}</h2>
       <div class="row">
-        <label>Read as</label><select data-opt="format">${fmtSel('auto', 'Detect automatically')}${fmtSel('notebook', 'Notebook II database (.DAT .DEF .IDX)')}${fmtSel('delimited', 'Delimited text')}${fmtSel('tagged', 'Tagged text (Field: value)')}${fmtSel('json', 'Notebook file (.json)')}${fmtSel('salvage', 'Salvage text from any file')}</select>
+        <label>Read as</label><select data-opt="format">${fmtSel('auto', 'Detect automatically')}${fmtSel('notebook', 'Notebook II database (.DAT .DEF .IDX)')}${fmtSel('delimited', 'Delimited text')}${fmtSel('tagged', 'Tagged text (Field: value)')}${fmtSel('json', 'Notebook file (.json)')}${fmtSel('salvage', 'Salvage: readable text from any file')}</select>
         <label>Characters</label><select data-opt="encoding">${encSel('auto', 'Detect')}${encSel('cp437', 'DOS (code page 437)')}${encSel('utf-8', 'UTF-8')}</select>
       </div>
       ${delimited ? `
@@ -909,6 +937,7 @@ function renderImport() {
       ${r.printForms?.length ? `<p>Print formats: ${r.printForms.map((f) => `<code>${esc(f.name)}</code>`).join(' ')}</p>` : ''}` : ''}
       ${r?.format === 'salvage' ? `<div class="row"><label>Shortest piece</label><input type="number" min="1" data-num="minLength" value="${o.minLength}"><label>Join pieces closer than</label><input type="number" min="0" data-num="mergeGap" value="${o.mergeGap}"> bytes</div>` : ''}
       ${imp.error ? `<p class="error">${esc(imp.error)}</p>` : ''}
+      ${imp.opts.format !== 'salvage' && (imp.error || !r?.records.length) ? `<p>This file could not be read as it is. <button type="button" id="trysalvage">Try Salvage</button> <span class="hint">pulls out every readable piece of text, one piece per record.</span></p>` : ''}
       ${(r?.warnings ?? []).map((w) => `<p class="warn">${esc(w)}</p>`).join('')}
       ${r ? importNumbersNote(r) : ''}
       ${r ? `<p>${r.records.length} record${r.records.length === 1 ? '' : 's'}, ${r.fields.length} field${r.fields.length === 1 ? '' : 's'}: ${r.fields.map((f) => `<code>${esc(f)}</code>`).join(' ')}</p>
@@ -921,6 +950,7 @@ function renderImport() {
         <input id="newname" value="${esc(imp.dbName)}" aria-label="New database name">
         ${state.db ? `<label class="check"><input type="radio" name="target" value="append" ${imp.target === 'append' ? 'checked' : ''}> Add to ${esc(state.db.name)}</label>` : ''}
       </div>
+      ${r.format !== 'salvage' && r.records.length ? '<p class="hint">If the preview looks wrong, change <em>Read as</em> (or the delimiters) above. <em>Salvage</em> there pulls the readable text out of any file, even a damaged one.</p>' : ''}
       <div class="buttons"><button type="button" id="doimport" ${r.records.length ? '' : 'disabled'}>Import</button></div>` : ''}
     </div>`;
   const reparse = () => { parseImport(); render(); };
@@ -938,6 +968,7 @@ function renderImport() {
     reparse();
   }));
   $$('[data-num]').forEach((el) => el.addEventListener('change', () => { imp.opts[el.dataset.num] = Math.max(0, +el.value || 0); reparse(); }));
+  $('#trysalvage')?.addEventListener('click', () => { imp.opts = { format: 'salvage', encoding: imp.opts.encoding }; reparse(); });
   $('#incdel')?.addEventListener('change', (e) => { imp.opts.includeDeleted = e.target.checked; reparse(); });
   $$('[name=target]').forEach((el) => el.addEventListener('change', () => { imp.target = el.value; }));
   $('#newname')?.addEventListener('input', (e) => { imp.dbName = e.target.value; });
@@ -1315,9 +1346,17 @@ function toggleMark() {
   setMarked(state.db, [rec], !rec.marked);
   persistSoon();
   say(`${rec.marked ? 'Marked' : 'Unmarked'} #${rec.id}. ${plural(markCount(), 'record')} marked.`);
-  if (state.mode !== 'view') return render();
-  // On a record, leave the fields (and any find) as they are.
   renderTitle();
+  if (state.mode !== 'view') {
+    const tr = $(`#main .brow[data-i="${state.cursor}"]`);
+    if (!tr) return render();
+    tr.classList.toggle('marked', !!rec.marked);
+    const mk = tr.querySelector('.mk');
+    mk.textContent = rec.marked ? '✓' : '';
+    mk.title = rec.marked ? 'Marked: click or press M to unmark' : 'Click or press M to mark';
+    return;
+  }
+  // On a record, leave the fields (and any find) as they are.
   const meta = $('#recordform .meta');
   if (meta) meta.innerHTML = recordMeta(rec);
 }
@@ -1374,8 +1413,15 @@ async function deleteCurrent() {
 
 function moveCursor(delta) {
   if (!state.list.length) return;
+  const old = state.cursor;
   state.cursor = Math.max(0, Math.min(state.list.length - 1, state.cursor + delta));
-  render();
+  // Within the rows on screen, just move the highlight: redrawing a long
+  // list on every arrow key would be slow.
+  const tr = state.mode === 'browse' && pageOf(old) === pageOf(state.cursor) && $(`#main .brow[data-i="${state.cursor}"]`);
+  if (!tr) return render();
+  $('#main .brow.cur')?.classList.remove('cur');
+  tr.classList.add('cur');
+  tr.scrollIntoView({ block: 'nearest' });
 }
 
 function cycleTheme() {
@@ -1408,6 +1454,8 @@ function renderAppearance() {
         <button type="button" data-size="1" title="Larger">A+</button> <span id="sizeval">${size} px</span></div>
       <h2>Line spacing</h2>
       <div class="row">${Object.keys(SPACING).map((k) => `<label class="check"><input type="radio" name="spacing" value="${k}" ${a.spacing === k ? 'checked' : ''}> ${k[0].toUpperCase() + k.slice(1)}</label>`).join('')}</div>
+      <h2>Records in the list</h2>
+      <div class="row">${LIST_ROWS.map((n) => `<label class="check"><input type="radio" name="listRows" value="${n}" ${+a.listRows === n ? 'checked' : ''}> ${n ? n.toLocaleString() + ' at a time' : 'All'}</label>`).join('')}</div>
       <h2>Light or dark</h2>
       <div class="row">${THEMES.map((t) => `<label class="check"><input type="radio" name="theme" value="${t}" ${theme === t ? 'checked' : ''}> ${{ auto: 'Follow the computer', light: 'Light', dark: 'Dark' }[t]}</label>`).join('')}</div>
       <p class="hint">Changes show at once and are kept on this ${platform.desktop ? 'computer' : 'browser'}. A font has to be installed on the computer to be used; if it isn't, the DOS screen font shows instead.</p>
@@ -1417,7 +1465,7 @@ function renderAppearance() {
   const update = () => {
     const size = +form.size.value;
     $('#sizeval').textContent = `${size} px`;
-    setAppearance({ font: form.font.value, custom: form.custom.value, size, spacing: form.spacing.value });
+    setAppearance({ font: form.font.value, custom: form.custom.value, size, spacing: form.spacing.value, listRows: +form.listRows.value });
   };
   form.addEventListener('input', (e) => {
     if (e.target.name === 'theme') { setTheme(e.target.value); renderTitle(); return; }

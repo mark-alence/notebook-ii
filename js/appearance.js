@@ -13,7 +13,9 @@ export const FONTS = [
 
 export const SPACING = { compact: 1.25, normal: 1.4, relaxed: 1.7 };
 export const SIZE = { min: 11, max: 32, default: 16 };
-export const DEFAULTS = { font: 'dos', custom: '', size: null, spacing: 'normal' };
+// listRows: how many records the list shows at a time (0 = all of them).
+export const LIST_ROWS = [200, 500, 1000, 0];
+export const DEFAULTS = { font: 'dos', custom: '', size: null, spacing: 'normal', listRows: 200 };
 
 export function getAppearance() {
   try {

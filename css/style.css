@@ -206,16 +206,22 @@ table.grid { border-collapse: collapse; width: 100%; }
 .grid tr.cur td { background: var(--sel-bg); color: var(--sel-fg); }
 .grid tbody tr:hover:not(.cur) td { background: var(--row-hover); }
 
-table.browse { table-layout: fixed; }
+/* The list of records. Rows are grids sharing one set of columns (--cols),
+   not a table, so the browser can skip laying out rows that are off screen:
+   a list of thousands draws and scrolls quickly. */
+.browse .brow { display: grid; grid-template-columns: var(--cols); }
+.browse .brow > span { padding: 0 1ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.browse .bbody .brow { cursor: pointer; content-visibility: auto; contain-intrinsic-size: auto calc(var(--lh, 1.4) * 1em); }
+.browse .num { text-align: right; }
+.browse .brow > .mk { padding: 0; text-align: center; color: var(--label); font-weight: bold; }
+.browse .brow.cur { background: var(--sel-bg); color: var(--sel-fg); }
+.browse .brow.cur > .mk { color: var(--sel-fg); }
+.browse .bbody .brow:hover:not(.cur) { background: var(--row-hover); }
+.browse .brow.marked:not(.cur) > :not(.mk) { color: var(--bright); }
 /* The headings stay in view as the list scrolls (top: over #main's padding),
    and rows brought into view by the arrow keys stop below them. */
 body[data-mode="browse"] #main { scroll-padding-top: 1.6em; }
-table.browse thead th { position: sticky; top: -0.5em; z-index: 1; background: var(--bg); box-shadow: inset 0 -1px var(--border); }
-table.browse th.mk { width: 3ch; padding: 0; text-align: center; }
-.grid td.mk { padding: 0; text-align: center; color: var(--label); font-weight: bold; }
-.grid tr.marked:not(.cur) td:not(.mk) { color: var(--bright); }
-.grid tr.cur td.mk { color: var(--sel-fg); }
-.browse td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.browse .bhead { position: sticky; top: -0.5em; z-index: 1; background: var(--bg); border-bottom: 1px solid var(--border); color: var(--label); }
 
 .scrollx { overflow-x: auto; max-width: 100%; }
 .scrollx .grid td { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -310,7 +316,8 @@ table.browse th.mk { width: 3ch; padding: 0; text-align: center; }
   html, body { font-size: var(--font-size, 15px); }
   .exportwide { grid-template-columns: 1fr; }
   .record .field { grid-template-columns: 1fr; }
-  table.browse th:nth-child(n+4), table.browse td:nth-child(n+4) { display: none; }
+  .browse { --cols: 3ch 8ch minmax(0, 1fr) !important; }
+  .browse .brow > :nth-child(n+4) { display: none; }
   #title { flex-wrap: wrap; }
   #title .dbname { flex: 1 1 0; min-width: 0; }
   #title .count { font-size: 0.85em; }
