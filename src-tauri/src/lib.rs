@@ -155,6 +155,7 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[
             &item("fields", "Fields…", None)?,
+            &item("appearance", "Appearance…", None)?,
             &item("theme", "Light or Dark", None)?,
             &item("palette", "All Commands…", None)?,
         ],

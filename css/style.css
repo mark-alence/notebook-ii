@@ -12,7 +12,8 @@
   --yellow: #ffff55;
   --black: #000000;
   --brown: #aa5500;
-  --font: "Perfect DOS VGA 437", "Px437 IBM VGA 8x16", "IBM Plex Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  --dos-font: "Perfect DOS VGA 437", "Px437 IBM VGA 8x16", "IBM Plex Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  --font: var(--dos-font);
 
   --bg: var(--blue);
   --fg: var(--gray);
@@ -77,7 +78,7 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--fg);
-  font: 16px/1.4 var(--font);
+  font: var(--font-size, 16px)/var(--lh, 1.4) var(--font);
 }
 
 .app {
@@ -225,7 +226,7 @@ table.browse th:first-child { width: 6ch; }
   display: block;
   width: 100%;
   min-height: 1.6em;
-  line-height: 1.4;
+  line-height: var(--lh, 1.4);
   resize: none;
   overflow: hidden;
   overflow-wrap: break-word;
@@ -246,7 +247,7 @@ table.browse th:first-child { width: 6ch; }
   inset: 0;
   padding: 0 0.5ch;
   border: 1px solid transparent;
-  line-height: 1.4;
+  line-height: var(--lh, 1.4);
   white-space: pre-wrap;
   overflow-wrap: break-word;
   color: transparent;
@@ -291,7 +292,7 @@ table.browse th:first-child { width: 6ch; }
 .keys-table td:nth-child(odd) { white-space: nowrap; }
 
 @media (max-width: 760px) {
-  html, body { font-size: 15px; }
+  html, body { font-size: var(--font-size, 15px); }
   .print { grid-template-columns: 1fr; }
   .record .field { grid-template-columns: 1fr; }
   table.browse th:nth-child(n+4), table.browse td:nth-child(n+4) { display: none; }
@@ -312,3 +313,23 @@ table.browse th:first-child { width: 6ch; }
 }
 #main .where { color: var(--hint); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grid tr.cur td.where { color: inherit; }
+
+/* ---------- find in a record ---------- */
+
+#recfind {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 1ch;
+  padding: 0.2em 1ch;
+  background: var(--status-bg);
+  color: var(--status-fg);
+}
+#recfind label { font-weight: bold; }
+#recfindinput { flex: 1 1 24ch; max-width: 50ch; }
+#recfindcount { min-width: 10ch; }
+#recfindcount.error { color: var(--warn); }
+.record .fmark mark.cur { background: var(--mark-bg); outline: 2px solid var(--focus); }
+
+.fontsample { display: inline-block; margin-top: 0.2em; }
+#appearanceform input[type=range] { width: min(24ch, 50vw); }

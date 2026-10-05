@@ -258,6 +258,37 @@ export function search(db, q) {
   return db.records.filter(match);
 }
 
+// Find within one record: every place in the given texts where a plain
+// string (capitals ignored) or a /pattern/ matches. Returns
+// { matches: [{ field, start, end }] } or { error } for an unfinished or broken
+// pattern.
+export function findInTexts(texts, query) {
+  const q = query.trim();
+  if (!q) return { matches: [] };
+  let re;
+  try {
+    if (q.startsWith('/')) {
+      const r = readRegex(q, 0);
+      if (r.i !== q.length) throw new Error('Put nothing after the closing / except flags');
+      re = makeRegex(r.source, r.flags, 'g');
+    } else {
+      re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    }
+  } catch (e) {
+    return { error: e.message };
+  }
+  const matches = [];
+  texts.forEach((text, field) => {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text ?? '')) && matches.length < 10000) {
+      if (!m[0].length) { re.lastIndex++; continue; }
+      matches.push({ field, start: m.index, end: m.index + m[0].length });
+    }
+  });
+  return { matches };
+}
+
 // Patterns to mark in a record for a query (ignores NOT terms and
 // comparisons): each word, or the regular expression itself.
 export function highlightPatterns(q) {

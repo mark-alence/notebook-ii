@@ -4,16 +4,17 @@
 // work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, sortRecords, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
+  moveField, orderRecords, previousEntered, carryOver, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, shownInList, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm,
 } from './model.js';
-import { compileQuery, highlightPatterns } from './search.js';
+import { compileQuery, highlightPatterns, findInTexts } from './search.js';
+import { FONTS, SPACING, SIZE, getAppearance, setAppearance, resetAppearance } from './appearance.js';
 import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportNotebookText, exportVertical, exportJson, toBytes } from './exporters.js';
 import { renderReport } from './printform.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent } from './storage.js';
 import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
-import { getTheme, setTheme, nextTheme } from './theme.js';
+import { THEMES, getTheme, setTheme, nextTheme } from './theme.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -55,8 +56,8 @@ function refreshList() {
       state.query = '';
     }
   }
-  if (state.sortKeys.length) recs = sortRecords(recs, state.sortKeys);
-  state.list = recs;
+  state.list = orderRecords(recs, state.sortKeys, state.db.order);
+  recs = state.list;
   state.cursor = Math.max(0, Math.min(state.cursor, recs.length - 1));
 }
 
@@ -134,7 +135,20 @@ function openDb(db, key = newKey(), path = null) {
   else if (!path && needsBackup(db)) say(`This notebook has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
 }
 
-// The notebook remembers its sort; "order entered" is no sort at all.
+// Without a sort field the list is in the order records were made, newest
+// first unless the notebook is set to oldest first.
+function setOrder(order) {
+  if (state.mode === 'view') go('browse');
+  const id = current()?.id;
+  state.db.order = order;
+  persist();
+  refreshList();
+  state.cursor = Math.max(0, state.list.findIndex((r) => r.id === id));
+  render();
+  say(order === 'oldest' ? 'Oldest records first.' : 'Newest records first.');
+}
+
+// The notebook remembers its sort; no sort fields means date-entered order.
 function setSort(keys) {
   state.sortKeys = keys;
   state.db.sortKeys = keys;
@@ -243,7 +257,7 @@ function readDelim(s) {
 // ---------- navigation ----------
 
 function go(mode) {
-  if (state.mode === 'view' && mode !== 'view') leaveRecord();
+  if (state.mode === 'view' && mode !== 'view') { hideRecordFind(); leaveRecord(); }
   if (mode !== state.mode && ['browse', 'view'].includes(state.mode)) state.back = state.mode;
   state.mode = mode;
   state.message = '';
@@ -275,8 +289,11 @@ const COMMANDS = [
   { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', fkey: 'F6', barKey: 'F6', where: ['view'], bar: true, run: () => copyFromPrevious(true) },
   { id: 'save', label: 'Save', key: 'Ctrl+s', fkey: 'F10', barKey: 'F10', where: ['view'], bar: true, run: () => saveRecord() },
   { id: 'revert', label: 'Revert changes to this record', where: ['view'], bar: true, run: () => revertRecord() },
-  { id: 'find', label: 'Find', key: '/', fkey: 'F4', where: ['browse', 'view'], bar: true, run: () => focusSearch() },
+  { id: 'find', label: 'Find', key: '/', fkey: 'F4', where: ['browse', 'view'], bar: true, run: () => (state.mode === 'view' ? openRecordFind() : focusSearch()) },
+  { id: 'findlist', label: 'Find records (search the whole list)', where: ['view'], run: () => focusSearch() },
   { id: 'all', label: 'Show all records', fkey: 'F5', where: ['browse'], run: () => clearSearch() },
+  { id: 'newest', label: 'Newest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('newest'); } },
+  { id: 'oldest', label: 'Oldest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('oldest'); } },
   { id: 'sort', label: 'Sort…', key: 's', fkey: 'F6', where: ['browse'], bar: true, run: () => go('sort') },
   { id: 'print', label: 'Print', key: 'p', fkey: 'F7', where: ['browse', 'view'], bar: true, run: () => go('print') },
   { id: 'fields', label: 'Fields', fkey: 'F8', where: ['browse', 'view'], bar: true, run: () => go('fields') },
@@ -286,9 +303,10 @@ const COMMANDS = [
   { id: 'backup', label: platform.desktop ? 'Save a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
   { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
   { id: 'close', label: 'Close database', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
-  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'print', 'import', 'export', 'help', 'newdb'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
+  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'print', 'import', 'export', 'help', 'newdb', 'appearance'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
   { id: 'help', label: 'Help', key: '?', fkey: 'F1', where: ['home', 'browse', 'view', 'sort', 'fields', 'print', 'import', 'export'], bar: true, run: () => go('help') },
   { id: 'theme', label: 'Light or dark screen', key: 'Alt+t', where: ['*'], run: () => cycleTheme() },
+  { id: 'appearance', label: 'Appearance: font, size, spacing, light or dark…', where: ['*'], run: () => go('appearance') },
   { id: 'palette', label: 'Commands', key: 'Ctrl+k', where: ['*'], bar: true, run: () => openPalette() },
 ];
 
@@ -318,7 +336,7 @@ function runCommand(id) {
 function render() {
   document.body.dataset.mode = state.mode;
   renderTitle();
-  const views = { home: renderHome, newdb: renderNewDb, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, print: renderPrint, import: renderImport, export: renderExport, help: renderHelp };
+  const views = { home: renderHome, appearance: renderAppearance, newdb: renderNewDb, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, print: renderPrint, import: renderImport, export: renderExport, help: renderHelp };
   views[state.mode]();
   renderKeys();
   renderStatus();
@@ -361,6 +379,7 @@ function renderStatus() {
   const bits = [];
   if (state.query) bits.push(`Find: ${state.query}`);
   if (state.sortKeys.length) bits.push(`Sorted by ${state.sortKeys.map((k) => k.field + (k.descending ? ' (Z-A)' : '')).join(', ')}`);
+  else if (state.db && ['browse', 'view'].includes(state.mode)) bits.push(state.db.order === 'oldest' ? 'Oldest first' : 'Newest first');
   const el = $('#status');
   el.textContent = state.message || bits.join('   ·   ') || ' ';
   el.classList.toggle('error', !!state.message && state.messageIsError);
@@ -505,10 +524,13 @@ function openRecord(rec = current(), { isNew = false, focus = false } = {}) {
   if (focus) focusField(isNew ? 0 : state.editField);
 }
 
+// "Previous" for an existing record: the one before it when the list is sorted
+// by a field, otherwise the one made just before it, whichever way the list
+// runs.
 function previousInList(rec) {
-  const order = state.list?.some((r) => r.id === rec.id) ? state.list : state.db.records;
-  const i = order.findIndex((r) => r.id === rec.id);
-  return i > 0 ? order[i - 1] : null;
+  if (!state.sortKeys.length || !state.list?.some((r) => r.id === rec.id)) return previousEntered(state.db.records, rec);
+  const i = state.list.findIndex((r) => r.id === rec.id);
+  return i > 0 ? state.list[i - 1] : null;
 }
 
 function newRecord() {
@@ -570,7 +592,7 @@ function renderView() {
     <form class="record" id="recordform" autocomplete="off">
       ${state.db.fields.map(({ name }, i) => `
         <label class="field"><span class="fname">${esc(name)}</span>
-          <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)" style="min-height: calc(${fieldLines(state.db.fields[i])} * 1.4em + 2px)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
+          <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)" style="min-height: calc(${fieldLines(state.db.fields[i])} * var(--lh, 1.4) * 1em + 2px)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
       <p class="hint">Fields can be any length, and changes are saved as you type. <kbd>F5</kbd> copies ${esc(copyList())} from ${state.copySource ? 'the previous record' : 'the previous record (there is none here)'} into blank fields; <kbd>F6</kbd> copies just the field you are in. <kbd>Tab</kbd> moves between fields, <kbd>Esc</kbd> leaves a field and then goes back to the list.</p>
       <p class="meta">${recordMeta(rec)}</p>
     </form>`;
@@ -731,14 +753,18 @@ function renderSort() {
       <h2>Sort</h2>
       ${keys.map((k, i) => `
         <div class="row"><label>${['First by', 'Then by', 'Then by'][i]}</label>
-          <select name="f${i}">${fieldOptions(k.field, i ? '(nothing)' : '(order entered)')}</select>
+          <select name="f${i}">${fieldOptions(k.field, i ? '(nothing)' : '(date entered)')}</select>
           <label class="check"><input type="checkbox" name="d${i}" ${k.descending ? 'checked' : ''}> Z to A</label></div>`).join('')}
-      <p class="hint">Numbers sort by value, so 9 comes before 10. Blank fields go last.</p>
+      <div class="row"><label>Date entered</label>
+        <label class="check"><input type="radio" name="order" value="newest" ${state.db.order !== 'oldest' ? 'checked' : ''}> Newest first</label>
+        <label class="check"><input type="radio" name="order" value="oldest" ${state.db.order === 'oldest' ? 'checked' : ''}> Oldest first</label></div>
+      <p class="hint">With "(date entered)" the list runs in the order the records were made. Otherwise records are sorted by the fields chosen, and records alike in those fields follow the date-entered order. Numbers sort by value, so 9 comes before 10. Blank fields go last.</p>
       <div class="buttons"><button type="submit">Sort</button></div>
     </form>`;
   $('#sortform').addEventListener('submit', (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
+    state.db.order = f.get('order') === 'oldest' ? 'oldest' : 'newest';
     setSort([0, 1, 2].map((i) => ({ field: f.get(`f${i}`), descending: !!f.get(`d${i}`) })).filter((k) => k.field));
     refreshList();
     state.cursor = 0;
@@ -1090,6 +1116,206 @@ function cycleTheme() {
   say({ auto: 'Screen follows your computer\'s light or dark setting.', light: 'Light screen.', dark: 'Dark screen.' }[t]);
 }
 
+// ---------- appearance ----------
+
+function renderAppearance() {
+  const a = getAppearance();
+  const size = a.size ?? (parseFloat(getComputedStyle(document.body).fontSize) || SIZE.default);
+  const sample = 'Cocoa prices, CO 96/728, 1938-03-17. The quick brown fox: 0123456789 Ç é ¶';
+  const theme = getTheme();
+  $('#main').innerHTML = `
+    <form class="panel" id="appearanceform">
+      <h2>Appearance</h2>
+      <h2>Font</h2>
+      ${FONTS.map((f) => `
+        <label class="check layout"><input type="radio" name="font" value="${f.id}" ${a.font === f.id ? 'checked' : ''}>
+          <span><strong>${esc(f.name)}</strong>${f.id === 'dos' ? ' <span class="hint">(the default)</span>' : ''}<br>
+          ${f.id === 'custom'
+            ? `<input name="custom" value="${esc(a.custom)}" placeholder="Font name, e.g. Courier New or Atkinson Hyperlegible" size="40" aria-label="Font name">`
+            : `<span class="fontsample" style="font-family: ${f.stack ? esc(f.stack) : 'var(--dos-font)'}">${esc(sample)}</span>`}</span></label>`).join('')}
+      <h2>Text size</h2>
+      <div class="row"><button type="button" data-size="-1" title="Smaller">A−</button>
+        <input type="range" name="size" min="${SIZE.min}" max="${SIZE.max}" value="${size}" aria-label="Text size">
+        <button type="button" data-size="1" title="Larger">A+</button> <span id="sizeval">${size} px</span></div>
+      <h2>Line spacing</h2>
+      <div class="row">${Object.keys(SPACING).map((k) => `<label class="check"><input type="radio" name="spacing" value="${k}" ${a.spacing === k ? 'checked' : ''}> ${k[0].toUpperCase() + k.slice(1)}</label>`).join('')}</div>
+      <h2>Light or dark</h2>
+      <div class="row">${THEMES.map((t) => `<label class="check"><input type="radio" name="theme" value="${t}" ${theme === t ? 'checked' : ''}> ${{ auto: 'Follow the computer', light: 'Light', dark: 'Dark' }[t]}</label>`).join('')}</div>
+      <p class="hint">Changes show at once and are kept on this ${platform.desktop ? 'computer' : 'browser'}. A font has to be installed on the computer to be used; if it isn't, the DOS screen font shows instead.</p>
+      <div class="buttons"><button type="button" id="resetlook">Back to the defaults</button></div>
+    </form>`;
+  const form = $('#appearanceform');
+  const update = () => {
+    const size = +form.size.value;
+    $('#sizeval').textContent = `${size} px`;
+    setAppearance({ font: form.font.value, custom: form.custom.value, size, spacing: form.spacing.value });
+  };
+  form.addEventListener('input', (e) => {
+    if (e.target.name === 'theme') { setTheme(e.target.value); renderTitle(); return; }
+    if (e.target.name === 'custom' && form.font.value !== 'custom') form.querySelector('[value=custom]').checked = true;
+    update();
+  });
+  $$('[data-size]', form).forEach((b) => b.addEventListener('click', () => { form.size.value = +form.size.value + +b.dataset.size; update(); }));
+  $('#resetlook').addEventListener('click', () => { resetAppearance(); render(); say('Appearance back to the defaults.'); });
+  form.addEventListener('submit', (e) => e.preventDefault());
+}
+
+// ---------- blocks: Ctrl+Space (or Ctrl+F2) in a record's field ----------
+//
+// As in Emacs, Ctrl+Space sets the mark; the arrow keys, Home, End, PgUp, PgDn
+// (with Ctrl for words) then stretch a block from the mark to the cursor.
+// Ctrl+C copies it, Ctrl+X cuts it, Delete or typing replaces it, Esc or
+// Ctrl+Space again cancels it. Ctrl+F2 was "Mark" in Notebook II's editor.
+
+const MOVE_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
+let mark = null; // { ta, at: where the mark is, caret: where the cursor is }
+let markTimer = null;
+
+function endMark(message) {
+  if (!mark) return;
+  mark = null;
+  if (message) say(message);
+}
+
+document.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLTextAreaElement) || !t.closest('#recordform')) return;
+  if (e.ctrlKey && !e.altKey && !e.metaKey && (e.code === 'Space' || e.key === 'F2')) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (mark?.ta === t) return endMark('Block cancelled.');
+    const at = t.selectionDirection === 'backward' ? t.selectionStart : t.selectionEnd;
+    t.setSelectionRange(at, at);
+    mark = { ta: t, at, caret: at };
+    return say('Block started. Move the cursor to stretch it; Ctrl+C copies, Ctrl+X cuts, Delete removes, Esc cancels.');
+  }
+  if (!mark || mark.ta !== t) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    t.setSelectionRange(mark.caret, mark.caret);
+    return endMark('Block cancelled.');
+  }
+  if (MOVE_KEYS.includes(e.key) && !e.shiftKey) {
+    // Move from the cursor end, then let the browser move it, then stretch.
+    // The cursor end is read afresh each time, so held-down keys keep up.
+    const c = t.selectionStart === t.selectionEnd ? t.selectionStart
+      : t.selectionDirection === 'backward' ? t.selectionStart : t.selectionEnd;
+    mark.caret = c;
+    t.setSelectionRange(c, c);
+    // Only the latest press stretches the block, after the browser has moved
+    // the cursor; an earlier one still waiting would read a stale position.
+    clearTimeout(markTimer);
+    markTimer = setTimeout(() => {
+      if (mark?.ta !== t || t.selectionStart !== t.selectionEnd) return;
+      const c = t.selectionStart;
+      mark.caret = c;
+      t.setSelectionRange(Math.min(mark.at, c), Math.max(mark.at, c), c < mark.at ? 'backward' : 'forward');
+    }, 0);
+    return;
+  }
+  if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+  endMark(); // anything else acts on the block as on any selection
+}, true);
+document.addEventListener('focusout', (e) => { if (mark?.ta === e.target) endMark(); });
+document.addEventListener('mousedown', (e) => { if (mark && e.target === mark.ta) endMark(); });
+
+// ---------- find in the record on screen ----------
+//
+// In the list, Find narrows the list. On a record it looks inside that record:
+// every match is marked, Enter goes to the next and Shift+Enter the previous,
+// Esc closes the bar and leaves the cursor on the match.
+
+const rf = { open: false, matches: [], cur: 0 };
+
+function openRecordFind() {
+  const bar = $('#recfind');
+  rf.open = true;
+  bar.hidden = false;
+  const input = $('#recfindinput');
+  input.focus();
+  input.select();
+  if (input.value) updateRecordFind();
+}
+
+function hideRecordFind() {
+  if (!rf.open) return;
+  rf.open = false;
+  rf.matches = [];
+  $('#recfind').hidden = true;
+}
+
+function closeRecordFind() {
+  const m = rf.matches[rf.cur];
+  hideRecordFind();
+  renderView();
+  const t = $$('#recordform textarea')[m?.field ?? state.editField];
+  if (!t) return;
+  t.focus();
+  if (m) t.setSelectionRange(m.start, m.end);
+}
+
+function updateRecordFind(keepPlace = false) {
+  const rec = viewed();
+  if (!rec) return;
+  const texts = state.db.fields.map(({ name }) => rec.values[name] ?? '');
+  const r = findInTexts(texts, $('#recfindinput').value);
+  const count = $('#recfindcount');
+  if (r.error) { count.textContent = r.error; count.classList.add('error'); return; }
+  count.classList.remove('error');
+  rf.matches = r.matches;
+  if (!keepPlace) rf.cur = 0;
+  rf.cur = Math.min(rf.cur, Math.max(0, rf.matches.length - 1));
+  paintRecordFind();
+}
+
+function stepRecordFind(dir) {
+  const n = rf.matches.length;
+  if (!n) return;
+  rf.cur = (rf.cur + dir + n) % n;
+  paintRecordFind();
+}
+
+function paintRecordFind() {
+  const areas = $$('#recordform textarea');
+  areas.forEach((t, i) => {
+    const wrap = t.parentElement;
+    wrap.querySelector('.fmark')?.remove();
+    const here = rf.matches.map((m, k) => ({ ...m, k })).filter((m) => m.field === i);
+    if (!here.length) return;
+    let html = '';
+    let at = 0;
+    for (const m of here) {
+      html += esc(t.value.slice(at, m.start)) + `<mark${m.k === rf.cur ? ' class="cur"' : ''}>${esc(t.value.slice(m.start, m.end))}</mark>`;
+      at = m.end;
+    }
+    wrap.insertAdjacentHTML('beforeend', `<span class="fmark" aria-hidden="true">${html}${esc(t.value.slice(at))}</span>`);
+  });
+  const n = rf.matches.length;
+  $('#recfindcount').textContent = $('#recfindinput').value.trim() ? (n ? `${rf.cur + 1} of ${n}` : 'Not in this record') : '';
+  $('#recordform mark.cur')?.scrollIntoView({ block: 'center' });
+}
+
+let recFindTimer = null;
+$('#recfindinput').addEventListener('input', () => {
+  clearTimeout(recFindTimer);
+  recFindTimer = setTimeout(() => updateRecordFind(), 120);
+});
+$('#recfindinput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(recFindTimer);
+    if (!rf.matches.length) updateRecordFind();
+    else stepRecordFind(e.shiftKey ? -1 : 1);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    closeRecordFind();
+  }
+});
+$('#recfind').addEventListener('submit', (e) => e.preventDefault());
+
 // ---------- yes / no questions ----------
 //
 // Drawn in the page like the command palette, because desktop windows and some
@@ -1146,6 +1372,7 @@ function paletteItems() {
 }
 
 function openPalette() {
+  palette.back = document.activeElement;
   palette.open = true;
   palette.sel = 0;
   $('#palette').hidden = false;
@@ -1155,9 +1382,15 @@ function openPalette() {
   input.focus();
 }
 
+// Focus goes back where it was, so keys work again straight away; a command
+// that moves focus itself (Find, a new note) does so afterwards.
 function closePalette() {
   palette.open = false;
   $('#palette').hidden = true;
+  const back = palette.back;
+  palette.back = null;
+  if (back?.isConnected && back !== document.body) back.focus();
+  else $('#main').focus();
 }
 
 function renderPalette() {
@@ -1218,6 +1451,7 @@ function onKey(key, e) {
   const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 
   if (key === 'Ctrl+s') return saveRecord();
+  if (key === 'Ctrl+f') return runCommand('find');
   if (m === 'view' && (key === 'Alt+PageUp' || key === 'Alt+PageDown')) return moveRecord(key === 'Alt+PageUp' ? -1 : 1);
   if (m === 'view' && (key === 'Ctrl+home' || key === 'Ctrl+end')) return recordEdge(key === 'Ctrl+end');
 
@@ -1256,7 +1490,7 @@ function onKey(key, e) {
     if (key === 'ArrowRight') return moveRecord(1);
     if (key === 'ArrowLeft') return moveRecord(-1);
     if (key === 'Enter') return editRecord();
-    if (key === 'f' || key === 'F') return focusSearch();
+    if (key === 'f' || key === 'F') return openRecordFind();
   }
 
   const k = key.length === 1 ? key.toLowerCase() : key;
@@ -1270,7 +1504,8 @@ document.addEventListener('keydown', (e) => {
   const key = keyName(e);
   if (!key) return;
   // Leave browser and text-editing shortcuts alone (copy, paste, undo …).
-  if (key.startsWith('Ctrl+') && !['Ctrl+s', 'Ctrl+Shift+s', 'Ctrl+k', 'Ctrl+d', 'Ctrl+Shift+d', 'Ctrl+home', 'Ctrl+end'].includes(key)) return;
+  if (key.startsWith('Ctrl+') && !['Ctrl+s', 'Ctrl+Shift+s', 'Ctrl+k', 'Ctrl+d', 'Ctrl+Shift+d', 'Ctrl+home', 'Ctrl+end', 'Ctrl+f'].includes(key)) return;
+  if (key === 'Ctrl+f' && !(state.db && ['browse', 'view'].includes(state.mode))) return;
   if ((key === 'Ctrl+home' || key === 'Ctrl+end') && state.mode !== 'view') return;
   if (onKey(key, e) !== false) e.preventDefault();
 });
@@ -1296,12 +1531,13 @@ const MENU = {
   copyprev: () => runCommand('copyprev'),
   copyfield: () => runCommand('copyfield'),
   delete: () => state.db && ['browse', 'view'].includes(state.mode) && deleteCurrent(),
-  find: () => state.db && focusSearch(),
+  find: () => state.db && (state.mode === 'view' ? openRecordFind() : focusSearch()),
   all: () => state.db && (state.mode === 'browse' || go('browse'), clearSearch()),
   sort: () => state.db && go('sort'),
   fields: () => state.db && go('fields'),
   theme: () => cycleTheme(),
   palette: () => openPalette(),
+  appearance: () => go('appearance'),
   help: () => go('help'),
   quit: () => platform.closeWindow(),
 };
