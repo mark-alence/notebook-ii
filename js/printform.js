@@ -8,6 +8,9 @@
 //   {Field:20}     exactly 20 characters of the field, cut off or padded with
 //                  spaces (Notebook II's "fixed" fields)
 //   {#}            the record's position in the output (1, 2, 3 ...)
+//   {Record#}      the record's own number, as 127 (also {Record#:6}), the
+//                  same as the Record# column of an export. A field of the
+//                  notebook's own called Record# comes first.
 //   {#id}          the record's own number, as #127
 //   [[ ... ]]      a line that is left out when every field in it is empty
 //
@@ -38,6 +41,7 @@ export function wrapLine(text, width, indent = 0) {
   return out;
 }
 
+const RECORD_NO = /^\s*record\s*#\s*$/i;
 const fieldKey = (fields, name) => fields.find((f) => f.toLowerCase() === name.trim().toLowerCase());
 
 export function fillPageText(text, { page = 1, pages = 1, now = new Date() } = {}) {
@@ -58,6 +62,8 @@ export function renderRecord(template, record, fields, { index = 1, width = 76 }
     const fixed = /^(.*):(\d+)$/.exec(name);
     const fixedKey = fixed && fieldKey(fields, fixed[1]);
     if (fixedKey) return (record.values[fixedKey] ?? '').replace(/\s*\n\s*/g, ' ').slice(0, +fixed[2]).padEnd(+fixed[2]);
+    if (RECORD_NO.test(name)) return record.id ? String(record.id) : '';
+    if (fixed && RECORD_NO.test(fixed[1])) return (record.id ? String(record.id) : '').slice(0, +fixed[2]).padEnd(+fixed[2]);
     if (name === '#') return String(index);
     if (name.trim().toLowerCase() === '#id') return record.id ? `#${record.id}` : '';
     return `{${name}}`;
