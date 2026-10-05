@@ -950,21 +950,26 @@ function finishImport() {
 // Every way of getting records out. A custom form (what Notebook II called a
 // print format) and vertical text can be saved as a text file or as a PDF.
 
-const EXPORT_FORMATS = [
-  ['json', 'Notebook file (.nb2.json) — keeps fields, forms, everything'],
-  ['vertical', 'Vertical text — one record after another, for reading'],
-  ['form', 'Custom form — your own layout'],
-  ['csv', 'Comma-separated (.csv)'],
-  ['tab', 'Tab-delimited (.txt)'],
-  ['tagged', 'Tagged text — Field: value (.txt)'],
-  ['notebook', 'Notebook II import text — %Field:value (.txt), for the DOS program'],
-  ['custom', 'Delimited, my own characters (.txt)'],
+// Shown as a list, in two groups, so every choice (and PDF) is in view.
+const EXPORT_GROUPS = [
+  ['For reading, sharing or printing', [
+    ['vertical', 'Vertical text', 'each record\'s fields one after another, notes under their label', 'text file or PDF'],
+    ['form', 'Custom form', 'your own layout, with a page header and footer', 'text file or PDF'],
+  ]],
+  ['For other programs', [
+    ['csv', 'Spreadsheet', 'comma-separated, for Excel, Numbers, LibreOffice, R', '.csv'],
+    ['tab', 'Tab-delimited', 'one record per line, fields separated by tabs', '.txt'],
+    ['json', 'Notebook file', 'everything, to open in Notebook II on another computer (Import)', '.nb2.json'],
+    ['tagged', 'Tagged text', 'Field: value lines', '.txt'],
+    ['notebook', 'Notebook II import text', '%Field:value, for the original DOS program', '.txt'],
+    ['custom', 'Delimited, my own characters', 'choose the separators', '.txt'],
+  ]],
 ];
 const PAGED = ['vertical', 'form']; // formats that can also be a PDF
 
 function exportState() {
   state.exp ??= {
-    format: 'json', output: 'text', encoding: 'utf-8', which: 'list',
+    format: 'vertical', output: 'text', encoding: 'utf-8', which: 'list',
     paper: /^en-(US|CA)|^es-(MX|US)/.test(navigator.language) ? 'letter' : 'a4', fontSize: 10,
     fieldDelim: '|', recordDelim: '\\r\\n', newlineMarker: '\\x14', header: true,
   };
@@ -993,11 +998,10 @@ function renderExport() {
   const pdf = PAGED.includes(x.format) && x.output === 'pdf';
   const form = isForm ? currentForm() : null;
   const opt = (v, l, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`;
-  $('#main').innerHTML = `
-    <form class="panel ${isForm || x.format === 'vertical' ? 'exportwide' : ''}" id="exportform">
-      <div class="exportmain">
-        <h2>Export</h2>
-        <div class="row"><label>Format</label><select name="format">${EXPORT_FORMATS.map(([v, l]) => opt(v, l, x.format)).join('')}</select></div>
+  // The chosen format's settings and the Save button sit right under its
+  // group, so they are in view next to the choice.
+  const settings = `
+        <div class="exportsettings">
         ${PAGED.includes(x.format) ? `
         <div class="row"><label>Save as</label>
           <label class="check"><input type="radio" name="output" value="text" ${pdf ? '' : 'checked'}> Text file</label>
@@ -1017,8 +1021,20 @@ function renderExport() {
           ${opt('list', `${state.query ? `The ${n} found` : `All ${total}`}, in the list's order`, x.which)}
           ${state.query ? opt('all', `All ${total}`, x.which) : ''}
         </select></div>
-        ${isForm ? formEditor(form, pdf) : ''}
         <div class="buttons"><button type="submit">${pdf ? 'Save as PDF' : 'Save file'}</button></div>
+        ${isForm ? formEditor(form, pdf) : ''}
+        </div>`;
+  $('#main').innerHTML = `
+    <form class="panel ${isForm || x.format === 'vertical' ? 'exportwide' : ''}" id="exportform">
+      <div class="exportmain">
+        <h2>Export</h2>
+        ${EXPORT_GROUPS.map(([title, items]) => `
+        <fieldset class="formatlist"><legend>${esc(title)}</legend>
+          ${items.map(([v, name, about, kind]) => `<label class="check"><input type="radio" name="format" value="${v}" ${x.format === v ? 'checked' : ''}>
+            <span><strong>${esc(name)}</strong> <span class="kind">${esc(kind)}</span><br><span class="hint">${esc(about)}</span></span></label>`).join('')}
+        </fieldset>
+        ${items.some(([v]) => v === x.format) ? settings : ''}`).join('')}
+        <p class="hint">To print on paper, save a PDF and print that.</p>
       </div>
       ${isForm || x.format === 'vertical' ? `<div class="printpreview"><h2>Preview${pdf ? ' of the PDF pages' : ''}</h2><pre id="printout"></pre></div>` : ''}
     </form>`;
