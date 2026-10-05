@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { jsPDF } from 'jspdf';
-import { pdfLayout, layoutPdf, makePdf, previewPdf } from '../js/pdf.js';
+import { pdfLayout, layoutPdf, makePdf, previewPdf, PDF_FONTS } from '../js/pdf.js';
 import { renderRecord, renderReport, fillPageText, upgradeForm } from '../js/printform.js';
 import { validateDatabase, createDatabase } from '../js/model.js';
 
-const font = readFileSync(new URL('../fonts/DejaVuSansMono.ttf', import.meta.url)).toString('base64');
+const fontFile = (id) => ({ id, data: readFileSync(new URL(`../fonts/${PDF_FONTS[id].file}`, import.meta.url)).toString('base64') });
+const font = fontFile('mono');
 const now = new Date(2026, 9, 5, 14, 30);
 
 test('header and footer placeholders use @, so fields called Date or Page stay fields', () => {
@@ -69,4 +70,28 @@ test('a real PDF: one page per laid-out page, every character kept', () => {
   const preview = previewPdf(blocks, options);
   assert.match(preview, /── page 1 of \d+/);
   assert.match(preview, /Notes .* page 1 of \d+\n\nRecord 1/);
+});
+
+test('PDF in a serif or sans-serif font: lines break by the real widths of the letters', () => {
+  const words = 'iiii '.repeat(60).trim(); // narrow letters: more per line than in monospace
+  const wide = 'MMMM '.repeat(60).trim();
+  const blocks = [`${words}\n${wide}`];
+  for (const id of ['serif', 'sans']) {
+    const { bytes, pages } = makePdf(blocks, { jsPDF, font: fontFile(id), paper: 'a4', fontSize: 10, now });
+    const text = Buffer.from(bytes).toString('latin1');
+    assert.match(text, new RegExp(`/BaseFont /${PDF_FONTS[id].family}`));
+    assert.equal(pages, 1);
+    // The same measuring the PDF used, through jsPDF.
+    const doc = new jsPDF({ unit: 'mm' });
+    doc.addFileToVFS(PDF_FONTS[id].file, fontFile(id).data);
+    doc.addFont(PDF_FONTS[id].file, PDF_FONTS[id].family, 'normal');
+    doc.setFont(PDF_FONTS[id].family, 'normal');
+    const { layout, pages: laid } = layoutPdf(blocks, { paper: 'a4', fontSize: 10, measure: (s) => doc.getStringUnitWidth(s) });
+    const lines = laid[0];
+    const narrow = lines.filter((l) => l.startsWith('i'));
+    const broad = lines.filter((l) => l.startsWith('M'));
+    assert.ok(narrow[0].length > layout.chars, 'narrow letters fill more than a monospace line');
+    assert.ok(broad[0].length < layout.chars, 'wide letters fill less');
+    for (const l of lines) assert.ok(doc.getStringUnitWidth(l) * 10 * 25.4 / 72 <= layout.width + 1e-6);
+  }
 });

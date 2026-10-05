@@ -11,7 +11,7 @@ import { FONTS, SPACING, SIZE, LIST_ROWS, getAppearance, setAppearance, resetApp
 import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportNotebookText, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
 import { renderReport, renderBlocks } from './printform.js';
-import { PAPERS, FONT_SIZES, makePdf, previewPdf } from './pdf.js';
+import { PAPERS, FONT_SIZES, PDF_FONTS, makePdf, previewPdf } from './pdf.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent } from './storage.js';
 import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
@@ -1070,7 +1070,7 @@ const NUMBERED = ['vertical', 'csv', 'tab', 'tagged', 'custom']; // can carry a 
 function exportState() {
   state.exp ??= {
     format: 'vertical', output: 'text', encoding: 'utf-8', which: 'list',
-    paper: /^en-(US|CA)|^es-(MX|US)/.test(navigator.language) ? 'letter' : 'a4', fontSize: 10,
+    paper: /^en-(US|CA)|^es-(MX|US)/.test(navigator.language) ? 'letter' : 'a4', fontSize: 10, pdfFont: 'mono',
     fieldDelim: '|', recordDelim: '\\r\\n', newlineMarker: '\\x14', header: true,
     numbers: true, ids: '',
   };
@@ -1109,7 +1109,9 @@ function renderExport() {
           <label class="check"><input type="radio" name="output" value="pdf" ${pdf ? 'checked' : ''}> PDF</label></div>` : ''}
         ${pdf ? `
         <div class="row"><label>Paper</label><select name="paper">${Object.entries(PAPERS).map(([v, p]) => opt(v, p.name, x.paper)).join('')}</select>
-          <label>Text size</label><select name="fontSize">${FONT_SIZES.map((s) => opt(String(s), `${s} pt`, String(x.fontSize))).join('')}</select></div>` : ''}
+          <label>Text size</label><select name="fontSize">${FONT_SIZES.map((s) => opt(String(s), `${s} pt`, String(x.fontSize))).join('')}</select>
+          <label>Font</label><select name="pdfFont">${Object.entries(PDF_FONTS).map(([v, f]) => opt(v, f.name + (f.fixed ? ' (the default)' : ''), x.pdfFont)).join('')}</select></div>
+        ${PDF_FONTS[x.pdfFont]?.fixed ? '' : '<p class="hint">In a serif or sans-serif font letters differ in width, so text lined up in columns (fixed-width fields such as <code>{Author:20}</code>, the labels of vertical text) will not stay lined up. Long lines still wrap to the page. Use Monospace to keep the alignment.</p>'}` : ''}
         ${x.format === 'custom' ? `
         <div class="row">
           <label>Field delimiter</label><input name="fieldDelim" value="${esc(x.fieldDelim)}" size="6">
@@ -1150,7 +1152,7 @@ function renderExport() {
     if (!t.name) return;
     x[t.name] = t.type === 'checkbox' ? t.checked : t.name === 'fontSize' ? +t.value : t.value;
     if (t.name === 'format' && t.value === 'notebook') x.encoding = 'cp437';
-    if (['format', 'output', 'paper', 'fontSize', 'which'].includes(t.name)) render();
+    if (['format', 'output', 'paper', 'fontSize', 'pdfFont', 'which'].includes(t.name)) render();
     else if (t.name === 'numbers') updateExportPreview();
   });
   el.addEventListener('input', (e) => {
@@ -1241,7 +1243,7 @@ function exportBlocks(recs, width) {
 function pdfOptions() {
   const x = state.exp;
   const form = x.format === 'form' ? currentForm() : null;
-  return { paper: x.paper, fontSize: x.fontSize, header: form?.header ?? '', footer: form?.footer ?? '', title: form ? `${state.db.name}: ${form.name}` : state.db.name };
+  return { paper: x.paper, fontSize: x.fontSize, pdfFont: x.pdfFont, header: form?.header ?? '', footer: form?.footer ?? '', title: form ? `${state.db.name}: ${form.name}` : state.db.name };
 }
 
 function updateExportPreview() {
@@ -1251,7 +1253,11 @@ function updateExportPreview() {
   const all = exportRecords();
   const recs = all.slice(0, 60);
   let text;
-  if (x.output === 'pdf') text = previewPdf(exportBlocks(recs), pdfOptions());
+  // The preview shows the PDF's lines in its own font, once that has loaded.
+  const face = x.output === 'pdf' ? previewFont(x.pdfFont) : null;
+  out.style.fontFamily = face?.family ? `"${face.family}"` : '';
+  if (face?.loading) text = 'Loading the font…';
+  else if (x.output === 'pdf') text = previewPdf(exportBlocks(recs), { ...pdfOptions(), ...(face ? { measure: face.measure } : {}) });
   else if (x.format === 'form') text = renderReport(currentForm(), recs, fieldNames(state.db)).replace(/\f/g, `${'─'.repeat(currentForm().width)}\n`);
   else {
     const shape = exportShape(recs);
@@ -1267,22 +1273,45 @@ function updateExportPreview() {
 
 // The PDF maker and its font load the first time a PDF is saved.
 let pdfKit = null;
-function loadPdfKit() {
-  pdfKit ??= (async () => {
-    if (!globalThis.jspdf) {
-      await new Promise((ok, fail) => {
-        const s = Object.assign(document.createElement('script'), { src: 'js/vendor/jspdf.umd.min.js', onload: ok, onerror: () => fail(new Error('Could not load the PDF maker.')) });
-        document.head.append(s);
-      });
-    }
-    const res = await fetch('fonts/DejaVuSansMono.ttf');
+function loadPdfKit(fontId) {
+  pdfKit ??= new Promise((ok, fail) => {
+    if (globalThis.jspdf) return ok();
+    const s = Object.assign(document.createElement('script'), { src: 'js/vendor/jspdf.umd.min.js', onload: ok, onerror: () => fail(new Error('Could not load the PDF maker.')) });
+    document.head.append(s);
+  }).catch((e) => { pdfKit = null; throw e; });
+  const face = PDF_FONTS[fontId] ?? PDF_FONTS.mono;
+  pdfFontData[fontId] ??= (async () => {
+    const res = await fetch(`fonts/${face.file}`);
     if (!res.ok) throw new Error('Could not load the font for the PDF.');
     const bytes = new Uint8Array(await res.arrayBuffer());
     let bin = '';
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return { jsPDF: globalThis.jspdf.jsPDF, font: btoa(bin) };
-  })().catch((e) => { pdfKit = null; throw e; });
-  return pdfKit;
+    return btoa(bin);
+  })().catch((e) => { delete pdfFontData[fontId]; throw e; });
+  return Promise.all([pdfKit, pdfFontData[fontId]]).then(([, data]) => ({ jsPDF: globalThis.jspdf.jsPDF, font: { id: fontId, data } }));
+}
+const pdfFontData = {};
+
+// The serif and sans-serif PDF fonts, loaded into the page too, so the
+// preview breaks lines where the PDF will and shows the letters it will have.
+const previewFaces = {};
+function previewFont(fontId) {
+  const face = PDF_FONTS[fontId];
+  if (!face || face.fixed || typeof FontFace === 'undefined') return null;
+  const family = `NB2 PDF ${fontId}`;
+  if (!previewFaces[fontId]) {
+    previewFaces[fontId] = { ready: false };
+    const ff = new FontFace(family, `url(fonts/${face.file})`);
+    ff.load().then((loaded) => {
+      document.fonts.add(loaded);
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.font = `100px "${family}"`;
+      if ('fontKerning' in ctx) ctx.fontKerning = 'none';
+      Object.assign(previewFaces[fontId], { ready: true, family, measure: (s) => ctx.measureText(s).width / 100 });
+      updateExportPreview();
+    }).catch(() => {});
+  }
+  return previewFaces[fontId].ready ? previewFaces[fontId] : { loading: true };
 }
 
 async function saveExport() {
@@ -1298,7 +1327,7 @@ async function saveExport() {
   if (PAGED.includes(x.format) && x.output === 'pdf') {
     say('Making the PDF…');
     try {
-      const kit = await loadPdfKit();
+      const kit = await loadPdfKit(x.pdfFont);
       const { bytes, pages } = makePdf(exportBlocks(recs), { ...kit, ...pdfOptions() });
       const name = x.format === 'form' ? `${base}-${safeName(currentForm().name)}.pdf` : `${base}.pdf`;
       if (await download(name, bytes, 'application/pdf')) say(`PDF saved: ${pages} page${pages === 1 ? '' : 's'}, ${recs.length} record${recs.length === 1 ? '' : 's'}.`);
