@@ -55,9 +55,14 @@ export function exportNotebookText(fields, records) {
 // the same shape. The file can be read back with Import (tagged text).
 export const VERTICAL_RULE = '-'.repeat(60);
 
-export function exportVertical(fields, records, { width = 70 } = {}) {
+export function exportVertical(fields, records, options) {
+  return (verticalBlocks(fields, records, options).join(`\n\n${VERTICAL_RULE}\n\n`) + '\n').replace(/\n/g, '\r\n');
+}
+
+// Each record's vertical text, for the file above or for a PDF.
+export function verticalBlocks(fields, records, { width = 70 } = {}) {
   const pad = Math.max(...fields.map((f) => f.length)) + 2;
-  const blocks = records.map((r) => {
+  return records.map((r) => {
     const out = [];
     fields.forEach((f, i) => {
       const v = (r.values[f] ?? '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
@@ -72,7 +77,6 @@ export function exportVertical(fields, records, { width = 70 } = {}) {
     });
     return out.join('\n');
   });
-  return (blocks.join(`\n\n${VERTICAL_RULE}\n\n`) + '\n').replace(/\n/g, '\r\n');
 }
 
 export function exportJson(db, records = db.records) {

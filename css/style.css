@@ -257,10 +257,11 @@ table.browse th:first-child { width: 6ch; }
    over the field, so inside a mark the letters show dark on yellow. */
 .record .fmark mark { color: var(--mark-fg); background: var(--mark-bg); }
 
-/* ---------- print ---------- */
+/* ---------- export ---------- */
 
-.print { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2ch; max-width: none; }
-.print textarea { width: 100%; white-space: pre; overflow-wrap: normal; }
+.exportwide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2ch; max-width: none; }
+.exportmain textarea { width: 100%; white-space: pre; overflow-wrap: normal; }
+.formlabel { display: block; color: var(--label); margin-top: 0.5em; }
 .printpreview pre {
   margin: 0;
   padding: 0.5em 1ch;
@@ -270,7 +271,6 @@ table.browse th:first-child { width: 6ch; }
   max-height: 70vh;
 }
 #formwidth { width: 7ch; }
-#print-area { display: none; }
 
 /* ---------- command palette, drawn like a DOS dialog box ---------- */
 
@@ -295,7 +295,7 @@ table.browse th:first-child { width: 6ch; }
 
 @media (max-width: 760px) {
   html, body { font-size: var(--font-size, 15px); }
-  .print { grid-template-columns: 1fr; }
+  .exportwide { grid-template-columns: 1fr; }
   .record .field { grid-template-columns: 1fr; }
   table.browse th:nth-child(n+4), table.browse td:nth-child(n+4) { display: none; }
   #title { flex-wrap: wrap; }
@@ -306,13 +306,6 @@ table.browse th:first-child { width: 6ch; }
   .keys-table td { display: block; padding-right: 0; }
 }
 
-@media print {
-  .app { display: none; }
-  html, body { background: #fff; color: #000; height: auto; }
-  #print-area { display: block; margin: 0; font: 11pt/1.3 "Courier New", monospace; white-space: pre-wrap; }
-  #print-area .page { break-after: page; }
-  #print-area .page:last-child { break-after: auto; }
-}
 #main .where { color: var(--hint); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grid tr.cur td.where { color: inherit; }
 

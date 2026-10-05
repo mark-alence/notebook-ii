@@ -1,3 +1,5 @@
+import { upgradeForm } from './printform.js';
+
 // A Notebook II-style database: named fields, variable-length records.
 // Every field of every record is free text of any length; the program never
 // interprets it. A field also carries a few display settings:
@@ -38,7 +40,7 @@ export function createDatabase(name, fieldNames = ['Text']) {
 export function defaultPrintForm(fieldNames) {
   const width = Math.max(...fieldNames.map((n) => n.length), 4);
   const lines = fieldNames.map((n) => `[[${n.padEnd(width)} : {${n}}]]`);
-  return { name: 'Standard', width: 76, template: lines.join('\n') };
+  return { name: 'Standard', width: 76, template: lines.join('\n'), header: '', footer: '', textPages: false, pageLines: 66 };
 }
 
 function touch(db) {
@@ -245,6 +247,7 @@ export function validateDatabase(db) {
     throw new Error('Not a Notebook database file');
   }
   db.printForms ??= [defaultPrintForm(fieldNames(db))];
+  db.printForms.forEach(upgradeForm);
   db.nextId ??= Math.max(0, ...db.records.map((r) => r.id)) + 1;
   for (const r of db.records) for (const f of db.fields) r.values[f.name] ??= '';
   return db;
