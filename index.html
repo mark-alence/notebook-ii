@@ -61,6 +61,7 @@
         <tr><td>Column heading</td><td>Sort by that field; click again for Z to A, a third time to go back to date order. <kbd>S</kbd> sorts by up to three fields.</td></tr>
         <tr><td><kbd>X</kbd> &nbsp; <kbd>I</kbd></td><td>Export, Import</td></tr>
         <tr><td><kbd>P</kbd></td><td>Export with a custom form, as a text file or a PDF</td></tr>
+        <tr><td><kbd>M</kbd>, or click the ✓ column</td><td>Mark or unmark the record (also on an open record). Marks collect a hand-picked set to find, export or delete together; see <em>Marked records</em> below.</td></tr>
         <tr><td><kbd>Del</kbd></td><td>Delete the record</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Back: leaves a field, then the record, then closes the database</td></tr>
         <tr><td><kbd>?</kbd></td><td>This help</td></tr>
@@ -107,9 +108,13 @@
         <tr><td><code>/colou?r/</code></td><td>a regular expression, anywhere in the record. Capitals don't matter unless you add <code>c</code> after it: <code>/Smith/c</code></td></tr>
         <tr><td><code>#127</code></td><td>record number 127 (Enter opens it)</td></tr>
         <tr><td><code>#120-140</code> &nbsp; <code>#12,15,31</code> &nbsp; <code>#500-</code></td><td>a range of record numbers, a list of them, or 500 and later; mix them with other terms, e.g. <code>#1-200 -farmers</code></td></tr>
+        <tr><td><code>@marked</code> &nbsp; <code>-@marked</code></td><td>records you have marked / not marked, e.g. <code>@marked year&gt;1980</code></td></tr>
         <tr><td><code>citation:/^CO 9\d/</code></td><td>a regular expression in one field; mix it with any other terms, e.g. <code>/^19[34]\d/ -farmers</code></td></tr>
       </table>
       <p>Capitals and accents don't matter. Sorting and exporting work on the records found.</p>
+
+      <h2>Marked records</h2>
+      <p>When the records you want don't share a search term or a run of numbers, mark them one by one: <kbd>M</kbd> on a row of the list or on an open record, or a click in the ✓ column. The title bar counts them. In the command list (<kbd data-key-label="Ctrl+k">Ctrl+K</kbd>): <em>Show marked records</em> (the same as searching <code>@marked</code>), <em>Mark all records in the list</em> (say after a search), <em>Unmark all records in the list</em>, <em>Clear all marks in the notebook</em> and <em>Delete marked records</em>. Export's Records choice has <em>The marked</em>. Marks are kept with the notebook and in backups, and marking a record does not count as changing it.</p>
 
       <h2>Importing your Notebook II files</h2>
       <p><strong>Database files.</strong> A Notebook II database called NAME is several files. Choose Import (<kbd>I</kbd>) and select <code>NAME.DAT</code>, <code>NAME.DEF</code> and <code>NAME.IDX</code> together (add <code>NAME.MSC</code> and any custom print formats, <code>*.R00</code>, if you have them). Records you marked deleted are left out unless you tick <em>Include records marked deleted</em>, and print formats become print forms. The <code>.DAT</code> file alone also works, but then field names are missing and records you edited in Notebook II show up once for every saved copy.</p>

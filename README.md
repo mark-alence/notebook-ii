@@ -88,12 +88,17 @@ title=the  -title=the Title begins / doesn't begin with "the"
 year>1980  author<=m  begins later / the same or earlier (also < and >=)
 /colou?r/             a regular expression (add c after it to match capitals: /Smith/c)
 citation:/^CO 9\d/    a regular expression in one field
+@marked  -@marked     records marked with M / not marked
 #127                  record number 127 (Enter opens it)
 #120-140  #12,15,31   a range or list of record numbers
 #500-                 number 500 and later; mix with other terms: #1-200 -farmers
 ```
 
 Search ignores capitals and accents (regular expressions ignore capitals but not accents). The last two lines are Notebook II's Select conditions (begins with, greater/less than); numbers compare as numbers.
+
+## Marked records
+
+To collect a hand-picked set, press **M** on a record in the list or on an open record, or click the ✓ column; the title bar counts the marked records. The command list (Ctrl+K) has *Show marked records* (the search `@marked`), *Mark all records in the list*, *Unmark all records in the list*, *Clear all marks in the notebook* and *Delete marked records*, and Export's Records choice has *The marked*. Marks are saved with the notebook and in backups; marking does not change a record's modified date.
 
 ## Custom forms and PDFs
 
