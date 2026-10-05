@@ -7,7 +7,7 @@ import {
   moveField, orderRecords, withRecordNumbers, recordNumbersIn, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, listColumns, setListColumns, moveListColumn, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
 } from './model.js';
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
-import { FONTS, SPACING, SIZE, LIST_ROWS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
+import { FONTS, SPACING, SIZE, LIST_ROWS, LABELS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
 import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
 import { renderReport, renderBlocks } from './printform.js';
@@ -1575,6 +1575,8 @@ function renderAppearance() {
         <button type="button" data-size="1" title="Larger">A+</button> <span id="sizeval">${size} px</span></div>
       <h2>Line spacing</h2>
       <div class="row">${Object.keys(SPACING).map((k) => `<label class="check"><input type="radio" name="spacing" value="${k}" ${a.spacing === k ? 'checked' : ''}> ${k[0].toUpperCase() + k.slice(1)}</label>`).join('')}</div>
+      <h2>Field names on a record</h2>
+      <div class="row">${Object.entries(LABELS).map(([k, l]) => `<label class="check"><input type="radio" name="labels" value="${k}" ${a.labels === k ? 'checked' : ''}> ${l}${k === 'auto' ? ' <span class="hint">(beside the text when there is room for it, above it in a narrow window)</span>' : ''}</label>`).join('')}</div>
       <h2>Records in the list</h2>
       <div class="row">${LIST_ROWS.map((n) => `<label class="check"><input type="radio" name="listRows" value="${n}" ${+a.listRows === n ? 'checked' : ''}> ${n ? n.toLocaleString() + ' at a time' : 'All <span class="hint">(the default)</span>'}</label>`).join('')}</div>
       <h2>Light or dark</h2>
@@ -1586,7 +1588,7 @@ function renderAppearance() {
   const update = () => {
     const size = +form.size.value;
     $('#sizeval').textContent = `${size} px`;
-    setAppearance({ font: form.font.value, custom: form.custom.value, size, spacing: form.spacing.value, listRows: +form.listRows.value });
+    setAppearance({ font: form.font.value, custom: form.custom.value, size, spacing: form.spacing.value, listRows: +form.listRows.value, labels: form.labels.value });
   };
   form.addEventListener('input', (e) => {
     if (e.target.name === 'theme') { setTheme(e.target.value); renderTitle(); return; }

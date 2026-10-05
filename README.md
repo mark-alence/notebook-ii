@@ -59,7 +59,7 @@ Every record has a number of its own, shown as `#127` in the list's first column
 
 Unless it is sorted by a field, the list shows the newest records first; *Oldest first* on the Sort screen or in the command list turns it round. The notebook remembers its sort and its order; clicking a column heading a third time goes back to date order.
 
-**Appearance** (in the command list, or View → Appearance in the desktop app) sets the font (DOS screen, modern monospace, sans-serif, serif, or any installed font), text size, line spacing, light or dark, and how many records the list shows (all by default, or 200, 500 or 1,000 at a time), kept on that computer. Even with all records shown, a list of thousands draws and scrolls quickly: the rows in view are drawn at once and the rest while the computer is idle.
+**Appearance** (in the command list, or View → Appearance in the desktop app) sets the font (DOS screen, modern monospace, sans-serif, serif, or any installed font), text size, line spacing, light or dark, where a record's field names go (automatically beside the text when the window shows the whole record and above it otherwise, or always above, or always beside), and how many records the list shows (all by default, or 200, 500 or 1,000 at a time), kept on that computer. Even with all records shown, a list of thousands draws and scrolls quickly: the rows in view are drawn at once and the rest while the computer is idle.
 
 ## Keeping your notebooks safe
 

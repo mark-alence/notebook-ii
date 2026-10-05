@@ -15,7 +15,10 @@ export const SPACING = { compact: 1.25, normal: 1.4, relaxed: 1.7 };
 export const SIZE = { min: 11, max: 32, default: 16 };
 // listRows: how many records the list shows at a time (0 = all of them).
 export const LIST_ROWS = [200, 500, 1000, 0];
-export const DEFAULTS = { font: 'dos', custom: '', size: null, spacing: 'normal', listRows: 0 };
+// labels: where a record's field names go: 'auto' (beside the text when there
+// is room for it, above it otherwise), 'above' or 'beside'.
+export const LABELS = { auto: 'Automatic', above: 'Always above the text', beside: 'Always beside the text' };
+export const DEFAULTS = { font: 'dos', custom: '', size: null, spacing: 'normal', listRows: 0, labels: 'auto' };
 
 export function getAppearance() {
   try {
@@ -40,6 +43,8 @@ export function applyAppearance(a = getAppearance()) {
   const root = document.documentElement.style;
   for (const name of ['--font', '--font-size', '--lh']) root.removeProperty(name);
   for (const [name, value] of Object.entries(cssVars(a))) root.setProperty(name, value);
+  if (a.labels === 'above' || a.labels === 'beside') document.documentElement.dataset.labels = a.labels;
+  else delete document.documentElement.dataset.labels;
 }
 
 export function setAppearance(changes) {
