@@ -389,13 +389,15 @@ function renderKeys() {
   const shown = COMMANDS.filter((c) => c.bar && available(c) && !(c.id === 'revert' && !recordChanged()));
   $('#keys').innerHTML = shown.map((c) => {
     const k = keyLabel(c.barKey ?? c.key);
-    return `<button type="button" data-cmd="${c.id}" title="${esc(c.label)}${k ? ` (${esc(k)})` : ''}"><span>${esc(barLabel(c))}</span>${k ? `<kbd>${esc(k)}</kbd>` : ''}</button>`;
+    const title = barLabel(c) === (SHORT[c.id] ?? c.label) ? c.label : barLabel(c);
+    return `<button type="button" data-cmd="${c.id}" title="${esc(title)}${k ? ` (${esc(k)})` : ''}"><span>${esc(barLabel(c))}</span>${k ? `<kbd>${esc(k)}</kbd>` : ''}</button>`;
   }).join('');
 }
 
 const SHORT = { print: 'Form/PDF', openfile: 'Open', saveas: 'Save as', newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
   if (c.id === 'find') return state.mode === 'view' ? 'Find in record' : 'Find';
+  if (c.id === 'delete' && state.mode === 'browse' && state.db && markCount()) return `Delete ${markCount()} marked`;
   return SHORT[c.id] ?? c.label;
 }
 
@@ -1445,6 +1447,7 @@ function toggleMark() {
     const tr = $(`#main .brow[data-i="${state.cursor}"]`);
     if (!tr) return render();
     tr.classList.toggle('marked', !!rec.marked);
+    renderKeys();
     const mk = tr.querySelector('.mk');
     mk.textContent = rec.marked ? '✓' : '';
     mk.title = rec.marked ? 'Marked: click or press M to unmark' : 'Click or press M to mark';
@@ -1492,7 +1495,10 @@ async function deleteMarked() {
   say(`Deleted ${plural(marked.length, 'record')}.`);
 }
 
+// Del: in the list, the marked records if there are any (the command bar
+// says so), otherwise the one under the cursor; on a record, that record.
 async function deleteCurrent() {
+  if (state.mode === 'browse' && markCount()) return deleteMarked();
   const rec = state.mode === 'view' ? viewed() : current();
   if (!rec) return;
   const label = preview(rec.values[state.db.fields[0].name], 50) || 'this record';

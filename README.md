@@ -98,7 +98,7 @@ Search ignores capitals and accents (regular expressions ignore capitals but not
 
 ## Marked records
 
-To collect a hand-picked set, press **M** on a record in the list or on an open record, or click the ✓ column; the title bar counts the marked records. The command list (Ctrl+K) has *Show marked records* (the search `@marked`), *Mark all records in the list*, *Clear all marks* (Shift+M, after asking) and *Delete marked records*, and Export's Records choice has *The marked*. Marks are saved with the notebook and in backups; marking does not change a record's modified date.
+To collect a hand-picked set, press **M** on a record in the list or on an open record, or click the ✓ column; the title bar counts the marked records. The command list (Ctrl+K) has *Show marked records* (the search `@marked`), *Mark all records in the list*, *Clear all marks* (Shift+M, after asking) and *Delete marked records* (also Del in the list whenever records are marked; the command bar then reads "Delete 3 marked", and an open record's Del still deletes just that one), and Export's Records choice has *The marked*. Marks are saved with the notebook and in backups; marking does not change a record's modified date.
 
 ## Custom forms and PDFs
 
