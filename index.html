@@ -39,6 +39,7 @@
   <div id="ask" class="overlay" hidden>
     <div class="pbox" role="alertdialog" aria-labelledby="askmsg">
       <p id="askmsg"></p>
+      <input id="askinput" autocomplete="off" spellcheck="false" aria-labelledby="askmsg" hidden>
       <div class="buttons"><button type="button" id="askyes">Yes</button><button type="button" id="askno">Cancel</button></div>
       <p class="hint"><kbd>Y</kbd> yes &nbsp; <kbd>N</kbd> or <kbd>Esc</kbd> no</p>
     </div>
@@ -84,6 +85,9 @@
         <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Start a block, as in Emacs: move the cursor with the arrows, Home, End, PgUp or PgDn (Ctrl for whole words) and the block follows. Ctrl+C copies it, Ctrl+X cuts it, Delete or typing replaces it, Esc or Ctrl+Space again cancels it. On a Mac, if Ctrl+Space switches keyboard languages, select with Shift and the arrow keys instead.</td></tr>
       </table>
       <p><kbd data-key-label="Ctrl+d">Ctrl+D</kbd> and <kbd data-key-label="Ctrl+Shift+d">Ctrl+Shift+D</kbd> work only in a new record, from pressing <kbd>N</kbd> until you leave it; once you go back to the list or to another record it is an ordinary record and they are not offered. They copy from the record you were on when you pressed <kbd>N</kbd> (open, or highlighted in the list), so after one record you can press <kbd>N</kbd> and then <kbd data-key-label="Ctrl+d">Ctrl+D</kbd> for the next one from the same source. The line under the fields names it, e.g. "copies Author, Title and Year from <strong>#125 (Darnton, Robert)</strong>".</p>
+
+      <h2>Projects</h2>
+      <p>A project groups collections, say all those for one book or thesis. The <em>Project</em> list at the top of the start screen (<kbd>P</kbd>) shows one project's collections, the Unfiled ones, or all of them; the choice is remembered. <em>New project</em>, <em>Rename</em> and <em>Delete</em> sit beside it; deleting a project keeps its collections, as Unfiled. New collections, imported ones and the sample go into the project on screen, and a collection can be moved to another project on its Fields screen. The title bar shows the project before the collection's name. A collection's project is kept in its backups.</p>
 
       <h2>Fields</h2>
       <p>A collection is whatever fields you give it, and every field holds plain text of any length. Dates and numbers are typed as text too: <code>1938-03-17</code> sorts in date order, and so does <code>1938-03-17 (approx.)</code>. In Fields you can rename, add, remove and reorder fields, tick which ones are copied into new records, set how many lines each one shows when a record opens, and, under <em>Columns in the list</em>, choose which fields the list shows and in what order, separately from the order of the fields in a record. Column widths follow the contents, so a short field such as Year gets a narrow column. The list remembers how you last sorted it.</p>
