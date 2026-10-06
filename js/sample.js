@@ -1,13 +1,74 @@
-// A small collection to try the program with.
+// A small collection to try the program with: books and journal articles on
+// African politics, each with publication details, keywords and free-form
+// notes, in the shape of the Research notes layout (with PubInfo added). The
+// notes are adapted from a published annotated bibliography.
 export const SAMPLE = {
   name: 'Research Notes',
-  fields: ['Author', 'Title', 'Source', 'Year', 'Keywords', 'Notes'],
+  fields: ['Author', 'Title', 'Year', 'PubInfo', 'Keywords', 'Notes'],
   records: [
-    { Author: 'Hall, Jacquelyn Dowd', Title: 'Like a Family: The Making of a Southern Cotton Mill World', Source: 'University of North Carolina Press', Year: '1987', Keywords: 'labor; textiles; oral history; South', Notes: 'Built from hundreds of interviews with mill workers in the Piedmont.\nGood on family labor and paternalism.' },
-    { Author: 'McPherson, James M.', Title: 'Battle Cry of Freedom: The Civil War Era', Source: 'Oxford University Press', Year: '1988', Keywords: 'Civil War; politics; military', Notes: 'One-volume history. Chapters 1-6 cover the 1850s crisis.' },
-    { Author: 'Ulrich, Laurel Thatcher', Title: 'A Midwife\'s Tale', Source: 'Knopf', Year: '1990', Keywords: 'women; medicine; diaries; Maine', Notes: 'Reads the diary of Martha Ballard, 1785-1812.\n\nUse for the chapter on household economies.' },
-    { Author: 'Cronon, William', Title: 'Changes in the Land: Indians, Colonists, and the Ecology of New England', Source: 'Hill and Wang', Year: '1983', Keywords: 'environment; colonial; New England', Notes: 'Ecological history. Compare with Merchant.' },
-    { Author: 'Foner, Eric', Title: 'Reconstruction: America\'s Unfinished Revolution, 1863-1877', Source: 'Harper & Row', Year: '1988', Keywords: 'Reconstruction; politics; labor; South', Notes: '' },
-    { Author: 'Levine, Lawrence W.', Title: 'Highbrow/Lowbrow', Source: 'Harvard University Press', Year: '1988', Keywords: 'culture; theater; music', Notes: 'Shakespeare as popular entertainment in the 19th century.' },
+    {
+      Author: "Ake, Claude",
+      Title: "The Unique Case of African Democracy",
+      Year: "1993",
+      PubInfo: "International Affairs, vol. 69, no. 2: 239–244",
+      Keywords: "democratization; liberalism; economic rights; community",
+      Notes: "Argues that the broad embrace of democratization in Africa reflects many distinct political agendas. For democracy to thrive in Africa, it must avoid the abstractions of Western liberalism and be grounded in Africans' communal conceptions of politics and their emphasis on concrete economic rights.",
+    },
+    {
+      Author: "Ake, Claude",
+      Title: "Democracy and Development in Africa",
+      Year: "1996",
+      PubInfo: "Washington, DC: Brookings Institution Press",
+      Keywords: "democracy; development; political economy",
+      Notes: "Argues that the main obstacles to economic development in Africa have been political, and that institutionalizing democracy is the only way of ensuring that the pursuit of development is aligned with the well-being of the population.\n\nCompare Bates on the politics behind economically damaging policies.",
+    },
+    {
+      Author: "Mamdani, Mahmood",
+      Title: "Citizen and Subject: Contemporary Africa and the Legacy of Late Colonialism",
+      Year: "1996",
+      PubInfo: "Princeton, NJ: Princeton University Press",
+      Keywords: "colonial legacy; customary law; citizenship; civil society",
+      Notes: "Analyzes the institutional legacy of late colonialism in Africa. Portrays the colonial state as bifurcated between urban areas governed by civil law that protected the rights of citizens and rural areas governed by customary law that enforced tradition on subjects. Argues that postcolonial societies bear the imprint of this pattern, which fragments civil society and complicates democratization.",
+    },
+    {
+      Author: "Mamdani, Mahmood",
+      Title: "Beyond Settler and Native as Political Identities: Overcoming the Political Legacy of Colonialism",
+      Year: "2001",
+      PubInfo: "Comparative Studies in Society and History, vol. 43, no. 4: 651–664",
+      Keywords: "colonial legacy; indigeneity; citizenship; land; conflict",
+      Notes: "Analyzes the legacy of colonial institutions for political identities in Africa. Argues that colonialism politicized indigeneity (favoring settler over native) and that conflict continues in these terms but with the tables turned (favoring native over settler). Claims of ethnic indigeneity proliferate in political battles, from local conflict over land to national conflict over citizenship.\n\nBuilds on Citizen and Subject (1996).",
+    },
+    {
+      Author: "Bates, Robert H.",
+      Title: "Markets and States in Tropical Africa: The Political Basis of Agricultural Policies",
+      Year: "1981",
+      PubInfo: "Berkeley: University of California Press",
+      Keywords: "agriculture; markets; urban bias; political economy",
+      Notes: "Analyzes the political incentives behind economically damaging market interventions in Africa. Argues it is politically rational for governments to adopt policies that systematically disadvantage rural farmers and favor politically pivotal urban dwellers, even if the result is agricultural stagnation.",
+    },
+    {
+      Author: "Herbst, Jeffrey",
+      Title: "States and Power in Africa: Comparative Lessons in Authority and Control",
+      Year: "2000",
+      PubInfo: "Princeton, NJ: Princeton University Press",
+      Keywords: "state formation; territory; population density; borders",
+      Notes: "Analyzes how political geography has shaped state formation in Africa. Emphasizes the challenges low population density poses for establishing territorial control. Argues that the mismatch between territorial units and state capacity predisposes Africa to state failure.",
+    },
+    {
+      Author: "Bayart, Jean-François",
+      Title: "Africa in the World: A History of Extraversion",
+      Year: "2000",
+      PubInfo: "African Affairs, vol. 99, no. 395: 217–267",
+      Keywords: "extraversion; globalization; international relations",
+      Notes: "Argues that external relations must be central to the conceptualization of the African state. Emphasizes African initiative in the international arena, portraying rulers' strategies in the contemporary era of globalization as part of a long history of purposeful “extraversion,” integral to the pursuit of power and resources.",
+    },
+    {
+      Author: "Berman, Bruce J.",
+      Title: "Ethnicity, Patronage and the African State: The Politics of Uncivil Nationalism",
+      Year: "1998",
+      PubInfo: "African Affairs, vol. 97, no. 388: 305–341",
+      Keywords: "ethnicity; patronage; colonial legacy; reform",
+      Notes: "Analyzes the construction of ethnic identities under colonial rule and their penetration of the postcolonial state. Argues that African politics continues to be characterized by ethnic factionalism and patronage networks, undermining prospects for political and economic reform.\n\nRead alongside Mamdani on how colonial rule shaped ethnic identities.",
+    },
   ],
 };
