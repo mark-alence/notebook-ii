@@ -1,0 +1,5 @@
+# Text files have plain (LF) line ends on every system, so the tests see the
+# same bytes on Windows as elsewhere.
+* text=auto eol=lf
+# A sample of a DOS file: its CR+LF line ends are the point.
+samples/bibliography-dos.txt -text
