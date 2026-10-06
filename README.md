@@ -95,6 +95,8 @@ notes:   notes:*      Notes blank / not blank
 title=the  -title=the Title begins / doesn't begin with "the"
 year>1980  author<=m  begins later / the same or earlier (also < and >=)
 /colou?r/             a regular expression (add c after it to match capitals: /Smith/c)
+/^see /m  /a.*b/s     after it: c matches capitals, m makes ^ $ match each line,
+                      s lets . match line breaks; they combine: /^Smith/cm
 citation:/^CO 9\d/    a regular expression in one field
 @marked  -@marked     records marked with M / not marked
 #127                  record number 127 (Enter opens it)
