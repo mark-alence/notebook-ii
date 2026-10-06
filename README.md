@@ -54,7 +54,7 @@ In the desktop app a project is a folder, as in RStudio. *New project…* asks w
 
 ## Fields
 
-A stack is whatever fields you give it, and every field holds plain text of any length. There are no date or number types: `1938-03-17` sorts in date order as text, and `1938-03-17 (approx.)` still does. A new stack starts from a layout (research notes, archive notes, archive sources, or one field) and opens on **Fields**, where each field has the settings below. Under them, **Columns in the list** sets which fields the list of records shows and in what order (▲ ▼, Remove, Add column), apart from the order of the fields in a record; the first four until changed. Column widths follow the contents: a short field such as Year gets a narrow column and the others share the rest in proportion to how long their entries usually are.
+A stack is whatever fields you give it, and every field holds plain text of any length. There are no date or number types: `1938-03-17` sorts in date order as text, and `1938-03-17 (approx.)` still does. A new stack starts from a layout (research notes, archive notes, archive sources, or one field) and opens on **Fields**, where each field has the settings below. Under them, **Columns in the list** sets which fields the list of records shows and in what order (▲ ▼, Remove, Add column), apart from the order of the fields in a record; a stack made from a layout starts with every field as a column (and a field added later joins them while all are shown); an imported stack starts with the first four. Column widths follow the contents: a short field such as Year gets a narrow column and the others share the rest in proportion to how long their entries usually are.
 
 | Setting | |
 |---|---|

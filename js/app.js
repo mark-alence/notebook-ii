@@ -282,6 +282,13 @@ function readDelim(s) {
     c === 't' ? '\t' : c === 'n' ? '\n' : c === 'f' ? '\f' : c === 'r' ? '\r' : c === '\\' ? '\\' : String.fromCharCode(parseInt(c.slice(1), 16)));
 }
 
+// The sample shows every field in the list, notes included.
+function sampleDb() {
+  const db = databaseFromImport(SAMPLE.name, SAMPLE);
+  setListColumns(db, SAMPLE.fields);
+  return db;
+}
+
 // ---------- navigation ----------
 
 function go(mode) {
@@ -305,7 +312,7 @@ function goBack() {
 const COMMANDS = [
   { id: 'newdb', label: 'New stack', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
   { id: 'openfile', label: 'Open stack file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
-  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openNew(inProject(databaseFromImport(SAMPLE.name, SAMPLE))) },
+  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openNew(inProject(sampleDb())) },
   { id: 'project', label: 'Choose a project', key: 'p', where: ['home'], run: () => $('#projsel')?.focus() },
   { id: 'newproject', label: 'New project…', where: ['home'], run: () => (platform.desktop ? newFolderProject() : newProjectAsk()) },
   { id: 'openproject', label: 'Open project folder…', where: ['home'], desktop: true, run: () => openFolderProject() },
@@ -1792,6 +1799,8 @@ function renderNewDb() {
     const layout = LAYOUTS.find((l) => l.id === form.layout.value) ?? LAYOUTS[0];
     const name = form.name.value.trim() || 'My stack';
     const db = createDatabase(name, layout.fields);
+    // Every field starts as a column in the list; Fields hides any.
+    setListColumns(db, layout.fields.map((f) => f.name));
     if (!platform.desktop) db.project = form.project.value;
     if (platform.desktop && state.folder) {
       const path = await openNew(db);
