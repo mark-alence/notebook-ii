@@ -10,7 +10,7 @@
 //   {#}            the record's position in the output (1, 2, 3 ...)
 //   {Record#}      the record's own number, as 127 (also {Record#:6}), the
 //                  same as the Record# column of an export. A field of the
-//                  collection's own called Record# comes first.
+//                  stack's own called Record# comes first.
 //   {#id}          the record's own number, as #127
 //   [[ ... ]]      a line that is left out when every field in it is empty
 //

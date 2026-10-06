@@ -1,6 +1,6 @@
 // PDF output for Export: pages laid out from the paper size, margins and font
 // size, with the form's header and footer on every page. The text is set in a
-// DejaVu font built into the PDF, so every character in a collection prints
+// DejaVu font built into the PDF, so every character in a stack prints
 // (accents of any language, DOS box lines). The monospace font keeps
 // fixed-width columns ({Field:20}) lined up; the serif and sans-serif ones do
 // not, since their letters differ in width.

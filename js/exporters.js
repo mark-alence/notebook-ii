@@ -1,4 +1,4 @@
-// Write a collection (or a selection of its records) back out as text.
+// Write a stack (or a selection of its records) back out as text.
 
 function quoteCsv(v, delim) {
   return /["\n\r]/.test(v) || v.includes(delim) || /^\s|\s$/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
@@ -73,13 +73,13 @@ export function exportJson(db, records = db.records) {
   return JSON.stringify({ ...db, records }, null, 2);
 }
 
-// A file name made from a collection's (or a form's) name. Letters and digits
+// A file name made from a stack's (or a form's) name. Letters and digits
 // of any alphabet are kept, accents included (written as one character each,
 // NFC, so every system shows them alike); spaces become hyphens; anything else
 // is dropped, which takes care of the characters Windows forbids
 // (\ / : * ? " < > |). Windows' reserved names (CON, NUL, COM1 …) get an
 // underscore, and very long names are cut short.
-export function safeFileName(s, fallback = 'collection') {
+export function safeFileName(s, fallback = 'stack') {
   let name = (s || '').normalize('NFC')
     .replace(/[^\p{L}\p{M}\p{N}_\- ]+/gu, '')
     .trim()

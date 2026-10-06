@@ -1,6 +1,6 @@
 # ThreeByFive
 
-A program for keeping records the way people once kept index cards: research notes, bibliographies, archive sources, or anything else. A **collection** holds **records**; each record has fields you name (Author, Title, Notes …), and every field holds as much text as it needs. Find records by any word, sort them, mark the ones you want, and export them as text, spreadsheets, or PDFs laid out with forms you design. It runs in a web browser or as a desktop app, and works from the keyboard.
+A program for keeping records the way people once kept index cards: research notes, bibliographies, archive sources, or anything else. A **stack** holds **records**; each record has fields you name (Author, Title, Notes …), and every field holds as much text as it needs. Find records by any word, sort them, mark the ones you want, and export them as text, spreadsheets, or PDFs laid out with forms you design. It runs in a web browser or as a desktop app, and works from the keyboard.
 
 ## Running it
 
@@ -12,14 +12,14 @@ npm start            # or: python3 -m http.server 8080
 
 then go to http://localhost:8080. Opening `index.html` straight from disk won't work, because browsers block the JavaScript modules on `file://` pages.
 
-To put it online, turn on GitHub Pages once (Settings > Pages > Source: **GitHub Actions**). After that, `.github/workflows/pages.yml` runs the tests and publishes the app on every push to `main`. Pages for a private repository needs a paid GitHub plan, and the site itself is public. Collections stay in each visitor's own browser and are never uploaded.
+To put it online, turn on GitHub Pages once (Settings > Pages > Source: **GitHub Actions**). After that, `.github/workflows/pages.yml` runs the tests and publishes the app on every push to `main`. Pages for a private repository needs a paid GitHub plan, and the site itself is public. Stacks stay in each visitor's own browser and are never uploaded.
 
-Collections are saved in the browser as you work; see [Keeping your collections safe](#keeping-your-collections-safe).
+Stacks are saved in the browser as you work; see [Keeping your stacks safe](#keeping-your-stacks-safe).
 
 ### As an app
 
-- **Install from the browser.** In Chrome or Edge, open the site and choose *Install* in the address bar (or the ⋮ menu → *Install ThreeByFive*). In Safari on a Mac, *File → Add to Dock*. It then opens in its own window and works without an internet connection. Collections are still kept in that browser.
-- **Desktop app.** A real program for macOS, Windows and Linux, from the repository's *Releases* page. Each collection is a file on your computer (`.3x5`; older `.nb2` files open too), saved as you type, that you can back up, copy or keep in a synced folder like any document; double-clicking one opens it. It has a menu bar (File, Edit, Search, View, Help) alongside the command bar.
+- **Install from the browser.** In Chrome or Edge, open the site and choose *Install* in the address bar (or the ⋮ menu → *Install ThreeByFive*). In Safari on a Mac, *File → Add to Dock*. It then opens in its own window and works without an internet connection. Stacks are still kept in that browser.
+- **Desktop app.** A real program for macOS, Windows and Linux, from the repository's *Releases* page. Each stack is a file on your computer (`.3x5`; older `.nb2` files open too), saved as you type, that you can back up, copy or keep in a synced folder like any document; double-clicking one opens it. It has a menu bar (File, Edit, Search, View, Help) alongside the command bar.
 
 The desktop app is the same code wrapped with [Tauri](https://tauri.app). To build it yourself you need Node 20 and Rust (plus, on Linux, `libwebkit2gtk-4.1-dev`): `npm install`, then `npm run desktop` to run it or `npm run desktop:build` to make an installer. The **Desktop app** workflow on GitHub builds installers for all three systems: run it from the Actions tab, or push a tag such as `v0.2.0`, and a public release appears with the installers attached (tick *draft* when running it to keep the release hidden until you publish it). Raise the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` first, or the build adds to the release of that version. The apps are not code-signed yet, so the first launch shows a warning: on a Mac right-click the app and choose *Open*; on Windows choose *More info* → *Run anyway*.
 
@@ -32,7 +32,7 @@ Every command is on the bar at the bottom of the screen, labelled, with its key 
 | `/`, F or Ctrl+F | Find: the box in the title bar finds records in the list, and text inside the record on a record | N | New record |
 | Click or Enter | Open a record | S | Sort by as many fields as you like |
 | Column heading | Sort by it (again: Z to A, again: date order) | P | Export with a form / PDF |
-| Esc | Back: on a record, stop editing, then back to the list; in the list, close the collection | X / I | Export / Import |
+| Esc | Back: on a record, stop editing, then back to the list; in the list, close the stack | X / I | Export / Import |
 | PgUp / PgDn | Previous / next record (outside a field) | Del | Delete record |
 | Ctrl+D / Ctrl+Shift+D | In a new record: copy previous / copy this field | ? | Help |
 | Tab | Next field (inside a field, arrows and PgUp/PgDn move through the text) | Ctrl+Shift+S | Backup |
@@ -48,13 +48,13 @@ In a new record, **Ctrl+D** copies the source fields (Author, Title, Year and th
 
 ## Projects
 
-A project groups collections, say all those for one book or thesis. On the web page: The **Project** list at the top of the start screen (P) shows one project's collections, the Unfiled ones, or all of them, and is remembered; *New project*, *Rename* and *Delete* sit beside it (deleting a project keeps its collections, as Unfiled). New and imported collections, and the sample, go into the project on screen; a collection moves to another project from its Fields screen. The title bar shows *project › collection*. The project is kept in the collection and its backups.
+A project groups stacks, say all those for one book or thesis. On the web page: The **Project** list at the top of the start screen (P) shows one project's stacks, the Unfiled ones, or all of them, and is remembered; *New project*, *Rename* and *Delete* sit beside it (deleting a project keeps its stacks, as Unfiled). New and imported stacks, and the sample, go into the project on screen; a stack moves to another project from its Fields screen. The title bar shows *project › stack*. The project is kept in the stack and its backups.
 
-In the desktop app a project is a folder, as in RStudio. *New project…* asks where to put it (choose a folder or make one) and makes `backup` and `exported` folders inside; *Open project…* makes any existing folder a project. The project's collections are the `.3x5` files at the top of its folder, and new and imported collections, and the sample, are saved there without a dialog. *Back up a copy* saves a dated copy in `backup`, and Export starts in `exported`. Delete on the start screen moves the file to the Trash. *Remove from list* forgets the project but leaves its folder alone. No marker file is written, so a project folder is just a folder.
+In the desktop app a project is a folder, as in RStudio. *New project…* asks where to put it (choose a folder or make one) and makes `backup` and `exported` folders inside; *Open project…* makes any existing folder a project. The project's stacks are the `.3x5` files at the top of its folder, and new and imported stacks, and the sample, are saved there without a dialog. *Back up a copy* saves a dated copy in `backup`, and Export starts in `exported`. Delete on the start screen moves the file to the Trash. *Remove from list* forgets the project but leaves its folder alone. No marker file is written, so a project folder is just a folder.
 
 ## Fields
 
-A collection is whatever fields you give it, and every field holds plain text of any length. There are no date or number types: `1938-03-17` sorts in date order as text, and `1938-03-17 (approx.)` still does. A new collection starts from a layout (research notes, archive notes, archive sources, or one field) and opens on **Fields**, where each field has the settings below. Under them, **Columns in the list** sets which fields the list of records shows and in what order (▲ ▼, Remove, Add column), apart from the order of the fields in a record; the first four until changed. Column widths follow the contents: a short field such as Year gets a narrow column and the others share the rest in proportion to how long their entries usually are.
+A stack is whatever fields you give it, and every field holds plain text of any length. There are no date or number types: `1938-03-17` sorts in date order as text, and `1938-03-17 (approx.)` still does. A new stack starts from a layout (research notes, archive notes, archive sources, or one field) and opens on **Fields**, where each field has the settings below. Under them, **Columns in the list** sets which fields the list of records shows and in what order (▲ ▼, Remove, Add column), apart from the order of the fields in a record; the first four until changed. Column widths follow the contents: a short field such as Year gets a narrow column and the others share the rest in proportion to how long their entries usually are.
 
 | Setting | |
 |---|---|
@@ -64,7 +64,7 @@ A collection is whatever fields you give it, and every field holds plain text of
 
 Every record has a number of its own, shown as `#127` in the list's first column and at the top of the record. It is given when the record is made and never changes or gets reused, so it can be used to refer to the record. Clicking the `#` heading switches between newest and oldest first.
 
-Unless it is sorted by a field, the list shows the newest records first; *Oldest first* on the Sort screen or in the command list turns it round. The collection remembers its sort and its order; clicking a column heading a third time goes back to date order.
+Unless it is sorted by a field, the list shows the newest records first; *Oldest first* on the Sort screen or in the command list turns it round. The stack remembers its sort and its order; clicking a column heading a third time goes back to date order.
 
 ## Appearance
 
@@ -72,11 +72,11 @@ The word at the right of the title bar, or **Alt+T**, switches the screen betwee
 
 **Appearance** (in the command list, or View → Appearance in the desktop app) sets the font (*Match the theme*, the default: a modern monospace, or the DOS screen font in Retro; or the DOS screen font, sans-serif, serif, or any installed font), text size, line spacing, the screen, where a record's field names go (automatically beside the text when the window shows the whole record and above it otherwise, or always above, or always beside), and how many records the list shows (all by default, or 200, 500 or 1,000 at a time), kept on that computer. Even with all records shown, a list of thousands draws and scrolls quickly: the rows in view are drawn at once and the rest while the computer is idle.
 
-## Keeping your collections safe
+## Keeping your stacks safe
 
-Collections are saved in the browser as you work. They are not on your other devices, and clearing the browser's history or site data deletes them. **Backup** (Ctrl+Shift+S) saves the open collection as a `.3x5.json` file, which Import reads back. The app reminds you when a collection has changed and not been backed up for a week, and asks the browser to keep its storage.
+Stacks are saved in the browser as you work. They are not on your other devices, and clearing the browser's history or site data deletes them. **Backup** (Ctrl+Shift+S) saves the open stack as a `.3x5.json` file, which Import reads back. The app reminds you when a stack has changed and not been backed up for a week, and asks the browser to keep its storage.
 
-Export also writes **vertical text**: each record's fields one after another, short values beside their label and long text below it, records separated by a rule. It is the most readable copy to keep or quote from, and Import reads it back. Exports follow the list's current order and search, or take all records, or the marked ones, or **These record numbers** (`12-40, 55, 500-`). Vertical text, CSV, tab-separated, tagged and custom-delimited exports can include a `Record#` line or column. Importing such a file into a **new** collection keeps the record numbers (if every record has a different one); adding it to an existing collection gives the records new numbers, since the old ones may already be taken. A `Record#` column that cannot be used comes in as an ordinary field, so nothing is lost. Every text export is UTF-8; the custom-delimited one marks line breaks inside a field with `¶`, which Import turns back into line breaks.
+Export also writes **vertical text**: each record's fields one after another, short values beside their label and long text below it, records separated by a rule. It is the most readable copy to keep or quote from, and Import reads it back. Exports follow the list's current order and search, or take all records, or the marked ones, or **These record numbers** (`12-40, 55, 500-`). Vertical text, CSV, tab-separated, tagged and custom-delimited exports can include a `Record#` line or column. Importing such a file into a **new** stack keeps the record numbers (if every record has a different one); adding it to an existing stack gives the records new numbers, since the old ones may already be taken. A `Record#` column that cannot be used comes in as an ordinary field, so nothing is lost. Every text export is UTF-8; the custom-delimited one marks line breaks inside a field with `¶`, which Import turns back into line breaks.
 
 ## Finding records
 
@@ -108,19 +108,19 @@ Search ignores capitals and accents (regular expressions ignore capitals but not
 
 ## Marked records
 
-To collect a hand-picked set, press **M** on a record in the list or on an open record, or click the ✓ column; the title bar counts the marked records. The command list (Ctrl+K) has *Show marked records* (the search `@marked`), *Mark all records in the list*, *Clear all marks* (Shift+M, after asking) and *Delete marked records* (also Del in the list whenever records are marked; the command bar then reads "Delete 3 marked", and an open record's Del still deletes just that one), and Export's Records choice has *The marked*. Marks are saved with the collection and in backups; marking does not change a record's modified date.
+To collect a hand-picked set, press **M** on a record in the list or on an open record, or click the ✓ column; the title bar counts the marked records. The command list (Ctrl+K) has *Show marked records* (the search `@marked`), *Mark all records in the list*, *Clear all marks* (Shift+M, after asking) and *Delete marked records* (also Del in the list whenever records are marked; the command bar then reads "Delete 3 marked", and an open record's Del still deletes just that one), and Export's Records choice has *The marked*. Marks are saved with the stack and in backups; marking does not change a record's modified date.
 
 ## Custom forms and PDFs
 
 **Export → Custom form** (or P) lays records out your own way, with a live preview. A form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{Field:20}` gives exactly 20 characters of it, cut off or padded. `{Record#}` is the record's own number (`127`, or `{Record#:6}` padded to 6 characters), `{#id}` the same as `#127`, and `{#}` the record's place in the output (1, 2, 3 …). A field of your own called Record# takes precedence. A line written as `[[ … ]]` is dropped when all its fields are blank. A name that is not a field stays visible as `{Name}`, so a misspelling shows.
 
-A form can have a page header and footer. In them `{@page}`, `{@pages}`, `{@date}` and `{@time}` give the page number, the number of pages, today's date and the time; the `@` keeps them apart from fields, so `{Date}` is always a field called Date. Forms are saved with the collection.
+A form can have a page header and footer. In them `{@page}`, `{@pages}`, `{@date}` and `{@time}` give the page number, the number of pages, today's date and the time; the `@` keeps them apart from fields, so `{Date}` is always a field called Date. Forms are saved with the stack.
 
 A custom form, or vertical text, is saved either as a text file or as a **PDF**. The PDF is made by the app itself, the same in every browser and in the desktop app: choose A4 or US Letter, a text size and a font (the paper, size, font and the text-or-PDF choice are remembered on that computer), and the pages are laid out to fit, with the header and footer on every page and no record split across pages when it fits on one. The font is built into the PDF, so every character prints: **Monospace** (DejaVu Sans Mono, the default) keeps fixed-width columns and the labels of vertical text lined up; **Serif** (DejaVu Serif) and **Sans-serif** (DejaVu Sans) read more like a book or a modern document, but their letters differ in width, so such columns do not stay lined up. Long lines wrap to the page in any of them, and the preview shows the lines in the chosen font. To print on paper, print the PDF. A text file has no font or pages of its own (the program that opens it decides); it has the header once at the start and the footer once at the end.
 
 ## Importing
 
-**Import** (I) first asks what kind of file to read, then for the file: *Any file* (ThreeByFive works out the kind), a *ThreeByFive collection* (a backup), *Spreadsheet (CSV)*, *Tab-delimited text*, *Tagged text*, *Other delimited text*, *Salvage*, or a *Notebook II database*. A preview follows, where the way the file is read and its delimiters can still be changed, and the records can make a new collection or join the open one.
+**Import** (I) first asks what kind of file to read, then for the file: *Any file* (ThreeByFive works out the kind), a *ThreeByFive stack* (a backup), *Spreadsheet (CSV)*, *Tab-delimited text*, *Tagged text*, *Other delimited text*, *Salvage*, or a *Notebook II database*. A preview follows, where the way the file is read and its delimiters can still be changed, and the records can make a new stack or join the open one.
 
 - **Delimited text.** Fields split by any character (tab, comma, `|`, `~`, `^`, ASCII 30/31 …), records by line breaks or another character, with an optional marker for line breaks inside a field (`¶`, and the DOS `¶`, character 20, are recognized automatically). Quoted CSV works. The import guesses the delimiters and whether the first row holds field names, and you can change them while watching a preview.
 - **Tagged text.** `Field: value` lines, with records separated by blank lines or rule lines (`---`, `***`, form feeds). Indented lines continue the field above. ThreeByFive's own vertical text reads back this way.
@@ -141,7 +141,7 @@ ThreeByFive was inspired by Notebook II, the text database Pro/Tem Software sold
 Plain JavaScript modules, no dependencies.
 
 ```
-js/model.js       collections, fields, records, sorting
+js/model.js       stacks, fields, records, sorting
 js/search.js      the search language
 js/importers.js   Notebook II database, delimited, tagged, JSON and salvage readers
 js/exporters.js   writers
@@ -157,7 +157,7 @@ sw.js             offline copy for the installed web app
 js/app.js         the screen and keys
 ```
 
-Inside the code a collection is still often called a database (`db`), and browser storage keys still begin `nb2:`, so collections made before the rename carry over unchanged.
+Inside the code a stack is still often called a database (`db`), and browser storage keys still begin `nb2:`, so stacks made before the rename carry over unchanged.
 
 `npm test` runs the tests (Node 20 or later). `test/fixtures/native/` holds a small database and print format made with Notebook II 2.31 itself, running in DOSBox; see the format notes for what it contains.
 

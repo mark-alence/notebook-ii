@@ -195,7 +195,7 @@ test('file names keep accented letters and drop what systems forbid', async () =
   assert.equal(safeFileName('a*b?c"d<e>f|g\\h'), 'abcdefgh');
   assert.equal(safeFileName('  Chapter 1 notes  '), 'Chapter-1-notes');
   assert.equal(safeFileName('CON'), 'CON_');
-  assert.equal(safeFileName('???'), 'collection');
-  assert.equal(safeFileName(''), 'collection');
+  assert.equal(safeFileName('???'), 'stack');
+  assert.equal(safeFileName(''), 'stack');
   assert.equal(safeFileName('x'.repeat(300)).length, 100);
 });

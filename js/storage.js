@@ -1,4 +1,4 @@
-// Collections are kept in this browser's local storage. Every change is saved
+// Stacks are kept in this browser's local storage. Every change is saved
 // right away; Export > ThreeByFive file makes a copy you can keep elsewhere.
 import { validateDatabase } from './model.js';
 
@@ -36,7 +36,7 @@ export function saveDb(key, db) {
 
 export function loadDb(key) {
   const raw = localStorage.getItem(PREFIX + key);
-  if (!raw) throw new Error('That collection is no longer in this browser');
+  if (!raw) throw new Error('That stack is no longer in this browser');
   return validateDatabase(JSON.parse(raw));
 }
 
@@ -51,9 +51,9 @@ export function removeDb(key) {
 
 // ---------- projects ----------
 //
-// A project is a name that collections are grouped under (db.project; '' is
+// A project is a name that stacks are grouped under (db.project; '' is
 // "Unfiled"). The names are listed here too, so a project can exist before
-// any collection is in it. The home screen shows one project at a time, or
+// any stack is in it. The home screen shows one project at a time, or
 // all of them ('*').
 
 const PROJECTS = 'nb2:projects';
@@ -77,7 +77,7 @@ function writeProjects(list) {
   }
 }
 
-// Every project name: those made, and those collections are in.
+// Every project name: those made, and those stacks are in.
 export function listProjects() {
   const names = [...storedProjects(), ...listSaved().map((d) => d.project), ...listRecent().map((d) => d.project)].filter(Boolean);
   return [...new Set(names)].sort(collator.compare);
@@ -91,9 +91,9 @@ export function addProject(name) {
   return name;
 }
 
-// Moves every collection kept in the browser from one project to another
-// ('' for Unfiled); collection files in the desktop app change when opened.
-function moveCollections(from, to) {
+// Moves every stack kept in the browser from one project to another
+// ('' for Unfiled); stack files in the desktop app change when opened.
+function moveStacks(from, to) {
   for (const d of listSaved()) {
     if ((d.project ?? '') !== from) continue;
     try {
@@ -101,7 +101,7 @@ function moveCollections(from, to) {
       db.project = to;
       saveDb(d.key, db);
     } catch {
-      // A collection that cannot be read stays where it was.
+      // A stack that cannot be read stays where it was.
     }
   }
 }
@@ -111,15 +111,15 @@ export function renameProject(from, to) {
   if (!to) throw new Error('A project needs a name');
   if (to !== from && listProjects().some((p) => p.toLowerCase() === to.toLowerCase() && p.toLowerCase() !== from.toLowerCase())) throw new Error(`There is already a project called ${to}`);
   writeProjects([...storedProjects().filter((p) => p !== from), to]);
-  moveCollections(from, to);
+  moveStacks(from, to);
   if (currentProject() === from) setCurrentProject(to);
   return to;
 }
 
-// The project's collections become Unfiled; none is deleted.
+// The project's stacks become Unfiled; none is deleted.
 export function removeProject(name) {
   writeProjects(storedProjects().filter((p) => p !== name));
-  moveCollections(name, '');
+  moveStacks(name, '');
   if (currentProject() === name) setCurrentProject('*');
 }
 
@@ -139,8 +139,8 @@ export function setCurrentProject(name) {
   }
 }
 
-// Desktop app: collection files opened recently, newest first. Only the list is
-// kept here; the collections themselves are files on disk.
+// Desktop app: stack files opened recently, newest first. Only the list is
+// kept here; the stacks themselves are files on disk.
 const RECENT = 'nb2:recent';
 
 export function listRecent() {
@@ -169,7 +169,7 @@ export function removeRecent(path) {
   }
 }
 
-// Desktop app: a project is a folder, and its collections are the files in it.
+// Desktop app: a project is a folder, and its stacks are the files in it.
 // Kept here: the project folders used recently (newest first) and the one on
 // the start screen ('' for none).
 const FOLDERS = 'nb2:folders';
