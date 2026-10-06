@@ -104,7 +104,10 @@ export function addField(db, name) {
   if (db.fields.some((f) => f.name.toLowerCase() === name.toLowerCase())) {
     throw new Error(`There is already a field called ${name}`);
   }
+  // A list showing every field goes on showing every field.
+  const showsAll = db.listColumns && db.fields.every((f) => db.listColumns.includes(f.name));
   db.fields.push({ name });
+  if (showsAll) db.listColumns.push(name);
   for (const r of db.records) r.values[name] = '';
   touch(db);
 }
@@ -170,7 +173,8 @@ export function fieldLines(field) {
   return field.lines ?? (LONG.test(field.name) ? 8 : 1);
 }
 
-// Until chosen, the list shows the first four fields.
+// Until chosen, the list shows the first four fields (stacks made from a
+// layout choose all of them).
 export function shownInList(db, field) {
   return field.list ?? db.fields.indexOf(field) < 4;
 }

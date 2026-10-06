@@ -1799,6 +1799,8 @@ function renderNewDb() {
     const layout = LAYOUTS.find((l) => l.id === form.layout.value) ?? LAYOUTS[0];
     const name = form.name.value.trim() || 'My stack';
     const db = createDatabase(name, layout.fields);
+    // Every field starts as a column in the list; Fields hides any.
+    setListColumns(db, layout.fields.map((f) => f.name));
     if (!platform.desktop) db.project = form.project.value;
     if (platform.desktop && state.folder) {
       const path = await openNew(db);

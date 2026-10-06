@@ -4,7 +4,7 @@ import { decodeCp437, encodeCp437, decodeBytes } from '../js/cp437.js';
 import { importFile, parseDelimited, parseTagged, parseSalvage, detectTagged } from '../js/importers.js';
 import { exportDelimited, exportTagged } from '../js/exporters.js';
 import { search, parseQuery, highlightPatterns } from '../js/search.js';
-import { createDatabase, addRecord, sortRecords, renameField, databaseFromImport } from '../js/model.js';
+import { createDatabase, addRecord, sortRecords, renameField, databaseFromImport, addField, setListColumns, listColumns } from '../js/model.js';
 import { renderRecord, wrapLine } from '../js/printform.js';
 
 const enc = (s) => new TextEncoder().encode(s);
@@ -198,4 +198,15 @@ test('file names keep accented letters and drop what systems forbid', async () =
   assert.equal(safeFileName('???'), 'stack');
   assert.equal(safeFileName(''), 'stack');
   assert.equal(safeFileName('x'.repeat(300)).length, 100);
+});
+
+test('a list showing every field takes in a field added later; a chosen list does not', () => {
+  const all = createDatabase('t', ['A', 'B']);
+  setListColumns(all, ['A', 'B']);
+  addField(all, 'C');
+  assert.deepEqual(listColumns(all), ['A', 'B', 'C']);
+  const some = createDatabase('t', ['A', 'B']);
+  setListColumns(some, ['B']);
+  addField(some, 'C');
+  assert.deepEqual(listColumns(some), ['B']);
 });
