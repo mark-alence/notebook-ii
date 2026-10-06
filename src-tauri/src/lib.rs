@@ -4,8 +4,9 @@
 
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::UNIX_EPOCH;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Runtime, State};
 #[cfg(target_os = "macos")]
@@ -45,16 +46,77 @@ async fn pick_open(app: AppHandle, title: String, filters: Vec<Filter>) -> Optio
         .and_then(to_string)
 }
 
+/// directory: the folder the dialog starts in (a project's exported/, say).
 #[tauri::command]
 async fn pick_save(
     app: AppHandle,
     title: String,
     default_name: String,
     filters: Vec<Filter>,
+    directory: Option<String>,
 ) -> Option<String> {
-    with_filters(app.dialog().file().set_title(title).set_file_name(default_name), &filters)
-        .blocking_save_file()
-        .and_then(to_string)
+    let mut dialog = app.dialog().file().set_title(title).set_file_name(default_name);
+    if let Some(dir) = directory {
+        dialog = dialog.set_directory(dir);
+    }
+    with_filters(dialog, &filters).blocking_save_file().and_then(to_string)
+}
+
+/// A project is a folder: the dialog can choose one or make a new one.
+#[tauri::command]
+async fn pick_folder(app: AppHandle, title: String) -> Option<String> {
+    app.dialog().file().set_title(title).blocking_pick_folder().and_then(to_string)
+}
+
+#[derive(Serialize)]
+struct FileEntry {
+    path: String,
+    file: String,
+    /// When the file last changed, in milliseconds since 1970.
+    modified: Option<u64>,
+}
+
+/// The collections in a project: the .3x5 (and older .nb2) files directly in
+/// the folder, not in its subfolders.
+#[tauri::command]
+async fn list_collections(dir: String) -> Result<Vec<FileEntry>, String> {
+    let entries = std::fs::read_dir(&dir).map_err(|e| format!("Could not read the folder {dir}: {e}"))?;
+    let mut files = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let ext = path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase);
+        if !path.is_file() || !matches!(ext.as_deref(), Some("3x5") | Some("nb2")) {
+            continue;
+        }
+        let modified = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64);
+        files.push(FileEntry {
+            file: entry.file_name().to_string_lossy().into_owned(),
+            path: path.to_string_lossy().into_owned(),
+            modified,
+        });
+    }
+    Ok(files)
+}
+
+#[tauri::command]
+async fn make_dir(path: String) -> Result<(), String> {
+    std::fs::create_dir_all(&path).map_err(|e| format!("Could not make the folder {path}: {e}"))
+}
+
+#[tauri::command]
+async fn path_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
+/// To the system Trash / Recycle Bin, where it can still be restored.
+#[tauri::command]
+async fn trash_file(path: String) -> Result<(), String> {
+    trash::delete(&path).map_err(|e| format!("Could not move {path} to the Trash: {e}"))
 }
 
 #[tauri::command]
@@ -107,6 +169,10 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[
             &item("newdb", "New Collection…", Some("CmdOrCtrl+Shift+N"))?,
             &item("open", "Open Collection…", Some("CmdOrCtrl+O"))?,
+            &sep()?,
+            &item("newproject", "New Project…", None)?,
+            &item("openproject", "Open Project…", None)?,
+            &sep()?,
             &item("saveas", "Save Collection As…", None)?,
             &sep()?,
             &item("import", "Import…", None)?,
@@ -198,7 +264,8 @@ pub fn run() {
             let _ = app.emit("menu", event.id().0.as_str());
         })
         .invoke_handler(tauri::generate_handler![
-            pick_open, pick_save, read_text, write_text, write_bytes, launch_file
+            pick_open, pick_save, pick_folder, list_collections, make_dir, path_exists, trash_file,
+            read_text, write_text, write_bytes, launch_file
         ])
         .build(tauri::generate_context!())
         .expect("error while starting ThreeByFive");
