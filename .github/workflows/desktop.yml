@@ -1,11 +1,16 @@
 # Builds the desktop app for macOS, Windows and Linux and attaches the
-# installers to a draft GitHub release. Run it from the Actions tab
-# ("Run workflow"), or push a tag such as v0.2.0. Then open Releases, check the
-# draft and publish it.
+# installers to a public GitHub release named after the version in
+# tauri.conf.json. Run it from the Actions tab ("Run workflow"; tick "draft" to
+# keep the release hidden until you publish it), or push a tag such as v0.2.0.
 name: Desktop app
 
 on:
   workflow_dispatch:
+    inputs:
+      draft:
+        description: Make a draft release, visible only to the repository's owners until published
+        type: boolean
+        default: false
   push:
     tags: ['v*']
 
@@ -55,6 +60,6 @@ jobs:
             - macOS: the .dmg (one build for Apple silicon and Intel). Open it and drag ThreeByFive to Applications. The app is not signed yet, so the first time macOS says it cannot check the developer: choose Done, then in System Settings > Privacy & Security choose Open Anyway (on older macOS, right-click the app and choose Open). After that it opens normally.
             - Windows: the -setup.exe (or the .msi). Windows may say it protected your PC because the publisher is unknown: choose More info, then Run anyway.
             - Linux: on Ubuntu or Debian the .deb: sudo apt install ./ThreeByFive_*_amd64.deb (then start it from the applications menu). On Fedora the .rpm. Anywhere else the .AppImage: make it executable (chmod +x) and run it.
-          releaseDraft: true
+          releaseDraft: ${{ inputs.draft == true }}
           prerelease: false
           args: ${{ matrix.args }}
