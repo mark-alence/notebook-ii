@@ -48,6 +48,10 @@ On a record, the box in the title bar (**Ctrl+F** or `/`) finds text or a `/rege
 
 In a new record, **Ctrl+D** copies the source fields (Author, Title, Year and the like) from the record you were on when you pressed N, so a new record from the same source needs only what is new; **Ctrl+Shift+D** copies just the field the cursor is in. Either asks for an OK before replacing text already in a field. They work only while the new record is open: once you leave it, it is an ordinary record and they are not offered. The line under the fields names the source, e.g. "from #125 (Darnton, Robert)".
 
+## Projects
+
+A project groups collections, say all those for one book or thesis. The **Project** list at the top of the start screen (P) shows one project's collections, the Unfiled ones, or all of them, and is remembered; *New project*, *Rename* and *Delete* sit beside it (deleting a project keeps its collections, as Unfiled). New and imported collections, and the sample, go into the project on screen; a collection moves to another project from its Fields screen. The title bar shows *project › collection*. The project is kept in the collection and its backups. (In the desktop app, projects are to become folders.)
+
 ## Fields
 
 A collection is whatever fields you give it, and every field holds plain text of any length. There are no date or number types: `1938-03-17` sorts in date order as text, and `1938-03-17 (approx.)` still does. A new collection starts from a layout (research notes, archive notes, archive sources, or one field) and opens on **Fields**, where each field has the settings below. Under them, **Columns in the list** sets which fields the list of records shows and in what order (▲ ▼, Remove, Add column), apart from the order of the fields in a record; the first four until changed. Column widths follow the contents: a short field such as Year gets a narrow column and the others share the rest in proportion to how long their entries usually are.

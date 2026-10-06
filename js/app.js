@@ -12,7 +12,7 @@ import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
 import { renderReport, renderBlocks } from './printform.js';
 import { PAPERS, FONT_SIZES, PDF_FONTS, makePdf, previewPdf } from './pdf.js';
-import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent } from './storage.js';
+import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent, listProjects, addProject, renameProject, removeProject, currentProject, setCurrentProject } from './storage.js';
 import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
 import { VERSION } from './version.js';
@@ -39,6 +39,7 @@ const state = {
   viewSnapshot: null, // its values when it was opened, for Revert
   viewIsNew: false,
   editField: 0, // the field that last had the cursor on the record screen
+  project: currentProject(), // the project the home screen shows ('*': all)
   copySource: null, // what copy previous copies from: the record you were on when you pressed N
   formIndex: 0,
   exp: null, // the Export screen's choices, kept while the collection is open
@@ -92,7 +93,7 @@ function writeFile() {
   const text = exportJson(db);
   writing = writing
     .then(() => platform.writeText(path, text))
-    .then(() => addRecent({ path, name: db.name, records: db.records.length, modified: db.modified }))
+    .then(() => addRecent({ path, name: db.name, records: db.records.length, modified: db.modified, project: db.project ?? '' }))
     .catch((e) => say(String(e), true));
   return writing;
 }
@@ -132,7 +133,7 @@ function openDb(db, key = newKey(), path = null) {
   state.copySource = null;
   $('#search').value = '';
   refreshList();
-  if (path) addRecent({ path, name: db.name, records: db.records.length, modified: db.modified });
+  if (path) addRecent({ path, name: db.name, records: db.records.length, modified: db.modified, project: db.project ?? '' });
   else persist();
   platform.setTitle(`${db.name} · ThreeByFive`);
   go('browse');
@@ -281,7 +282,11 @@ function goBack() {
 const COMMANDS = [
   { id: 'newdb', label: 'New collection', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
   { id: 'openfile', label: 'Open collection file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
-  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openDb(databaseFromImport(SAMPLE.name, SAMPLE)) },
+  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openDb(inProject(databaseFromImport(SAMPLE.name, SAMPLE))) },
+  { id: 'project', label: 'Choose a project', key: 'p', where: ['home'], run: () => $('#projsel')?.focus() },
+  { id: 'newproject', label: 'New project…', where: ['home'], run: () => newProjectAsk() },
+  { id: 'renameproject', label: 'Rename this project…', where: ['home'], run: () => renameProjectAsk() },
+  { id: 'deleteproject', label: 'Delete this project (its collections become Unfiled)…', where: ['home'], run: () => deleteProjectAsk() },
   { id: 'open', label: 'Open selected collection', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
   { id: 'deldb', label: 'Delete selected collection', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
 
@@ -366,7 +371,7 @@ function renderTitle() {
     const marked = markedRecords(db).length;
     if (marked) right += ` · ${marked} marked`;
   }
-  $('#title .dbname').textContent = db?.name ?? '';
+  $('#title .dbname').textContent = db ? (db.project ? `${db.project} › ${db.name}` : db.name) : (state.project !== '*' ? projectName(state.project) : '');
   $('#title .count').textContent = right;
   // One box, two jobs: in the list it finds records, on a record it finds
   // text in that record. Each keeps its own words.
@@ -419,7 +424,68 @@ function preview(text, max = 120) {
 // first, then any kept inside the app; on the web, those kept in this browser.
 function homeEntries() {
   const files = platform.desktop ? listRecent().map((r) => ({ ...r, kind: 'file' })) : [];
-  return [...files, ...listSaved().map((d) => ({ ...d, kind: 'app' }))];
+  const all = [...files, ...listSaved().map((d) => ({ ...d, kind: 'app' }))];
+  return state.project === '*' ? all : all.filter((d) => (d.project ?? '') === state.project);
+}
+
+// ---------- projects ----------
+//
+// A project groups collections; the home screen shows one project's, or all.
+// '' is Unfiled, '*' all projects. New and imported collections go into the
+// project on screen.
+
+const projectName = (p) => (p === '*' ? 'All collections' : p || 'Unfiled');
+
+function projectOptions(selected, { all = false } = {}) {
+  const names = listProjects();
+  const opt = (v, label) => `<option value="${esc(v)}" ${v === selected ? 'selected' : ''}>${esc(label)}</option>`;
+  return (all ? opt('*', 'All collections') : '') + names.map((n) => opt(n, n)).join('') + opt('', 'Unfiled');
+}
+
+function inProject(db) {
+  if (state.project !== '*') db.project = state.project;
+  return db;
+}
+
+function chooseProject(p) {
+  state.project = p;
+  setCurrentProject(p);
+  state.homeCursor = 0;
+  render();
+}
+
+async function newProjectAsk() {
+  const name = await ask('Name of the new project:', 'Make project', { input: '' });
+  if (!name) return;
+  try {
+    chooseProject(addProject(name));
+    say(`Project "${name}" made. New collections made here go into it; a collection can be moved on its Fields screen.`);
+  } catch (e) {
+    say(e.message, true);
+  }
+}
+
+async function renameProjectAsk() {
+  const from = state.project;
+  if (from === '*' || from === '') return say('Choose a project to rename first.', true);
+  const to = await ask(`New name for the project "${from}":`, 'Rename', { input: from });
+  if (!to || to === from) return;
+  try {
+    chooseProject(renameProject(from, to));
+    say(`Project renamed to "${to}".`);
+  } catch (e) {
+    say(e.message, true);
+  }
+}
+
+async function deleteProjectAsk() {
+  const name = state.project;
+  if (name === '*' || name === '') return say('Choose a project to delete first.', true);
+  const n = homeEntries().length;
+  if (!(await ask(`Delete the project "${name}"?${n ? ` Its ${n === 1 ? 'collection stays, as Unfiled' : `${n} collections stay, as Unfiled`}.` : ''}`, 'Delete project'))) return;
+  removeProject(name);
+  chooseProject('*');
+  say(`Project "${name}" deleted${n ? '; its collections are now Unfiled' : ''}.`);
 }
 
 // The folder and file name; the full path shows on hover.
@@ -429,25 +495,40 @@ function shortPath(path) {
 }
 
 function renderHome() {
+  // A project remembered from before that no longer exists: show them all.
+  if (state.project !== '*' && state.project !== '' && !listProjects().includes(state.project)) state.project = '*';
   const entries = homeEntries();
+  const all = state.project === '*';
   state.homeCursor = Math.min(state.homeCursor, Math.max(0, entries.length - 1));
   const rows = entries.map((d, i) => `
     <tr data-i="${i}" class="${i === state.homeCursor ? 'cur' : ''}">
-      <td>${esc(d.name)}</td>${platform.desktop ? `<td class="where" title="${esc(d.kind === 'file' ? d.path : '')}">${esc(d.kind === 'file' ? shortPath(d.path) : 'kept in the app')}</td>` : ''}<td class="num">${d.records ?? ''}</td><td>${d.modified ? esc(new Date(d.modified).toLocaleString()) : ''}</td>
+      <td>${esc(d.name)}</td>${all ? `<td>${esc(projectName(d.project ?? ''))}</td>` : ''}${platform.desktop ? `<td class="where" title="${esc(d.kind === 'file' ? d.path : '')}">${esc(d.kind === 'file' ? shortPath(d.path) : 'kept in the app')}</td>` : ''}<td class="num">${d.records ?? ''}</td><td>${d.modified ? esc(new Date(d.modified).toLocaleString()) : ''}</td>
     </tr>`).join('');
   const keep = platform.desktop
     ? `<p class="hint">Each collection is a file on your computer (<code>.3x5</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.</p>`
     : `<p class="warn">Collections are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a collection, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>`;
+  const named = !all && state.project !== '';
   $('#main').innerHTML = `
     <div class="panel home">
-      <h2>${platform.desktop ? 'Recent collections' : 'Collections'}</h2>
-      ${entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th>${platform.desktop ? '<th>File</th>' : ''}<th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <p class="hint">Click a collection to open it, or use ↑ ↓ and Enter.</p>`
-      : `<p>No collections yet. Press <kbd>N</kbd> to make one, ${platform.desktop ? '<kbd>O</kbd> to open a collection file, ' : ''}<kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample.</p>`}
+      <div class="row projectbar"><label for="projsel">Project</label><select id="projsel">${projectOptions(state.project, { all: true })}</select>
+        <button type="button" id="newproj">New project</button>
+        ${named ? '<button type="button" id="renproj">Rename</button><button type="button" id="delproj">Delete</button>' : ''}</div>
+      <h2>${esc(all ? (platform.desktop ? 'Recent collections' : 'Collections') : projectName(state.project))}</h2>
+      ${entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th>${all ? '<th>Project</th>' : ''}${platform.desktop ? '<th>File</th>' : ''}<th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="hint">Click a collection to open it, or use ↑ ↓ and Enter. <kbd>P</kbd> chooses another project.</p>`
+      : all ? `<p>No collections yet. Press <kbd>N</kbd> to make one, ${platform.desktop ? '<kbd>O</kbd> to open a collection file, ' : ''}<kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample.</p>`
+        : `<p>No collections in ${esc(projectName(state.project))} yet. Press <kbd>N</kbd> to make one here, <kbd>I</kbd> to import one, or choose another project. A collection can also be moved here from its Fields screen.</p>`}
       <p class="hint">Every command is on the bar at the bottom, and <kbd>${esc(keyLabel('Ctrl+k'))}</kbd> lists them all.</p>
       ${keep}
     </div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
+  const sel = $('#projsel');
+  sel.addEventListener('change', () => { chooseProject(sel.value); $('#projsel')?.focus(); });
+  // Esc or Enter in the project list goes back to the collections.
+  sel.addEventListener('keydown', (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); sel.blur(); } });
+  $('#newproj').addEventListener('click', newProjectAsk);
+  $('#renproj')?.addEventListener('click', renameProjectAsk);
+  $('#delproj')?.addEventListener('click', deleteProjectAsk);
 }
 
 function openSaved(i) {
@@ -927,7 +1008,7 @@ function renderFields() {
       })()}
       <p class="hint">The list of records shows these fields as columns, left to right (top to bottom here), in their own order: it need not follow the order of the fields in a record. Widths follow the contents, so a short field such as Year gets a narrow column.</p>
       <h2>Collection name</h2>
-      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Collection name"></div>
+      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Collection name"><label for="dbproject">Project</label><select id="dbproject">${projectOptions(db.project ?? '')}</select></div>
       <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text (a date written <code>1938-03-17</code> sorts in date order, and <code>1938-03-17 (approx.)</code> still does).</p>
       <p class="hint"><strong>Copy into new records</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
@@ -946,6 +1027,7 @@ function renderFields() {
   }));
   $('#addfield').addEventListener('submit', (e) => { e.preventDefault(); done(() => addField(db, e.target.name.value)); });
   $('#dbname').addEventListener('change', (e) => done(() => { db.name = e.target.value.trim() || db.name; }));
+  $('#dbproject').addEventListener('change', (e) => done(() => { db.project = e.target.value; say(`Moved to ${projectName(db.project)}.`); }));
 }
 
 
@@ -1104,6 +1186,9 @@ function finishImport() {
   }
   const db = r.database ? validateDatabase(structuredClone(r.database)) : databaseFromImport(dbName.trim() || 'Imported', r);
   if (r.database && dbName.trim()) db.name = dbName.trim();
+  // A backup keeps its own project unless one is chosen on the home screen.
+  if (!r.database) db.project = '';
+  inProject(db);
   state.imp = null;
   openDb(db);
   say(`Imported ${db.records.length} records${recordNumbersIn(r)?.ids ? ', keeping their record numbers' : ''}.`);
@@ -1458,6 +1543,7 @@ function renderNewDb() {
     <form class="panel" id="newdbform">
       <h2>New collection</h2>
       <div class="row"><label for="nbname">Name</label><input id="nbname" name="name" value="My collection" required></div>
+      <div class="row"><label for="nbproject">Project</label><select id="nbproject" name="project">${projectOptions(state.project === '*' ? '' : state.project)}</select></div>
       <h2>Start with</h2>
       ${LAYOUTS.map((l, i) => `
         <label class="check layout"><input type="radio" name="layout" value="${l.id}" ${i ? '' : 'checked'}>
@@ -1473,6 +1559,7 @@ function renderNewDb() {
     const layout = LAYOUTS.find((l) => l.id === form.layout.value) ?? LAYOUTS[0];
     const name = form.name.value.trim() || 'My collection';
     const db = createDatabase(name, layout.fields);
+    db.project = form.project.value;
     if (platform.desktop) {
       const path = await platform.pickNotebookPath(safeName(name));
       if (!path) return say('Not made: choose where to save the collection file.');
@@ -1793,19 +1880,25 @@ function recordFindKeys(e) {
 
 let asking = null;
 
-function ask(message, yesLabel = 'Yes') {
+// Yes or no; with { input: 'text' } it asks for a line of text instead and
+// gives the text typed (or null when cancelled).
+function ask(message, yesLabel = 'Yes', { input = null } = {}) {
   const box = $('#ask');
+  const field = $('#askinput');
   $('#askmsg').textContent = message;
   $('#askyes').textContent = yesLabel;
+  field.hidden = input === null;
+  field.value = input ?? '';
   box.hidden = false;
   const back = document.activeElement;
-  $('#askno').focus();
+  if (input === null) $('#askno').focus();
+  else { field.focus(); field.select(); }
   return new Promise((resolve) => {
     asking = (answer) => {
       asking = null;
       box.hidden = true;
       back?.focus?.();
-      resolve(answer);
+      resolve(input === null ? answer : answer ? field.value.trim() || null : null);
     };
   });
 }
@@ -1815,6 +1908,14 @@ $('#askno').addEventListener('click', () => asking?.(false));
 document.addEventListener('keydown', (e) => {
   if (!asking) return;
   const k = e.key.toLowerCase();
+  if (e.target === $('#askinput')) {
+    // Typing a name: Enter is OK, Esc cancels, everything else is text.
+    if (k === 'enter') { e.preventDefault(); asking(true); }
+    else if (k === 'escape') { e.preventDefault(); asking(false); }
+    else if (k === 'tab') { e.preventDefault(); $('#askyes').focus(); }
+    e.stopImmediatePropagation();
+    return;
+  }
   if (k === 'escape' || k === 'n') { e.preventDefault(); asking(false); }
   else if (k === 'y') { e.preventDefault(); asking(true); }
   else if (k === 'tab') { e.preventDefault(); (document.activeElement === $('#askno') ? $('#askyes') : $('#askno')).focus(); }
