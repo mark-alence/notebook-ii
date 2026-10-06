@@ -73,6 +73,23 @@ export function exportJson(db, records = db.records) {
   return JSON.stringify({ ...db, records }, null, 2);
 }
 
+// A file name made from a collection's (or a form's) name. Letters and digits
+// of any alphabet are kept, accents included (written as one character each,
+// NFC, so every system shows them alike); spaces become hyphens; anything else
+// is dropped, which takes care of the characters Windows forbids
+// (\ / : * ? " < > |). Windows' reserved names (CON, NUL, COM1 …) get an
+// underscore, and very long names are cut short.
+export function safeFileName(s, fallback = 'collection') {
+  let name = (s || '').normalize('NFC')
+    .replace(/[^\p{L}\p{M}\p{N}_\- ]+/gu, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100);
+  if (/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(name)) name += '_';
+  return name || fallback;
+}
+
 // Every text export is UTF-8.
 export function toBytes(text) {
   return new TextEncoder().encode(text);

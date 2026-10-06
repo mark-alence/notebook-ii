@@ -173,3 +173,17 @@ test('own-delimiter export: line breaks as ¶, read back by Import', () => {
   const back = importFile(new TextEncoder().encode(text));
   assert.deepEqual(back.records, [{ Title: 'One', Notes: 'first line\nsecond line' }, { Title: 'Two', Notes: 'x' }]);
 });
+
+test('file names keep accented letters and drop what systems forbid', async () => {
+  const { safeFileName } = await import('../js/exporters.js');
+  assert.equal(safeFileName('Café notes'), 'Café-notes');
+  assert.equal(safeFileName('Café notes'), 'Café-notes'); // é typed as e + accent: one character
+  assert.equal(safeFileName('Müller & Søn: Brief 1938/39'), 'Müller-Søn-Brief-193839');
+  assert.equal(safeFileName('Записки, Ελληνικά'), 'Записки-Ελληνικά');
+  assert.equal(safeFileName('a*b?c"d<e>f|g\\h'), 'abcdefgh');
+  assert.equal(safeFileName('  Chapter 1 notes  '), 'Chapter-1-notes');
+  assert.equal(safeFileName('CON'), 'CON_');
+  assert.equal(safeFileName('???'), 'collection');
+  assert.equal(safeFileName(''), 'collection');
+  assert.equal(safeFileName('x'.repeat(300)).length, 100);
+});
