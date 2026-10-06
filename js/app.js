@@ -510,6 +510,11 @@ function renderHome() {
   const named = !all && state.project !== '';
   $('#main').innerHTML = `
     <div class="panel home">
+      <header class="intro">
+        <h1><svg class="introcard" viewBox="7 17 50 30" aria-hidden="true"><rect x="7" y="17" width="50" height="30" rx="1.5" fill="#fbf8ef"/><path d="M7 23.5h50" stroke="#d64545" stroke-width="1.6"/><path d="M11 29.5h42M11 35h42M11 40.5h30" stroke="#6f97c9" stroke-width="1.2"/></svg>ThreeByFive</h1>
+        <p>Records with fields you name, each holding as much text as it needs, like a box of index cards. Group collections into projects, find and sort records, mark the ones you want, and export them as text, spreadsheets or PDFs.</p>
+        <p class="hint keys">${[['N', 'new collection'], ...(platform.desktop ? [['O', 'open a collection file']] : []), ['I', 'import'], ['S', 'try a sample'], ['?', 'help'], [keyLabel('Ctrl+k'), 'every command']].map(([k, l]) => `<span><kbd>${esc(k)}</kbd> ${l}</span>`).join(' ')}</p>
+      </header>
       <div class="row projectbar"><label for="projsel">Project</label><select id="projsel">${projectOptions(state.project, { all: true })}</select>
         <button type="button" id="newproj">New project</button>
         ${named ? '<button type="button" id="renproj">Rename</button><button type="button" id="delproj">Delete</button>' : ''}</div>
@@ -518,7 +523,6 @@ function renderHome() {
         <p class="hint">Click a collection to open it, or use ↑ ↓ and Enter. <kbd>P</kbd> chooses another project.</p>`
       : all ? `<p>No collections yet. Press <kbd>N</kbd> to make one, ${platform.desktop ? '<kbd>O</kbd> to open a collection file, ' : ''}<kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample.</p>`
         : `<p>No collections in ${esc(projectName(state.project))} yet. Press <kbd>N</kbd> to make one here, <kbd>I</kbd> to import one, or choose another project. A collection can also be moved here from its Fields screen.</p>`}
-      <p class="hint">Every command is on the bar at the bottom, and <kbd>${esc(keyLabel('Ctrl+k'))}</kbd> lists them all.</p>
       ${keep}
     </div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
