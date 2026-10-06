@@ -1,6 +1,6 @@
 //! The desktop shell around the web app in ../js. It adds what a browser page
-//! cannot do: native open and save dialogs, reading and writing collection files
-//! on disk, a menu bar, and opening a collection file that was double-clicked.
+//! cannot do: native open and save dialogs, reading and writing stack files
+//! on disk, a menu bar, and opening a stack file that was double-clicked.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -19,7 +19,7 @@ struct Filter {
     extensions: Vec<String>,
 }
 
-/// A collection file given on the command line (or by the file manager), handed
+/// A stack file given on the command line (or by the file manager), handed
 /// to the page once when it asks.
 #[derive(Default)]
 struct LaunchFile(Mutex<Option<String>>);
@@ -80,10 +80,10 @@ struct FileEntry {
     modified: Option<u64>,
 }
 
-/// The collections in a project: the .3x5 (and older .nb2) files directly in
+/// The stacks in a project: the .3x5 (and older .nb2) files directly in
 /// the folder, not in its subfolders.
 #[tauri::command]
-async fn list_collections(dir: String) -> Result<Vec<FileEntry>, String> {
+async fn list_stacks(dir: String) -> Result<Vec<FileEntry>, String> {
     let entries = std::fs::read_dir(&dir).map_err(|e| format!("Could not read the folder {dir}: {e}"))?;
     let mut files = Vec::new();
     for entry in entries.flatten() {
@@ -129,7 +129,7 @@ async fn read_text(path: String) -> Result<String, String> {
 }
 
 /// Writes next to the target and renames over it, so the file on disk is
-/// always either the old collection or the new one, never half of each.
+/// always either the old stack or the new one, never half of each.
 fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
     let target = PathBuf::from(path);
     let mut tmp = target.clone().into_os_string();
@@ -171,20 +171,20 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "File",
         true,
         &[
-            &item("newdb", "New Collection…", Some("CmdOrCtrl+Shift+N"))?,
-            &item("open", "Open Collection…", Some("CmdOrCtrl+O"))?,
+            &item("newdb", "New Stack…", Some("CmdOrCtrl+Shift+N"))?,
+            &item("open", "Open Stack…", Some("CmdOrCtrl+O"))?,
             &sep()?,
             &item("newproject", "New Project…", None)?,
             &item("openproject", "Open Project…", None)?,
             &sep()?,
-            &item("saveas", "Save Collection As…", None)?,
+            &item("saveas", "Save Stack As…", None)?,
             &item("backup", "Back Up a Copy", None)?,
             &sep()?,
             &item("import", "Import…", None)?,
             &item("export", "Export…", None)?,
             &item("print", "Export with a Form or as PDF…", None)?,
             &sep()?,
-            &item("close", "Close Collection", Some("CmdOrCtrl+W"))?,
+            &item("close", "Close Stack", Some("CmdOrCtrl+W"))?,
             #[cfg(not(target_os = "macos"))]
             &sep()?,
             #[cfg(not(target_os = "macos"))]
@@ -269,7 +269,7 @@ pub fn run() {
             let _ = app.emit("menu", event.id().0.as_str());
         })
         .invoke_handler(tauri::generate_handler![
-            pick_open, pick_save, pick_folder, list_collections, make_dir, path_exists, trash_file,
+            pick_open, pick_save, pick_folder, list_stacks, make_dir, path_exists, trash_file,
             read_text, write_text, write_bytes, launch_file
         ])
         .build(tauri::generate_context!())
@@ -309,9 +309,9 @@ mod tests {
             std::fs::write(dir.join(f), "{}").unwrap();
         }
         std::fs::write(sub.join("old.3x5"), "{}").unwrap();
-        let mut files: Vec<String> = block_on(list_collections(dir.to_string_lossy().into())).unwrap().into_iter().map(|e| e.file).collect();
+        let mut files: Vec<String> = block_on(list_stacks(dir.to_string_lossy().into())).unwrap().into_iter().map(|e| e.file).collect();
         files.sort();
-        assert_eq!(files, ["a.NB2", "b.3x5"]); // only the top of the folder, only collections
+        assert_eq!(files, ["a.NB2", "b.3x5"]); // only the top of the folder, only stacks
         let gone = dir.join("b.3x5");
         block_on(trash_file(gone.to_string_lossy().into())).unwrap();
         assert!(!gone.exists());

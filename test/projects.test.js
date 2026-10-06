@@ -19,7 +19,7 @@ function keep(key, name, project) {
 
 beforeEach(() => store.clear());
 
-test('projects: made empty, or found on collections; collections from before have none', () => {
+test('projects: made empty, or found on stacks; stacks from before have none', () => {
   keep('a', 'Old', undefined);
   keep('b', 'Thesis notes', 'Thesis');
   addProject('Book');
@@ -29,7 +29,7 @@ test('projects: made empty, or found on collections; collections from before hav
   assert.throws(() => addProject('book'), /already a project/);
 });
 
-test('projects: renaming moves the collections; deleting leaves them Unfiled', () => {
+test('projects: renaming moves the stacks; deleting leaves them Unfiled', () => {
   keep('a', 'One', 'Thesis');
   keep('b', 'Two', 'Thesis');
   keep('c', 'Three', 'Book');
@@ -43,7 +43,7 @@ test('projects: renaming moves the collections; deleting leaves them Unfiled', (
   assert.throws(() => renameProject('Dissertation', 'book'), /already a project/);
   removeProject('Dissertation');
   assert.equal(loadDb('a').project, '');
-  assert.equal(listSaved().length, 3); // no collection deleted
+  assert.equal(listSaved().length, 3); // no stack deleted
   assert.deepEqual(listProjects(), ['Book']);
   assert.equal(currentProject(), '*');
 });

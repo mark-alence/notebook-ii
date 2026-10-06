@@ -56,7 +56,7 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseName: ThreeByFive v__VERSION__
           releaseBody: |
-            Desktop installers for ThreeByFive. Collections are .3x5 files (older .nb2 files open too); double-clicking one opens it.
+            Desktop installers for ThreeByFive. Stacks are .3x5 files (older .nb2 files open too); double-clicking one opens it.
             - macOS: the .dmg (one build for Apple silicon and Intel). Open it and drag ThreeByFive to Applications. The app is not signed yet, so the first time macOS says it cannot check the developer: choose Done, then in System Settings > Privacy & Security choose Open Anyway (on older macOS, right-click the app and choose Open). After that it opens normally.
             - Windows: the -setup.exe (or the .msi). Windows may say it protected your PC because the publisher is unknown: choose More info, then Run anyway.
             - Linux: on Ubuntu or Debian the .deb: sudo apt install ./ThreeByFive_*_amd64.deb (then start it from the applications menu). On Fedora the .rpm. Anywhere else the .AppImage: make it executable (chmod +x) and run it.

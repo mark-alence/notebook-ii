@@ -26,8 +26,8 @@ const CTRL = MAC ? '⌘' : 'Ctrl ';
 
 const state = {
   db: null,
-  key: null, // where the collection is kept in browser storage, or null
-  path: null, // desktop app: the collection's file, or null
+  key: null, // where the stack is kept in browser storage, or null
+  path: null, // desktop app: the stack's file, or null
   query: '',
   sortKeys: [],
   list: null, // records shown, after search and sort
@@ -44,7 +44,7 @@ const state = {
   folderList: null, // desktop: { dir, entries } read from that folder
   copySource: null, // what copy previous copies from: the record you were on when you pressed N
   formIndex: 0,
-  exp: null, // the Export screen's choices, kept while the collection is open
+  exp: null, // the Export screen's choices, kept while the stack is open
   imp: null,
   message: '',
   messageIsError: false,
@@ -87,7 +87,7 @@ function persist() {
   }
 }
 
-// Desktop app: the collection is a file, rewritten as it changes. Writes run one
+// Desktop app: the stack is a file, rewritten as it changes. Writes run one
 // after another, so a slow disk never gets them out of order.
 let writing = Promise.resolve();
 function writeFile() {
@@ -121,7 +121,7 @@ function flush() {
 addEventListener('pagehide', flush);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
-// key: the collection's place in browser storage (a new one by default); path:
+// key: the stack's place in browser storage (a new one by default); path:
 // its file, in the desktop app, when it was opened from or saved to one.
 function openDb(db, key = newKey(), path = null) {
   state.db = db;
@@ -139,12 +139,12 @@ function openDb(db, key = newKey(), path = null) {
   else persist();
   platform.setTitle(`${db.name} · ThreeByFive`);
   go('browse');
-  if (!path && platform.desktop) say(`This collection is kept inside the app. Save As (${keyLabel('Ctrl+Shift+s')}) makes it a file you can back up and move.`);
-  else if (!path && needsBackup(db)) say(`This collection has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
+  if (!path && platform.desktop) say(`This stack is kept inside the app. Save As (${keyLabel('Ctrl+Shift+s')}) makes it a file you can back up and move.`);
+  else if (!path && needsBackup(db)) say(`This stack has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
 }
 
 // Without a sort field the list is in the order records were made, newest
-// first unless the collection is set to oldest first.
+// first unless the stack is set to oldest first.
 function setOrder(order) {
   if (state.mode === 'view') go('browse');
   const id = current()?.id;
@@ -156,7 +156,7 @@ function setOrder(order) {
   say(order === 'oldest' ? 'Oldest records first.' : 'Newest records first.');
 }
 
-// The collection remembers its sort; no sort fields means date-entered order.
+// The stack remembers its sort; no sort fields means date-entered order.
 function setSort(keys) {
   state.sortKeys = keys;
   state.db.sortKeys = keys;
@@ -170,14 +170,14 @@ function needsBackup(db) {
   return db.modified > db.lastBackup && Date.now() - Date.parse(db.lastBackup) > WEEK;
 }
 
-// Collections live in this browser's storage, which is lost if the browser's
+// Stacks live in this browser's storage, which is lost if the browser's
 // site data is cleared. A backup is the same file Export > ThreeByFive file
 // makes; Import reads it back.
 async function backupDb() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
   const stamp = new Date().toISOString();
-  const folder = collectionFolder();
+  const folder = stackFolder();
   const saved = folder ? await backupToFolder(folder, stamp) : await download(`${safeFileName(db.name)}-${stamp.slice(0, 10)}${platform.desktop ? '.3x5' : '.3x5.json'}`, toBytes(exportJson(db)), 'application/json');
   if (!saved) return;
   db.lastBackup = stamp;
@@ -186,7 +186,7 @@ async function backupDb() {
   say(folder ? `Copy saved in the project's backup folder as ${platform.fileName(saved)}.` : platform.desktop ? `Copy saved as ${platform.fileName(saved)}.` : 'Backup saved to your downloads. Import reads it back.');
 }
 
-// A collection in a project folder backs up into its backup/ folder, no dialog.
+// A stack in a project folder backs up into its backup/ folder, no dialog.
 async function backupToFolder(folder, stamp) {
   try {
     const dir = platform.joinPath(folder, 'backup');
@@ -209,7 +209,7 @@ async function closeDb() {
   go('home');
 }
 
-// ---------- desktop app: collections as files ----------
+// ---------- desktop app: stacks as files ----------
 
 async function openFile(path = null) {
   try {
@@ -220,7 +220,7 @@ async function openFile(path = null) {
       db = validateDatabase(JSON.parse(await platform.readText(path)));
     } catch (e) {
       if (/read/i.test(String(e))) throw e;
-      throw new Error(`${platform.fileName(path)} is not a ThreeByFive collection. To bring in other files, including Notebook II's own .DAT files, use Import.`);
+      throw new Error(`${platform.fileName(path)} is not a ThreeByFive stack. To bring in other files, including Notebook II's own .DAT files, use Import.`);
     }
     if (state.db) await closeDb();
     // A file in a project folder: the start screen shows that project after.
@@ -233,12 +233,12 @@ async function openFile(path = null) {
   }
 }
 
-// Saves the open collection to a new file and keeps working on that file. A
-// collection that was kept inside the app moves out to the file.
+// Saves the open stack to a new file and keeps working on that file. A
+// stack that was kept inside the app moves out to the file.
 async function saveAs() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
-  const path = await platform.pickNotebookPath(safeFileName(db.name), collectionFolder() ?? (state.folder || null));
+  const path = await platform.pickNotebookPath(safeFileName(db.name), stackFolder() ?? (state.folder || null));
   if (!path) return;
   const oldKey = state.key;
   state.path = path;
@@ -260,7 +260,7 @@ function say(msg, isError = false) {
 // The desktop dialog starts in the project's exported/ folder.
 async function download(name, bytes, type = 'application/octet-stream') {
   try {
-    const folder = collectionFolder();
+    const folder = stackFolder();
     let directory = null;
     if (folder) {
       directory = platform.joinPath(folder, 'exported');
@@ -303,17 +303,17 @@ function goBack() {
 // where: the screens it belongs to; bar: shown on the command bar there.
 
 const COMMANDS = [
-  { id: 'newdb', label: 'New collection', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
-  { id: 'openfile', label: 'Open collection file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
+  { id: 'newdb', label: 'New stack', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
+  { id: 'openfile', label: 'Open stack file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
   { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openNew(inProject(databaseFromImport(SAMPLE.name, SAMPLE))) },
   { id: 'project', label: 'Choose a project', key: 'p', where: ['home'], run: () => $('#projsel')?.focus() },
   { id: 'newproject', label: 'New project…', where: ['home'], run: () => (platform.desktop ? newFolderProject() : newProjectAsk()) },
   { id: 'openproject', label: 'Open project folder…', where: ['home'], desktop: true, run: () => openFolderProject() },
   { id: 'forgetproject', label: 'Remove this project from the list (its folder stays)', where: ['home'], desktop: true, run: () => forgetFolderProject() },
   { id: 'renameproject', label: 'Rename this project…', where: ['home'], web: true, run: () => renameProjectAsk() },
-  { id: 'deleteproject', label: 'Delete this project (its collections become Unfiled)…', where: ['home'], web: true, run: () => deleteProjectAsk() },
-  { id: 'open', label: 'Open selected collection', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
-  { id: 'deldb', label: 'Delete selected collection', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
+  { id: 'deleteproject', label: 'Delete this project (its stacks become Unfiled)…', where: ['home'], web: true, run: () => deleteProjectAsk() },
+  { id: 'open', label: 'Open selected stack', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
+  { id: 'deldb', label: 'Delete selected stack', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
 
   { id: 'back', label: 'Back to the list', key: 'Escape', where: ['view'], bar: true, run: () => go('browse') },
   { id: 'prev', label: 'Previous record', key: 'PageUp', where: ['view'], bar: true, run: () => moveRecord(-1) },
@@ -333,7 +333,7 @@ const COMMANDS = [
   { id: 'fields', label: 'Fields', where: ['browse', 'view'], bar: true, run: () => go('fields') },
   { id: 'import', label: 'Import…', key: 'i', where: ['home', 'browse', 'view'], bar: true, run: () => go('importpick') },
   { id: 'export', label: 'Export', key: 'x', where: ['browse', 'view'], bar: true, run: () => go('export') },
-  { id: 'saveas', label: 'Save collection as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, desktop: true, run: () => saveAs() },
+  { id: 'saveas', label: 'Save stack as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, desktop: true, run: () => saveAs() },
   { id: 'backup', label: platform.desktop ? 'Back up a copy (in a project: to its backup folder)' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
   { id: 'mark', label: 'Mark or unmark this record', key: 'm', where: ['browse', 'view'], run: () => toggleMark() },
   { id: 'showmarked', label: 'Show marked records', where: ['browse', 'view'], run: () => showMarked() },
@@ -341,7 +341,7 @@ const COMMANDS = [
   { id: 'clearmarks', label: 'Clear all marks', key: 'Shift+m', where: ['browse', 'view'], run: () => clearMarks() },
   { id: 'delmarked', label: 'Delete marked records…', where: ['browse', 'view'], run: () => deleteMarked() },
   { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
-  { id: 'close', label: 'Close collection', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
+  { id: 'close', label: 'Close stack', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
   { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'importpick', 'import', 'export', 'help', 'newdb', 'appearance'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
   { id: 'help', label: 'Help', key: '?', where: ['home', 'browse', 'view', 'sort', 'fields', 'importpick', 'import', 'export', 'appearance'], bar: true, run: () => go('help') },
   { id: 'theme', label: 'Light, dark or retro screen', key: 'Alt+t', where: ['*'], run: () => cycleTheme() },
@@ -398,7 +398,7 @@ function renderTitle() {
     if (marked) right += ` · ${marked} marked`;
   }
   $('#title .dbname').textContent = platform.desktop
-    ? (db ? (collectionFolder() ? `${folderName(collectionFolder())} › ${db.name}` : db.name) : state.folder ? folderName(state.folder) : '')
+    ? (db ? (stackFolder() ? `${folderName(stackFolder())} › ${db.name}` : db.name) : state.folder ? folderName(state.folder) : '')
     : db ? (db.project ? `${db.project} › ${db.name}` : db.name) : (state.project !== '*' ? projectName(state.project) : '');
   $('#title .count').textContent = right;
   // One box, two jobs: in the list it finds records, on a record it finds
@@ -446,8 +446,8 @@ function preview(text, max = 120) {
   return one.length > max ? one.slice(0, max - 1) + '…' : one;
 }
 
-// The start screen lists collections: in the desktop app, the files in the
-// project folder, or with no project recent collection files then any kept
+// The start screen lists stacks: in the desktop app, the files in the
+// project folder, or with no project recent stack files then any kept
 // inside the app; on the web, those kept in this browser.
 function homeEntries() {
   if (platform.desktop && state.folder) return (state.folderList?.dir === state.folder && state.folderList.entries) || [];
@@ -458,16 +458,16 @@ function homeEntries() {
 
 // ---------- projects ----------
 //
-// A project groups collections; the home screen shows one project's, or all.
-// '' is Unfiled, '*' all projects. New and imported collections go into the
+// A project groups stacks; the home screen shows one project's, or all.
+// '' is Unfiled, '*' all projects. New and imported stacks go into the
 // project on screen.
 
-const projectName = (p) => (p === '*' ? 'All collections' : p || 'Unfiled');
+const projectName = (p) => (p === '*' ? 'All stacks' : p || 'Unfiled');
 
 function projectOptions(selected, { all = false } = {}) {
   const names = listProjects();
   const opt = (v, label) => `<option value="${esc(v)}" ${v === selected ? 'selected' : ''}>${esc(label)}</option>`;
-  return (all ? opt('*', 'All collections') : '') + names.map((n) => opt(n, n)).join('') + opt('', 'Unfiled');
+  return (all ? opt('*', 'All stacks') : '') + names.map((n) => opt(n, n)).join('') + opt('', 'Unfiled');
 }
 
 function inProject(db) {
@@ -487,7 +487,7 @@ async function newProjectAsk() {
   if (!name) return;
   try {
     chooseProject(addProject(name));
-    say(`Project "${name}" made. New collections made here go into it; a collection can be moved on its Fields screen.`);
+    say(`Project "${name}" made. New stacks made here go into it; a stack can be moved on its Fields screen.`);
   } catch (e) {
     say(e.message, true);
   }
@@ -510,24 +510,24 @@ async function deleteProjectAsk() {
   const name = state.project;
   if (name === '*' || name === '') return say('Choose a project to delete first.', true);
   const n = homeEntries().length;
-  if (!(await ask(`Delete the project "${name}"?${n ? ` Its ${n === 1 ? 'collection stays, as Unfiled' : `${n} collections stay, as Unfiled`}.` : ''}`, 'Delete project'))) return;
+  if (!(await ask(`Delete the project "${name}"?${n ? ` Its ${n === 1 ? 'stack stays, as Unfiled' : `${n} stacks stay, as Unfiled`}.` : ''}`, 'Delete project'))) return;
   removeProject(name);
   chooseProject('*');
-  say(`Project "${name}" deleted${n ? '; its collections are now Unfiled' : ''}.`);
+  say(`Project "${name}" deleted${n ? '; its stacks are now Unfiled' : ''}.`);
 }
 
 // ---------- desktop app: projects are folders ----------
 //
-// As in RStudio, a project is a folder on disk: its collections are the .3x5
-// files at the top of it, and new, imported and sample collections made while
+// As in RStudio, a project is a folder on disk: its stacks are the .3x5
+// files at the top of it, and new, imported and sample stacks made while
 // it is on the start screen are saved there. Backups go to its backup/ folder
 // and exports start in exported/; both are made when needed. Nothing else
 // marks a folder as a project, so any folder can be opened as one.
 
 const folderName = (dir) => platform.fileName(dir.replace(/[\\/]+$/, '')) || dir;
 
-// The project folder the open collection's file is in, if it is in one.
-function collectionFolder() {
+// The project folder the open stack's file is in, if it is in one.
+function stackFolder() {
   if (!platform.desktop || !state.path) return null;
   const dir = platform.dirName(state.path);
   return listFolders().includes(dir) ? dir : null;
@@ -548,7 +548,7 @@ async function uniquePath(dir, base, ext = '.3x5') {
   }
 }
 
-// A new collection (made, imported or the sample): in a project, a new file in
+// A new stack (made, imported or the sample): in a project, a new file in
 // its folder; otherwise as before.
 async function openNew(db) {
   if (!(platform.desktop && state.folder)) return openDb(db);
@@ -564,12 +564,12 @@ async function openNew(db) {
   }
 }
 
-// Reads the collections in a project folder for the start screen.
+// Reads the stacks in a project folder for the start screen.
 async function loadFolder(dir) {
   let entries = [];
   let error = '';
   try {
-    const files = await platform.listCollections(dir);
+    const files = await platform.listStacks(dir);
     entries = await Promise.all(files.map(async (f) => {
       try {
         const db = JSON.parse(await platform.readText(f.path));
@@ -604,14 +604,14 @@ async function newFolderProject() {
     return say(String(e.message ?? e), true);
   }
   await enterFolder(dir);
-  say(`Project ${folderName(dir)} made. New collections are saved in its folder; backups go to backup/ and exports start in exported/.`);
+  say(`Project ${folderName(dir)} made. New stacks are saved in its folder; backups go to backup/ and exports start in exported/.`);
 }
 
 async function openFolderProject() {
   const dir = await platform.pickFolder('Open project folder');
   if (!dir) return;
   await enterFolder(dir);
-  say(`Project ${folderName(dir)}: the collections in ${dir}.`);
+  say(`Project ${folderName(dir)}: the stacks in ${dir}.`);
 }
 
 function forgetFolderProject() {
@@ -633,8 +633,8 @@ function homeIntro() {
   return `
       <header class="intro">
         <h1><svg class="introcard" viewBox="7 17 50 30" aria-hidden="true"><rect x="7" y="17" width="50" height="30" rx="1.5" fill="#fbf8ef"/><path d="M7 23.5h50" stroke="#d64545" stroke-width="1.6"/><path d="M11 29.5h42M11 35h42M11 40.5h30" stroke="#6f97c9" stroke-width="1.2"/></svg>ThreeByFive</h1>
-        <p>Records with fields you name, each holding as much text as it needs, like a collection of index cards. Group collections into projects, find and sort records, mark the ones you want, and export them as text, spreadsheets, or PDFs.</p>
-        <p class="hint keys">${[['N', 'new collection'], ...(platform.desktop ? [['O', 'open a collection file']] : []), ['I', 'import'], ['S', 'try a sample'], ['?', 'help'], [keyLabel('Ctrl+k'), 'every command']].map(([k, l]) => `<span><kbd>${esc(k)}</kbd> ${l}</span>`).join(' ')}</p>
+        <p>Records with fields you name, each holding as much text as it needs, like a stack of index cards. Group stacks into projects, find and sort records, mark the ones you want, and export them as text, spreadsheets, or PDFs.</p>
+        <p class="hint keys">${[['N', 'new stack'], ...(platform.desktop ? [['O', 'open a stack file']] : []), ['I', 'import'], ['S', 'try a sample'], ['?', 'help'], [keyLabel('Ctrl+k'), 'every command']].map(([k, l]) => `<span><kbd>${esc(k)}</kbd> ${l}</span>`).join(' ')}</p>
       </header>`;
 }
 
@@ -658,20 +658,20 @@ function renderDesktopHome() {
   const error = dir && state.folderList?.error;
   $('#main').innerHTML = `
     <div class="panel home">${homeIntro()}
-      <div class="row projectbar"><label for="projsel">Project</label><select id="projsel">${opt('', 'None: recent collections')}${folders.map((p) => opt(p, label(p))).join('')}</select>
+      <div class="row projectbar"><label for="projsel">Project</label><select id="projsel">${opt('', 'None: recent stacks')}${folders.map((p) => opt(p, label(p))).join('')}</select>
         <button type="button" id="newproj">New project…</button><button type="button" id="openproj">Open project…</button>
         ${dir ? '<button type="button" id="forgetproj" title="Take it off this list; the folder and its files stay">Remove from list</button>' : ''}</div>
       ${dir ? `<p class="hint">Folder: ${esc(dir)}</p>` : ''}
-      <h2>${esc(dir ? folderName(dir) : 'Recent collections')}</h2>
+      <h2>${esc(dir ? folderName(dir) : 'Recent stacks')}</h2>
       ${error ? `<p class="warn">${esc(error)}</p>`
       : reading ? '<p class="hint">Reading the folder…</p>'
       : entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th><th>File</th><th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <p class="hint">Click a collection to open it, or use ↑ ↓ and Enter. <kbd>P</kbd> chooses another project.</p>`
-      : dir ? `<p>No collections in this project yet. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import one, or <kbd>S</kbd> to try a sample; each is saved as a file in the project folder.</p>`
-      : `<p>No collections yet. Press <kbd>N</kbd> to make one, <kbd>O</kbd> to open a collection file, <kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample. A project (<em>New project…</em>) keeps a piece of work's collections together in one folder.</p>`}
+        <p class="hint">Click a stack to open it, or use ↑ ↓ and Enter. <kbd>P</kbd> chooses another project.</p>`
+      : dir ? `<p>No stacks in this project yet. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import one, or <kbd>S</kbd> to try a sample; each is saved as a file in the project folder.</p>`
+      : `<p>No stacks yet. Press <kbd>N</kbd> to make one, <kbd>O</kbd> to open a stack file, <kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample. A project (<em>New project…</em>) keeps a piece of work's stacks together in one folder.</p>`}
       <p class="hint">${dir
-        ? 'This project\'s collections are the <code>.3x5</code> files in its folder, saved as you type. <em>Backup</em> saves a dated copy in its <code>backup</code> folder, and exports start in its <code>exported</code> folder.'
-        : 'Each collection is a file on your computer (<code>.3x5</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.'}</p>
+        ? 'This project\'s stacks are the <code>.3x5</code> files in its folder, saved as you type. <em>Backup</em> saves a dated copy in its <code>backup</code> folder, and exports start in its <code>exported</code> folder.'
+        : 'Each stack is a file on your computer (<code>.3x5</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.'}</p>
     </div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
   const sel = $('#projsel');
@@ -694,25 +694,25 @@ function renderHome() {
       <td>${esc(d.name)}</td>${all ? `<td>${esc(projectName(d.project ?? ''))}</td>` : ''}${platform.desktop ? `<td class="where" title="${esc(d.kind === 'file' ? d.path : '')}">${esc(d.kind === 'file' ? shortPath(d.path) : 'kept in the app')}</td>` : ''}<td class="num">${d.records ?? ''}</td><td>${d.modified ? esc(new Date(d.modified).toLocaleString()) : ''}</td>
     </tr>`).join('');
   const keep = platform.desktop
-    ? `<p class="hint">Each collection is a file on your computer (<code>.3x5</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.</p>`
-    : `<p class="warn">Collections are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a collection, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>`;
+    ? `<p class="hint">Each stack is a file on your computer (<code>.3x5</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.</p>`
+    : `<p class="warn">Stacks are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a stack, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>`;
   const named = !all && state.project !== '';
   $('#main').innerHTML = `
     <div class="panel home">${homeIntro()}
       <div class="row projectbar"><label for="projsel">Project</label><select id="projsel">${projectOptions(state.project, { all: true })}</select>
         <button type="button" id="newproj">New project</button>
         ${named ? '<button type="button" id="renproj">Rename</button><button type="button" id="delproj">Delete</button>' : ''}</div>
-      <h2>${esc(all ? (platform.desktop ? 'Recent collections' : 'Collections') : projectName(state.project))}</h2>
+      <h2>${esc(all ? (platform.desktop ? 'Recent stacks' : 'Stacks') : projectName(state.project))}</h2>
       ${entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th>${all ? '<th>Project</th>' : ''}${platform.desktop ? '<th>File</th>' : ''}<th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <p class="hint">Click a collection to open it, or use ↑ ↓ and Enter. <kbd>P</kbd> chooses another project.</p>`
-      : all ? `<p>No collections yet. Press <kbd>N</kbd> to make one, ${platform.desktop ? '<kbd>O</kbd> to open a collection file, ' : ''}<kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample.</p>`
-        : `<p>No collections in ${esc(projectName(state.project))} yet. Press <kbd>N</kbd> to make one here, <kbd>I</kbd> to import one, or choose another project. A collection can also be moved here from its Fields screen.</p>`}
+        <p class="hint">Click a stack to open it, or use ↑ ↓ and Enter. <kbd>P</kbd> chooses another project.</p>`
+      : all ? `<p>No stacks yet. Press <kbd>N</kbd> to make one, ${platform.desktop ? '<kbd>O</kbd> to open a stack file, ' : ''}<kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample.</p>`
+        : `<p>No stacks in ${esc(projectName(state.project))} yet. Press <kbd>N</kbd> to make one here, <kbd>I</kbd> to import one, or choose another project. A stack can also be moved here from its Fields screen.</p>`}
       ${keep}
     </div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
   const sel = $('#projsel');
   sel.addEventListener('change', () => { chooseProject(sel.value); $('#projsel')?.focus(); });
-  // Esc or Enter in the project list goes back to the collections.
+  // Esc or Enter in the project list goes back to the stacks.
   sel.addEventListener('keydown', (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); sel.blur(); } });
   $('#newproj').addEventListener('click', newProjectAsk);
   $('#renproj')?.addEventListener('click', renameProjectAsk);
@@ -735,7 +735,7 @@ function deleteSavedDb() {
   if (!d) return;
   if (d.kind === 'file' && state.folder) {
     const what = d.unreadable ? d.file : `"${d.name}" (${plural(d.records ?? 0, 'record')}, ${d.file})`;
-    ask(`Move the collection ${what} to the Trash? It can be restored from there.`, 'Move to Trash').then(async (yes) => {
+    ask(`Move the stack ${what} to the Trash? It can be restored from there.`, 'Move to Trash').then(async (yes) => {
       if (!yes) return;
       try {
         await platform.trashFile(d.path);
@@ -756,7 +756,7 @@ function deleteSavedDb() {
   }
   const n = d.records ?? 0;
   const where = platform.desktop ? 'the app' : 'this browser';
-  ask(`Delete the collection "${d.name}" and its ${n} record${n === 1 ? '' : 's'} from ${where}? This cannot be undone; backup files are not affected.`, 'Delete').then((yes) => {
+  ask(`Delete the stack "${d.name}" and its ${n} record${n === 1 ? '' : 's'} from ${where}? This cannot be undone; backup files are not affected.`, 'Delete').then((yes) => {
     if (!yes) return;
     removeDb(d.key);
     render();
@@ -823,7 +823,7 @@ function renderBrowse() {
   };
   $('#main').innerHTML = state.list.length
     ? `<div class="browse" role="table" style="--cols: 3ch ${String(Math.max(0, db.nextId - 1)).length + 5}ch ${columnWidths(db, cols)}"><div class="brow bhead" role="row"><span role="columnheader" class="mk" title="Marked records (M marks one; @marked finds them)">✓</span><span role="columnheader" class="num"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></span>${cols.map((c) => `<span role="columnheader"><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></span>`).join('')}</div><div class="bbody" role="rowgroup">${rows}</div></div>${more}`
-    : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This collection is empty. Press <kbd>N</kbd> for a new record or <kbd>I</kbd> to import some.'}</p></div>`;
+    : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This stack is empty. Press <kbd>N</kbd> for a new record or <kbd>I</kbd> to import some.'}</p></div>`;
   const body = $('#main .bbody');
   body?.addEventListener('click', (e) => {
     const tr = e.target.closest('[data-i]');
@@ -1240,8 +1240,8 @@ function renderFields() {
         ${others.length ? `<div class="row"><select id="addcol" aria-label="Field to add as a column">${others.map((n) => `<option>${esc(n)}</option>`).join('')}</select><button type="button" id="addcolbtn">Add column</button></div>` : '<p class="hint">Every field is a column.</p>'}`;
       })()}
       <p class="hint">The list of records shows these fields as columns, left to right (top to bottom here), in their own order: it need not follow the order of the fields in a record. Widths follow the contents, so a short field such as Year gets a narrow column.</p>
-      <h2>Collection name</h2>
-      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Collection name">${platform.desktop ? '' : `<label for="dbproject">Project</label><select id="dbproject">${projectOptions(db.project ?? '')}</select>`}</div>
+      <h2>Stack name</h2>
+      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Stack name">${platform.desktop ? '' : `<label for="dbproject">Project</label><select id="dbproject">${projectOptions(db.project ?? '')}</select>`}</div>
       <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text (a date written <code>1938-03-17</code> sorts in date order, and <code>1938-03-17 (approx.)</code> still does).</p>
       <p class="hint"><strong>Copy into new records</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
@@ -1281,7 +1281,7 @@ function pickFiles(onFiles) {
 // preview screen can still change it). Notebook II's own files come last.
 const IMPORT_KINDS = [
   { id: 'auto', name: 'Any file', about: 'ThreeByFive works out what kind of file it is', opts: {} },
-  { id: 'json', name: 'ThreeByFive collection', about: 'a backup or collection file: .3x5.json or .3x5 (older ones: .nb2.json, .nb2)', opts: { format: 'json' } },
+  { id: 'json', name: 'ThreeByFive stack', about: 'a backup or stack file: .3x5.json or .3x5 (older ones: .nb2.json, .nb2)', opts: { format: 'json' } },
   { id: 'csv', name: 'Spreadsheet (CSV)', about: 'comma-separated, from Excel, Numbers, LibreOffice, R …', opts: { format: 'delimited', fieldDelim: ',' } },
   { id: 'tab', name: 'Tab-delimited text', about: 'one record per line, fields separated by tabs', opts: { format: 'delimited', fieldDelim: '\t' } },
   { id: 'tagged', name: 'Tagged text', about: 'Field: value lines, as in ThreeByFive\'s own vertical text', opts: { format: 'tagged' } },
@@ -1298,7 +1298,7 @@ function renderImportPick() {
       <div class="kinds">${IMPORT_KINDS.map((k, i) => `
         <button type="button" class="kind" data-kind="${i}"><kbd>${i + 1}</kbd> <strong>${esc(k.name)}</strong><br><span class="hint">${esc(k.about)}</span></button>`).join('')}
       </div>
-      ${state.db ? `<p class="hint">Records can go into a new collection or be added to ${esc(state.db.name)}; you choose on the next screen.</p>` : ''}
+      ${state.db ? `<p class="hint">Records can go into a new stack or be added to ${esc(state.db.name)}; you choose on the next screen.</p>` : ''}
     </div>`;
   $$('#importpick [data-kind]').forEach((b) => b.addEventListener('click', () => importKind(+b.dataset.kind)));
   $('#importpick [data-kind]')?.focus();
@@ -1340,7 +1340,7 @@ function renderImport() {
     <div class="panel" id="importer">
       <h2>Import ${esc(imp.name)}</h2>
       <div class="row">
-        <label>Read as</label><select data-opt="format">${fmtSel('auto', 'Detect automatically')}${fmtSel('notebook', 'Notebook II database (.DAT .DEF .IDX)')}${fmtSel('delimited', 'Delimited text')}${fmtSel('tagged', 'Tagged text (Field: value)')}${fmtSel('json', 'ThreeByFive collection (.3x5.json)')}${fmtSel('salvage', 'Salvage: readable text from any file')}</select>
+        <label>Read as</label><select data-opt="format">${fmtSel('auto', 'Detect automatically')}${fmtSel('notebook', 'Notebook II database (.DAT .DEF .IDX)')}${fmtSel('delimited', 'Delimited text')}${fmtSel('tagged', 'Tagged text (Field: value)')}${fmtSel('json', 'ThreeByFive stack (.3x5.json)')}${fmtSel('salvage', 'Salvage: readable text from any file')}</select>
         <label>Characters</label><select data-opt="encoding">${encSel('auto', 'Detect')}${encSel('cp437', 'DOS (code page 437)')}${encSel('utf-8', 'UTF-8')}</select>
       </div>
       ${delimited ? `
@@ -1365,8 +1365,8 @@ function renderImport() {
       </tbody></table></div>
       ${r.records.length > shown.length ? `<p class="hint">First ${shown.length} records shown.</p>` : ''}
       <div class="row target">
-        <label class="check"><input type="radio" name="target" value="new" ${imp.target === 'new' ? 'checked' : ''}> New collection named</label>
-        <input id="newname" value="${esc(imp.dbName)}" aria-label="New collection name">
+        <label class="check"><input type="radio" name="target" value="new" ${imp.target === 'new' ? 'checked' : ''}> New stack named</label>
+        <input id="newname" value="${esc(imp.dbName)}" aria-label="New stack name">
         ${state.db ? `<label class="check"><input type="radio" name="target" value="append" ${imp.target === 'append' ? 'checked' : ''}> Add to ${esc(state.db.name)}</label>` : ''}
       </div>
       ${r.format !== 'salvage' && r.records.length ? '<p class="hint">If the preview looks wrong, change <em>Read as</em> (or the delimiters) above. <em>Salvage</em> there pulls the readable text out of any file, even a damaged one.</p>' : ''}
@@ -1401,7 +1401,7 @@ function importNumbersNote(r) {
   if (!numbers.ids) return `<p class="warn">The ${esc(numbers.field)} column cannot be used as record numbers (${esc(numbers.problem)}), so it comes in as an ordinary field.</p>`;
   const lo = Math.min(...numbers.ids);
   const hi = Math.max(...numbers.ids);
-  return `<p class="hint">The ${esc(numbers.field)} column holds record numbers (#${lo}–#${hi}). A new collection keeps them; records added to an open collection get new numbers, so they cannot clash.</p>`;
+  return `<p class="hint">The ${esc(numbers.field)} column holds record numbers (#${lo}–#${hi}). A new stack keeps them; records added to an open stack get new numbers, so they cannot clash.</p>`;
 }
 
 async function finishImport() {
@@ -1449,7 +1449,7 @@ const EXPORT_GROUPS = [
 const PAGED = ['vertical', 'form']; // formats that can also be a PDF
 const NUMBERED = ['vertical', 'csv', 'tab', 'tagged', 'custom']; // can carry a Record# column
 
-// Export choices kept on this computer for next time (in every collection),
+// Export choices kept on this computer for next time (in every stack),
 // with the values each may take.
 const EXPORT_KEY = 'nb2:export';
 const REMEMBERED = {
@@ -1537,7 +1537,7 @@ function renderExport() {
           ${opt('ids', 'These record numbers…', x.which)}
         </select>
         ${x.which === 'ids' ? `<input name="ids" value="${esc(x.ids)}" placeholder="e.g. 12-40, 55, 500-" size="22" aria-label="Record numbers"> <span id="idcount" class="hint"></span>` : ''}</div>
-        ${NUMBERED.includes(x.format) ? `<div class="row"><label class="check"><input type="checkbox" name="numbers" ${x.numbers ? 'checked' : ''}> <span>Include record numbers (a <code>Record#</code> ${x.format === 'vertical' ? 'line' : 'column'}; importing into a new collection keeps them)</span></label></div>` : ''}
+        ${NUMBERED.includes(x.format) ? `<div class="row"><label class="check"><input type="checkbox" name="numbers" ${x.numbers ? 'checked' : ''}> <span>Include record numbers (a <code>Record#</code> ${x.format === 'vertical' ? 'line' : 'column'}; importing into a new stack keeps them)</span></label></div>` : ''}
         <div class="buttons"><button type="submit">${pdf ? 'Save as PDF' : 'Save file'}</button></div>
         ${isForm ? formEditor(form, pdf) : ''}
         </div>`;
@@ -1769,20 +1769,20 @@ function renderHelp() {
 
 // ---------- commands that need more than one line ----------
 
-// A new collection starts from one of a few layouts, then opens on Fields so the
+// A new stack starts from one of a few layouts, then opens on Fields so the
 // fields can be named and set up before the first record.
 function renderNewDb() {
   $('#main').innerHTML = `
     <form class="panel" id="newdbform">
-      <h2>New collection</h2>
-      <div class="row"><label for="nbname">Name</label><input id="nbname" name="name" value="My collection" required></div>
+      <h2>New stack</h2>
+      <div class="row"><label for="nbname">Name</label><input id="nbname" name="name" value="My stack" required></div>
       ${platform.desktop ? (state.folder ? `<p class="hint">Saved as a file in the project folder ${esc(state.folder)}.</p>` : '') : `<div class="row"><label for="nbproject">Project</label><select id="nbproject" name="project">${projectOptions(state.project === '*' ? '' : state.project)}</select></div>`}
       <h2>Start with</h2>
       ${LAYOUTS.map((l, i) => `
         <label class="check layout"><input type="radio" name="layout" value="${l.id}" ${i ? '' : 'checked'}>
           <span><strong>${esc(l.name)}</strong><br><span class="hint">${l.fields.map((f) => esc(f.name)).join(' · ')}</span></span></label>`).join('')}
       <p class="hint">Every field holds text of any length. You can rename, add, remove and reorder fields on the next screen, and at any time later.</p>
-      <div class="buttons"><button type="submit">Make collection</button></div>
+      <div class="buttons"><button type="submit">Make stack</button></div>
     </form>`;
   const form = $('#newdbform');
   form.name.focus();
@@ -1790,18 +1790,18 @@ function renderNewDb() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const layout = LAYOUTS.find((l) => l.id === form.layout.value) ?? LAYOUTS[0];
-    const name = form.name.value.trim() || 'My collection';
+    const name = form.name.value.trim() || 'My stack';
     const db = createDatabase(name, layout.fields);
     if (!platform.desktop) db.project = form.project.value;
     if (platform.desktop && state.folder) {
       const path = await openNew(db);
       if (!path) return;
       go('fields');
-      return say(`Collection "${name}" made, saved as ${platform.fileName(path)} in the project folder. Set up its fields here, then press Esc to start adding records.`);
+      return say(`Stack "${name}" made, saved as ${platform.fileName(path)} in the project folder. Set up its fields here, then press Esc to start adding records.`);
     }
     if (platform.desktop) {
       const path = await platform.pickNotebookPath(safeFileName(name));
-      if (!path) return say('Not made: choose where to save the collection file.');
+      if (!path) return say('Not made: choose where to save the stack file.');
       if (state.db) await closeDb();
       openDb(db, null, path);
       await writeFile();
@@ -1809,7 +1809,7 @@ function renderNewDb() {
       openDb(db);
     }
     go('fields');
-    say(`Collection "${name}" made. Set up its fields here, then press Esc to start adding records.`);
+    say(`Stack "${name}" made. Set up its fields here, then press Esc to start adding records.`);
   });
 }
 

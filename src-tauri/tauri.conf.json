@@ -41,15 +41,15 @@
     "fileAssociations": [
       {
         "ext": ["3x5"],
-        "name": "ThreeByFive collection",
-        "description": "ThreeByFive collection",
+        "name": "ThreeByFive stack",
+        "description": "ThreeByFive stack",
         "role": "Editor",
         "mimeType": "application/x-threebyfive"
       },
       {
         "ext": ["nb2"],
-        "name": "ThreeByFive collection (older)",
-        "description": "ThreeByFive collection, from before the rename",
+        "name": "ThreeByFive stack (older)",
+        "description": "ThreeByFive stack, from before the rename",
         "role": "Editor",
         "mimeType": "application/x-notebook-ii"
       }

@@ -1,4 +1,4 @@
-// A small collection to try the program with: books and journal articles on
+// A small stack to try the program with: books and journal articles on
 // African politics, each with publication details, keywords and free-form
 // notes, in the shape of the Research notes layout. The notes are adapted
 // from a published annotated bibliography.
