@@ -377,11 +377,9 @@ function renderTitle() {
   if (search.dataset.job !== job) {
     search.dataset.job = job;
     search.value = job === 'record' ? rf.query : state.query;
-    search.placeholder = job === 'record'
-      ? 'Find in this record (/)   text or /regex/   Enter next, Shift+Enter back'
-      : 'Find records (/)   e.g. smith  author:smith  year>1980  /regex/';
     search.setAttribute('aria-label', job === 'record' ? 'Find in this record' : 'Find records');
   }
+  fitSearchHint();
   $('#themebtn').textContent = THEME_NAMES[getTheme()];
 }
 
@@ -824,6 +822,28 @@ function growField(t) {
   t.style.height = `${t.scrollHeight + 2}px`;
 }
 window.addEventListener('resize', () => $$('#recordform textarea').forEach(growField));
+
+// The search box's hint, longest first: it shows the longest that fits the
+// box in its font and size, and the whole of it on hover.
+const SEARCH_HINTS = {
+  list: ['Find records (/)   e.g. smith  author:smith  year>1980  /regex/', 'Find records (/)  smith  author:smith  /regex/', 'Find records (/)  word or /regex/', 'Find (/)  word or /regex/', 'Find records (/)', 'Find'],
+  record: ['Find in this record (/)   text or /regex/   Enter next, Shift+Enter back', 'Find in this record (/)  text or /regex/  Enter: next', 'Find in record (/)  text or /regex/', 'Find (/)  text or /regex/', 'Find in record (/)', 'Find'],
+};
+const hintCanvas = document.createElement('canvas').getContext('2d');
+function fitSearchHint() {
+  const box = $('#search');
+  if (!box || box.hidden) return;
+  const hints = SEARCH_HINTS[box.dataset.job === 'record' ? 'record' : 'list'];
+  const cs = getComputedStyle(box);
+  hintCanvas.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const room = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4;
+  const hint = hints.find((h) => hintCanvas.measureText(h).width <= room) ?? hints[hints.length - 1];
+  if (box.placeholder !== hint) box.placeholder = hint;
+  box.title = hints[0];
+}
+window.addEventListener('resize', fitSearchHint);
+// Fonts load after the first drawing; measure again once they have.
+document.fonts?.ready.then(fitSearchHint);
 
 function revertRecord() {
   const rec = viewed();
@@ -1721,6 +1741,7 @@ function renderAppearance() {
     const size = +form.size.value;
     $('#sizeval').textContent = `${size} px`;
     setAppearance({ font: form.font.value, custom: form.custom.value, size, spacing: form.spacing.value, listRows: +form.listRows.value, labels: form.labels.value });
+    fitSearchHint();
   };
   form.addEventListener('input', (e) => {
     if (e.target.name === 'theme') { setTheme(e.target.value); renderTitle(); return; }
