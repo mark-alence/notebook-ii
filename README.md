@@ -34,7 +34,7 @@ Every command is on the bar at the bottom of the screen, labelled, with its key 
 | `/`, F or Ctrl+F | Find: the box in the title bar finds records in the list, and text inside the record on a record | N | New record |
 | Click or Enter | Open a record | S | Sort by as many fields as you like |
 | Column heading | Sort by it (again: Z to A, again: date order) | P | Export with a form / PDF |
-| Esc | Back: out of a field, the record, the collection | X / I | Export / Import |
+| Esc | Back: on a record, stop editing, then back to the list; in the list, close the collection | X / I | Export / Import |
 | PgUp / PgDn | Previous / next record (outside a field) | Del | Delete record |
 | Ctrl+D / Ctrl+Shift+D | In a new record: copy previous / copy this field | ? | Help |
 | Tab | Next field (inside a field, arrows and PgUp/PgDn move through the text) | Ctrl+Shift+S | Backup |

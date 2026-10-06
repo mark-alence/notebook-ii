@@ -768,7 +768,7 @@ function renderView() {
       ${state.db.fields.map(({ name }, i) => `
         <label class="field"><span class="fname">${esc(name)}</span>
           <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)" style="min-height: calc(${fieldLines(state.db.fields[i])} * var(--lh, 1.4) * 1em + 2px)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
-      <p class="hint">Fields can be any length, and changes are saved as you type. ${copyHint()} <kbd>Tab</kbd> moves between fields, <kbd>Esc</kbd> leaves a field and then goes back to the list.</p>
+      <p class="hint">Fields can be any length, and changes are saved as you type. ${copyHint()} <kbd>Tab</kbd> moves between fields. <kbd>Esc</kbd> stops editing; then <kbd>Esc</kbd> goes back to the list, <kbd>N</kbd> starts a new record, <kbd>PgUp</kbd> <kbd>PgDn</kbd> go to the previous or next record, and <kbd>E</kbd> or <kbd>Enter</kbd> edits again.</p>
       <p class="meta">${recordMeta(rec)}</p>
     </form>`;
   $$('#recordform textarea').forEach((t, i) => {
@@ -2042,7 +2042,7 @@ function onKey(key, e) {
   const modified = key.includes('+');
   if (typing && !modified) {
     if (inRecordField) {
-      if (key === 'Escape') { target.blur(); say('Esc again goes back to the list.'); return; }
+      if (key === 'Escape') { target.blur(); say('Editing stopped. Esc: back to the list · N: new record · PgUp/PgDn: previous/next · E: edit again'); return; }
       return false;
     }
     if (key === 'Escape') return runCommand('dback');
