@@ -345,7 +345,7 @@ body[data-mode="browse"] #main { scroll-padding-top: 1.6em; }
 }
 
 #main .where { color: var(--hint); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.grid tr.cur td.where { color: inherit; }
+#main .grid tr.cur td.where { color: inherit; }
 
 /* ---------- find in a record ---------- */
 

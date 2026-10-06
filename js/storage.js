@@ -168,3 +168,52 @@ export function removeRecent(path) {
     // nothing to do
   }
 }
+
+// Desktop app: a project is a folder, and its collections are the files in it.
+// Kept here: the project folders used recently (newest first) and the one on
+// the start screen ('' for none).
+const FOLDERS = 'nb2:folders';
+const FOLDER = 'nb2:folder';
+
+export function listFolders() {
+  try {
+    return JSON.parse(localStorage.getItem(FOLDERS)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function addFolder(path) {
+  try {
+    localStorage.setItem(FOLDERS, JSON.stringify([path, ...listFolders().filter((p) => p !== path)].slice(0, 20)));
+  } catch {
+    // The list is a convenience; the folder itself is on disk.
+  }
+}
+
+// Only forgets the folder; nothing on disk changes.
+export function removeFolder(path) {
+  try {
+    localStorage.setItem(FOLDERS, JSON.stringify(listFolders().filter((p) => p !== path)));
+    if (currentFolder() === path) setCurrentFolder('');
+  } catch {
+    // nothing to do
+  }
+}
+
+export function currentFolder() {
+  try {
+    const f = localStorage.getItem(FOLDER) ?? '';
+    return listFolders().includes(f) ? f : '';
+  } catch {
+    return '';
+  }
+}
+
+export function setCurrentFolder(path) {
+  try {
+    localStorage.setItem(FOLDER, path);
+  } catch {
+    // Used for this visit only.
+  }
+}

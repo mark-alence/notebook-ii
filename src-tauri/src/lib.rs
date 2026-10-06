@@ -40,8 +40,12 @@ fn to_string(p: tauri_plugin_dialog::FilePath) -> Option<String> {
 }
 
 #[tauri::command]
-async fn pick_open(app: AppHandle, title: String, filters: Vec<Filter>) -> Option<String> {
-    with_filters(app.dialog().file().set_title(title), &filters)
+async fn pick_open(app: AppHandle, title: String, filters: Vec<Filter>, directory: Option<String>) -> Option<String> {
+    let mut dialog = app.dialog().file().set_title(title);
+    if let Some(dir) = directory {
+        dialog = dialog.set_directory(dir);
+    }
+    with_filters(dialog, &filters)
         .blocking_pick_file()
         .and_then(to_string)
 }
@@ -174,6 +178,7 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &item("openproject", "Open Project…", None)?,
             &sep()?,
             &item("saveas", "Save Collection As…", None)?,
+            &item("backup", "Back Up a Copy", None)?,
             &sep()?,
             &item("import", "Import…", None)?,
             &item("export", "Export…", None)?,
