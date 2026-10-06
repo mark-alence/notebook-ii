@@ -1,12 +1,12 @@
 {
-  "name": "Notebook II",
-  "short_name": "Notebook II",
-  "description": "A text database for research notes, in the style of Notebook II from Pro/Tem Software",
+  "name": "ThreeByFive",
+  "short_name": "ThreeByFive",
+  "description": "Records with fields you name, each holding text of any length: research notes, bibliographies, anything you would once have kept on index cards",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0000aa",
-  "theme_color": "#00aaaa",
+  "background_color": "#f7f8fa",
+  "theme_color": "#1f3352",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

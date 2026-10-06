@@ -1,4 +1,4 @@
-// Write a database (or a selection of its records) back out as text.
+// Write a collection (or a selection of its records) back out as text.
 
 function quoteCsv(v, delim) {
   return /["\n\r]/.test(v) || v.includes(delim) || /^\s|\s$/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;

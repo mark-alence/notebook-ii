@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Notebook II",
+  "productName": "ThreeByFive",
   "version": "0.1.0",
-  "identifier": "io.github.markalence.notebookii",
+  "identifier": "io.github.markalence.threebyfive",
   "build": {
     "frontendDist": "../dist",
     "beforeBuildCommand": "node scripts/build-web.mjs",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Notebook II",
+        "title": "ThreeByFive",
         "width": 1100,
         "height": 760,
         "minWidth": 480,
@@ -28,9 +28,9 @@
     "active": true,
     "targets": "all",
     "category": "Productivity",
-    "shortDescription": "A text database for research notes",
-    "longDescription": "Notebook II keeps research notes and bibliographies as records with fields you name, each holding text of any length. It reads databases from the 1980s DOS program of the same name.",
-    "copyright": "Notebook II was a product of Pro/Tem Software, Inc. This is an independent recreation.",
+    "shortDescription": "Records with fields you name, like index cards",
+    "longDescription": "ThreeByFive keeps research notes, bibliographies and anything else you would once have kept on index cards, as records with fields you name, each holding text of any length. It can also import databases from Notebook II, the 1980s DOS program.",
+    "copyright": "ThreeByFive. Notebook II, whose files it imports, was a product of Pro/Tem Software, Inc.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,9 +40,16 @@
     ],
     "fileAssociations": [
       {
+        "ext": ["3x5"],
+        "name": "ThreeByFive collection",
+        "description": "ThreeByFive collection",
+        "role": "Editor",
+        "mimeType": "application/x-threebyfive"
+      },
+      {
         "ext": ["nb2"],
-        "name": "Notebook II notebook",
-        "description": "Notebook II notebook",
+        "name": "ThreeByFive collection (older)",
+        "description": "ThreeByFive collection, from before the rename",
         "role": "Editor",
         "mimeType": "application/x-notebook-ii"
       }

@@ -1,5 +1,5 @@
-// Databases are kept in this browser's local storage. Every change is saved
-// right away; Export > Notebook file makes a copy you can keep elsewhere.
+// Collections are kept in this browser's local storage. Every change is saved
+// right away; Export > ThreeByFive file makes a copy you can keep elsewhere.
 import { validateDatabase } from './model.js';
 
 const INDEX = 'nb2:index';
@@ -36,7 +36,7 @@ export function saveDb(key, db) {
 
 export function loadDb(key) {
   const raw = localStorage.getItem(PREFIX + key);
-  if (!raw) throw new Error('That database is no longer in this browser');
+  if (!raw) throw new Error('That collection is no longer in this browser');
   return validateDatabase(JSON.parse(raw));
 }
 
@@ -49,8 +49,8 @@ export function removeDb(key) {
   }
 }
 
-// Desktop app: notebook files opened recently, newest first. Only the list is
-// kept here; the notebooks themselves are files on disk.
+// Desktop app: collection files opened recently, newest first. Only the list is
+// kept here; the collections themselves are files on disk.
 const RECENT = 'nb2:recent';
 
 export function listRecent() {

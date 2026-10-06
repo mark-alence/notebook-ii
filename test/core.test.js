@@ -163,3 +163,13 @@ test('search: regular expressions, alone, in a field, and mixed with other terms
   assert.throws(() => search(db, '/ab/x'), /Unknown pattern flag/);
   assert.deepEqual(highlightPatterns('/co\\w+/ prices').map((r) => r.source), ['co\\w+', 'prices']);
 });
+
+test('own-delimiter export: line breaks as ¶, read back by Import', () => {
+  const db = createDatabase('t', ['Title', 'Notes']);
+  addRecord(db, { Title: 'One', Notes: 'first line\nsecond line' });
+  addRecord(db, { Title: 'Two', Notes: 'x' });
+  const text = exportDelimited(['Title', 'Notes'], db.records, { fieldDelim: '|', recordDelim: '\n', newlineMarker: '¶', header: true, quote: false });
+  assert.equal(text, 'Title|Notes\nOne|first line¶second line\nTwo|x\n');
+  const back = importFile(new TextEncoder().encode(text));
+  assert.deepEqual(back.records, [{ Title: 'One', Notes: 'first line\nsecond line' }, { Title: 'Two', Notes: 'x' }]);
+});

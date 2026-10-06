@@ -16,7 +16,7 @@ test('header and footer placeholders use @, so fields called Date or Page stay f
   assert.equal(renderRecord('{Date} p.{Page} {Time} {#}', rec, ['Date', 'Page'], { index: 4 }), '1938-03-17 p.12 {Time} 4');
 });
 
-test('old forms get the @ names and keep their text pages', () => {
+test('old forms get the @ names', () => {
   const f = upgradeForm({ name: 'Cards', width: 60, template: '{Date}', header: 'List {Date} {Time} page {Page}', footer: '' });
   assert.equal(f.header, 'List {@date} {@time} page {@page}');
   assert.equal(f.template, '{Date}');
@@ -27,13 +27,10 @@ test('old forms get the @ names and keep their text pages', () => {
   assert.equal(upgradeForm({ ...db.printForms[0], header: 'kept {Page}' }).header, 'kept {Page}'); // already new: untouched
 });
 
-test('a text file has its header and footer once, unless cut into pages', () => {
+test('a text file has its header and footer once', () => {
   const recs = [{ values: { A: 'one' } }, { values: { A: 'two' } }];
   const form = { width: 40, template: '{A}', header: 'Top {@page}/{@pages}', footer: 'Bottom', textPages: false };
   assert.equal(renderReport(form, recs, ['A'], { now }), 'Top 1/1\n\none\n\ntwo\n\nBottom\n');
-  const paged = renderReport({ ...form, textPages: true, pageLines: 10 }, recs, ['A'], { now });
-  assert.equal(paged.split('\n')[0], 'Top 1/1');
-  assert.equal(paged.split('\n').length, 11);
 });
 
 test('PDF layout: real page sizes decide lines and characters', () => {

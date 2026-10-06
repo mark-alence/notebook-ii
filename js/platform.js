@@ -1,13 +1,14 @@
 // What differs between the web page and the desktop app (Tauri). The desktop
-// app keeps each notebook as a file on disk and has native file dialogs and a
-// menu bar; the web page keeps notebooks in browser storage and downloads
+// app keeps each collection as a file on disk and has native file dialogs and a
+// menu bar; the web page keeps collections in browser storage and downloads
 // files. Everything else in the program is the same code.
 const T = globalThis.__TAURI__;
 export const desktop = !!T;
 
 const invoke = (cmd, args) => T.core.invoke(cmd, args);
 
-export const NOTEBOOK_FILTERS = [{ name: 'Notebook', extensions: ['nb2', 'json'] }];
+// .3x5; .nb2 is the same file from before the rename to ThreeByFive.
+export const NOTEBOOK_FILTERS = [{ name: 'ThreeByFive collection', extensions: ['3x5', 'nb2', 'json'] }];
 
 // Save bytes the user asked for (an export, a backup). Web: a download.
 // Desktop: a Save dialog. Returns the path or file name, or null if cancelled.
@@ -29,20 +30,20 @@ export async function saveBytes(name, bytes, type = 'application/octet-stream') 
 }
 
 export async function pickNotebookToOpen() {
-  return invoke('pick_open', { title: 'Open notebook', filters: NOTEBOOK_FILTERS });
+  return invoke('pick_open', { title: 'Open collection', filters: NOTEBOOK_FILTERS });
 }
 
 export async function pickNotebookPath(name) {
-  return invoke('pick_save', { title: 'Save notebook as', defaultName: `${name}.nb2`, filters: NOTEBOOK_FILTERS });
+  return invoke('pick_save', { title: 'Save collection as', defaultName: `${name}.3x5`, filters: NOTEBOOK_FILTERS });
 }
 
 export const readText = (path) => invoke('read_text', { path });
 
 // The desktop side writes to a temporary file and renames it, so a crash or
-// power cut mid-save never leaves half a notebook.
+// power cut mid-save never leaves half a collection.
 export const writeText = (path, text) => invoke('write_text', { path, text });
 
-// A notebook file the app was opened with (double-clicked in the file manager).
+// A collection file the app was opened with (double-clicked in the file manager).
 export const launchFile = () => (desktop ? invoke('launch_file') : Promise.resolve(null));
 
 export function onMenu(handler) {

@@ -1,7 +1,7 @@
 {
   "name": "notebook-ii",
   "version": "0.1.0",
-  "description": "A web recreation of Notebook II, the DOS text database from Pro/Tem Software",
+  "description": "ThreeByFive: records with fields you name, like index cards; imports Notebook II databases",
   "private": true,
   "type": "module",
   "scripts": {

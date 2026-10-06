@@ -54,6 +54,7 @@ test('find in a record: text, patterns, and unfinished patterns', () => {
 test('appearance: CSS for each choice, nothing for the defaults', () => {
   assert.deepEqual(cssVars(DEFAULTS), {});
   assert.match(cssVars({ ...DEFAULTS, font: 'serif' })['--font'], /Georgia/);
+  assert.equal(cssVars({ ...DEFAULTS, font: 'dos' })['--font'], 'var(--dos-font)'); // the theme's own face is the default
   assert.match(cssVars({ ...DEFAULTS, font: 'custom', custom: 'Courier "New"' })['--font'], /^"Courier New", ui-monospace/);
   assert.deepEqual(cssVars({ ...DEFAULTS, font: 'custom', custom: '  ' }), {});
   assert.equal(cssVars({ ...DEFAULTS, size: 99 })['--font-size'], '32px');

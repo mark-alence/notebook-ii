@@ -10,7 +10,7 @@
 //   {#}            the record's position in the output (1, 2, 3 ...)
 //   {Record#}      the record's own number, as 127 (also {Record#:6}), the
 //                  same as the Record# column of an export. A field of the
-//                  notebook's own called Record# comes first.
+//                  collection's own called Record# comes first.
 //   {#id}          the record's own number, as #127
 //   [[ ... ]]      a line that is left out when every field in it is empty
 //
@@ -19,9 +19,8 @@
 //   {@date} {@time}    today's date and the time
 // The @ keeps them apart from fields, which may well be called Date or Page.
 //
-// A PDF always has pages. A text file is one long page unless the form's
-// textPages is set: then it is cut into pages of form.pageLines lines
-// (default 66) separated by form feeds, as Notebook II printed them.
+// A PDF has pages; a text file is one long page, with the header at the start
+// and the footer at the end.
 
 const PLACEHOLDER = /\{([^{}]+)\}/g;
 const PAGE_TOKEN = /\{@(page|pages|date|time)\}/gi;
@@ -114,32 +113,14 @@ export function renderReport(form, records, fields, { title = '', now = new Date
   const blocks = renderBlocks(form, records, fields);
   const header = form.header?.trim() ? form.header : '';
   const footer = form.footer?.trim() ? form.footer : '';
-  if (form.textPages) return pagedText(form, blocks, header, footer, now);
   const head = header ? [fillPageText(header, { now }), ''] : title ? [title, '='.repeat(Math.min(title.length, form.width)), ''] : [];
   const foot = footer ? ['', fillPageText(footer, { now })] : [];
   return [...head, blocks.join('\n\n'), ...foot].join('\n') + '\n';
 }
 
-function pagedText(form, blocks, header, footer, now) {
-  const pageLines = form.pageLines || 66;
-  const head = header ? 2 : 0;
-  const foot = footer ? 2 : 0;
-  const pages = paginateLines(blocks, Math.max(5, pageLines - head - foot));
-  return pages.map((lines, i) => {
-    const at = { page: i + 1, pages: pages.length, now };
-    const out = [];
-    if (head) out.push(fillPageText(header, at), '');
-    out.push(...lines);
-    if (foot) {
-      while (out.length < pageLines - 1) out.push('');
-      out.push(fillPageText(footer, at));
-    }
-    return out.join('\n') + '\n';
-  }).join('\f');
-}
-
 // Forms saved before the @ names used {Page}, {Date} and {Time} in headers
-// and footers, and always cut text into pages when they had either.
+// and footers. textPages (once: cut text files into pages) now only marks a
+// form as already converted.
 export function upgradeForm(form) {
   if (form.textPages !== undefined) return form;
   const old = (t) => (t ?? '').replace(/\{(page|date|time)\}/gi, (_, n) => `{@${n.toLowerCase()}}`);

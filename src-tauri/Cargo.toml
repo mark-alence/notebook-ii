@@ -1,12 +1,12 @@
 [package]
-name = "notebook-ii"
+name = "threebyfive"
 version = "0.1.0"
-description = "Notebook II: a text database for research notes"
+description = "ThreeByFive: records with fields you name, like index cards"
 edition = "2021"
 license = "MIT"
 
 [lib]
-name = "notebook_ii_lib"
+name = "threebyfive_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

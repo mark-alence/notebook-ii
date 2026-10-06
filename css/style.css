@@ -1,8 +1,13 @@
-/* The look of a DOS text-mode program: 16-color VGA palette, one monospace face. */
-/* Dark is the original blue screen. Light keeps the VGA blue for bars and
-   labels on white paper, with VGA brown where dark uses yellow. Components use
-   the role tokens below, never the palette directly. The theme follows the
-   system unless data-theme="light" or "dark" is set on <html>. */
+/* Four looks, chosen with data-theme on <html> (none: follow the computer's
+   light or dark setting). Components use the role tokens (--bg, --label …),
+   never the colors directly.
+   Light: dark navy text and bars on near-white.
+   Dark: for long reading in low light, after current advice on eye strain: a
+     very dark blue rather than pure black (less glare and smearing around
+     letters), off-white rather than pure white text (contrast about 12:1, not
+     21:1), and soft, desaturated accents.
+   Retro: the blue screen of a DOS text-mode program (16-color VGA palette).
+   --font is the face that "Match the theme" (Appearance) uses. */
 :root {
   --blue: #0000aa;
   --navy: #000066;
@@ -11,64 +16,56 @@
   --white: #ffffff;
   --yellow: #ffff55;
   --black: #000000;
-  --brown: #aa5500;
   --dos-font: "Perfect DOS VGA 437", "Px437 IBM VGA 8x16", "IBM Plex Mono", "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
-  --font: var(--dos-font);
+  --modern-font: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --font: var(--modern-font);
 
-  --bg: var(--blue);
-  --fg: var(--gray);
-  --bright: var(--white);
-  --label: var(--yellow);
-  --hint: var(--cyan);
-  --warn: var(--yellow);
-  --focus: var(--yellow);
-  --border: var(--cyan);
-  --bar-bg: var(--cyan);
-  --bar-fg: var(--black);
-  --sel-bg: var(--cyan);
-  --sel-fg: var(--black);
-  --row-hover: var(--navy);
-  --field-bg: var(--navy);
-  --status-bg: var(--navy);
-  --status-fg: var(--white);
-  --keys-bg: var(--black);
-  --key-bg: var(--cyan);
-  --key-fg: var(--black);
-  --kbd-bg: var(--black);
-  --kbd-fg: var(--white);
-  --btn-bg: var(--gray);
-  --btn-fg: var(--black);
-  --btn-border: var(--white);
-  --btn-hover: var(--white);
-  --mark-bg: var(--yellow);
-  --mark-fg: var(--black);
-  --paper-bg: var(--white);
-  --paper-fg: var(--black);
-  color-scheme: dark;
+  --bg: #f7f8fa; --fg: #2b3240; --bright: #0d1320; --label: #1f4e8c; --hint: #0f6b66;
+  --warn: #8a4b0f; --focus: #b5651d; --border: #9aa8bf;
+  --bar-bg: #1f3352; --bar-fg: #ffffff; --sel-bg: #1f4e8c; --sel-fg: #ffffff;
+  --row-hover: #e6ebf3; --field-bg: #ffffff; --status-bg: #e3e8f0; --status-fg: #0d1320;
+  --keys-bg: #1f3352; --key-bg: #e3e8f0; --key-fg: #0d1320; --kbd-bg: #1f3352; --kbd-fg: #ffffff;
+  --btn-bg: #e3e8f0; --btn-fg: #0d1320; --btn-border: #1f3352; --btn-hover: #ffffff;
+  --mark-bg: #ffe27a; --mark-fg: #0d1320;
+  --paper-bg: #ffffff; --paper-fg: #0d1320;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg: #f6f6fb; --fg: #2a2a3a; --bright: #000000; --label: var(--blue); --hint: #006a6a;
-    --warn: var(--brown); --focus: var(--brown); --border: #7a7ab8;
-    --bar-bg: var(--blue); --bar-fg: var(--white); --sel-bg: var(--blue); --sel-fg: var(--white);
-    --row-hover: #e1e1f0; --field-bg: var(--white); --status-bg: #dedeec; --status-fg: var(--black);
-    --keys-bg: var(--blue); --key-bg: #dedeec; --key-fg: var(--black); --kbd-bg: var(--blue); --kbd-fg: var(--white);
-    --btn-bg: #dedeec; --btn-fg: var(--black); --btn-border: var(--blue); --btn-hover: var(--white);
-   
-    --paper-bg: var(--white); --paper-fg: var(--black);
-    color-scheme: light;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0f1420; --fg: #c8d0db; --bright: #e8edf3; --label: #8fb4e8; --hint: #7fb7ad;
+    --warn: #e2bd7a; --focus: #e2bd7a; --border: #33425c;
+    --bar-bg: #172033; --bar-fg: #dbe3ee; --sel-bg: #2b4a78; --sel-fg: #f2f6fb;
+    --row-hover: #172030; --field-bg: #141b2a; --status-bg: #131a28; --status-fg: #c8d0db;
+    --keys-bg: #0b1019; --key-bg: #1c2738; --key-fg: #dbe3ee; --kbd-bg: #2b3a52; --kbd-fg: #e8edf3;
+    --btn-bg: #1f2a3c; --btn-fg: #dbe3ee; --btn-border: #46597a; --btn-hover: #2b3a52;
+    --mark-bg: #c9a24f; --mark-fg: #0f1420;
+    --paper-bg: #161e2d; --paper-fg: #d5dce6;
+    color-scheme: dark;
   }
 }
-:root[data-theme="light"] {
-  --bg: #f6f6fb; --fg: #2a2a3a; --bright: #000000; --label: var(--blue); --hint: #006a6a;
-  --warn: var(--brown); --focus: var(--brown); --border: #7a7ab8;
-  --bar-bg: var(--blue); --bar-fg: var(--white); --sel-bg: var(--blue); --sel-fg: var(--white);
-  --row-hover: #e1e1f0; --field-bg: var(--white); --status-bg: #dedeec; --status-fg: var(--black);
-  --keys-bg: var(--blue); --key-bg: #dedeec; --key-fg: var(--black); --kbd-bg: var(--blue); --kbd-fg: var(--white);
-  --btn-bg: #dedeec; --btn-fg: var(--black); --btn-border: var(--blue); --btn-hover: var(--white);
+:root[data-theme="dark"] {
+  --bg: #0f1420; --fg: #c8d0db; --bright: #e8edf3; --label: #8fb4e8; --hint: #7fb7ad;
+  --warn: #e2bd7a; --focus: #e2bd7a; --border: #33425c;
+  --bar-bg: #172033; --bar-fg: #dbe3ee; --sel-bg: #2b4a78; --sel-fg: #f2f6fb;
+  --row-hover: #172030; --field-bg: #141b2a; --status-bg: #131a28; --status-fg: #c8d0db;
+  --keys-bg: #0b1019; --key-bg: #1c2738; --key-fg: #dbe3ee; --kbd-bg: #2b3a52; --kbd-fg: #e8edf3;
+  --btn-bg: #1f2a3c; --btn-fg: #dbe3ee; --btn-border: #46597a; --btn-hover: #2b3a52;
+  --mark-bg: #c9a24f; --mark-fg: #0f1420;
+  --paper-bg: #161e2d; --paper-fg: #d5dce6;
+  color-scheme: dark;
+}
+:root[data-theme="retro"] {
+  --font: var(--dos-font);
+  --bg: var(--blue); --fg: var(--gray); --bright: var(--white); --label: var(--yellow); --hint: var(--cyan);
+  --warn: var(--yellow); --focus: var(--yellow); --border: var(--cyan);
+  --bar-bg: var(--cyan); --bar-fg: var(--black); --sel-bg: var(--cyan); --sel-fg: var(--black);
+  --row-hover: var(--navy); --field-bg: var(--navy); --status-bg: var(--navy); --status-fg: var(--white);
+  --keys-bg: var(--black); --key-bg: var(--cyan); --key-fg: var(--black); --kbd-bg: var(--black); --kbd-fg: var(--white);
+  --btn-bg: var(--gray); --btn-fg: var(--black); --btn-border: var(--white); --btn-hover: var(--white);
+  --mark-bg: var(--yellow); --mark-fg: var(--black);
   --paper-bg: var(--white); --paper-fg: var(--black);
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -192,6 +189,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .panel { max-width: 110ch; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4em 1ch; margin: 0.5em 0; }
 .row > label:not(.check) { color: var(--label); }
+.kinds { display: grid; gap: 0.4em; max-width: 90ch; margin: 0.5em 0; }
+.kinds .kind { display: block; width: 100%; text-align: left; padding: 0.35em 1ch; }
+.kinds .kind kbd { margin-right: 0.5ch; }
 .check { display: inline-flex; gap: 0.5ch; align-items: center; }
 .buttons { display: flex; flex-wrap: wrap; gap: 1ch; margin: 0.75em 0; }
 td.buttons { margin: 0; flex-wrap: nowrap; }

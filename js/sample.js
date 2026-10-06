@@ -1,4 +1,4 @@
-// A small database to try the program with.
+// A small collection to try the program with.
 export const SAMPLE = {
   name: 'Research Notes',
   fields: ['Author', 'Title', 'Source', 'Year', 'Keywords', 'Notes'],

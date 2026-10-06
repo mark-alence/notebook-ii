@@ -113,18 +113,13 @@ test('native: custom print format (.R00) becomes a print form', () => {
   assert.equal(db.printForms[1].name, 'Standard');
 });
 
-test('print forms: fixed-width fields and pages with header and footer', () => {
+test('print forms: fixed-width fields; a text file has the header and footer once', () => {
   const rec = { values: { Author: 'Davis, Natalie Zemon', Year: '1983' } };
   assert.equal(renderRecord('{#}. {Author:10}|{Year:6}|', rec, ['Author', 'Year']), '1. Davis, Nat|1983  |');
-  const records = [1, 2, 3].map((n) => ({ values: { Author: `A${n}`, Year: '' } }));
-  const out = renderReport({ width: 40, template: '{Author}', header: 'Page {@page}', footer: 'end', pageLines: 10, textPages: true }, records, ['Author', 'Year']);
-  const pages = out.split('\f');
-  assert.equal(pages.length, 1);
-  assert.deepEqual(pages[0].split('\n').slice(0, 7), ['Page 1', '', 'A1', '', 'A2', '', 'A3']);
-  assert.equal(pages[0].split('\n').length, 11); // 10 lines and the final line end
-  const four = [...records, { values: { Author: 'A4', Year: '' } }];
-  const many = renderReport({ width: 40, template: '{Author}', header: 'Page {@page} of {@pages}', pageLines: 6, textPages: true }, four, ['Author', 'Year']);
-  assert.deepEqual(many.split('\f'), ['Page 1 of 2\n\nA1\n\nA2\n\nA3\n', 'Page 2 of 2\n\nA4\n']);
+  const records = [1, 2, 3, 4].map((n) => ({ values: { Author: `A${n}`, Year: '' } }));
+  // Forms imported from Notebook II (textPages, pageLines) no longer cut text into pages.
+  const out = renderReport({ width: 40, template: '{Author}', header: 'Page {@page} of {@pages}', footer: 'end', pageLines: 6, textPages: true }, records, ['Author', 'Year']);
+  assert.equal(out, 'Page 1 of 1\n\nA1\n\nA2\n\nA3\n\nA4\n\nend\n');
 });
 
 test('rename field updates fixed-width placeholders too', () => {

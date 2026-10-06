@@ -3,8 +3,11 @@
 // variables too, so index.html can apply them before the page first draws.
 const KEY = 'nb2:appearance';
 
+// 'theme': the theme's own face (css --font): modern monospace, or the DOS
+// screen font in Retro.
 export const FONTS = [
-  { id: 'dos', name: 'DOS screen', stack: null },
+  { id: 'theme', name: 'Match the theme', stack: null },
+  { id: 'dos', name: 'DOS screen', stack: 'var(--dos-font)' },
   { id: 'mono', name: 'Modern monospace', stack: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' },
   { id: 'sans', name: 'Sans-serif', stack: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' },
   { id: 'serif', name: 'Serif', stack: 'Georgia, Cambria, "Times New Roman", "Liberation Serif", serif' },
@@ -18,11 +21,15 @@ export const LIST_ROWS = [200, 500, 1000, 0];
 // labels: where a record's field names go: 'auto' (beside the text when there
 // is room for it, above it otherwise), 'above' or 'beside'.
 export const LABELS = { auto: 'Automatic', above: 'Always above the text', beside: 'Always beside the text' };
-export const DEFAULTS = { font: 'dos', custom: '', size: null, spacing: 'normal', listRows: 0, labels: 'auto' };
+export const DEFAULTS = { font: 'theme', custom: '', size: null, spacing: 'normal', listRows: 0, labels: 'auto' };
 
 export function getAppearance() {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY))?.settings };
+    const saved = JSON.parse(localStorage.getItem(KEY))?.settings ?? {};
+    // Before version 2 the DOS font was everyone's default, so a saved 'dos'
+    // is most likely just that: it becomes "Match the theme".
+    if (!saved.v && saved.font === 'dos') saved.font = 'theme';
+    return { ...DEFAULTS, ...saved };
   } catch {
     return { ...DEFAULTS };
   }
@@ -32,7 +39,7 @@ export function getAppearance() {
 export function cssVars(a) {
   const vars = {};
   const font = FONTS.find((f) => f.id === a.font);
-  if (a.font === 'custom' && a.custom.trim()) vars['--font'] = `"${a.custom.trim().replace(/["\\]/g, '')}", ${FONTS[1].stack}`;
+  if (a.font === 'custom' && a.custom.trim()) vars['--font'] = `"${a.custom.trim().replace(/["\\]/g, '')}", ${FONTS.find((f) => f.id === 'mono').stack}`;
   else if (font?.stack) vars['--font'] = font.stack;
   if (a.size) vars['--font-size'] = `${Math.max(SIZE.min, Math.min(SIZE.max, Math.round(a.size)))}px`;
   if (a.spacing && a.spacing !== 'normal' && SPACING[a.spacing]) vars['--lh'] = String(SPACING[a.spacing]);
@@ -48,7 +55,7 @@ export function applyAppearance(a = getAppearance()) {
 }
 
 export function setAppearance(changes) {
-  const a = { ...getAppearance(), ...changes };
+  const a = { ...getAppearance(), ...changes, v: 2 };
   try {
     localStorage.setItem(KEY, JSON.stringify({ settings: a, vars: cssVars(a) }));
   } catch {
