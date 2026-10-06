@@ -550,7 +550,14 @@ function deleteSavedDb() {
     render();
     return say(`Removed ${platform.fileName(d.path)} from this list. The file itself is untouched.`);
   }
-  ask(`Delete the collection "${d.name}" from ${platform.desktop ? 'the app' : 'this browser'}? Make a backup first if you want a copy.`, 'Delete').then((yes) => { if (yes) { removeDb(d.key); render(); } });
+  const n = d.records ?? 0;
+  const where = platform.desktop ? 'the app' : 'this browser';
+  ask(`Delete the collection "${d.name}" and its ${n} record${n === 1 ? '' : 's'} from ${where}? This cannot be undone; backup files are not affected.`, 'Delete').then((yes) => {
+    if (!yes) return;
+    removeDb(d.key);
+    render();
+    say(`Deleted "${d.name}".`);
+  });
 }
 
 // Records drawn at a time in the list (Appearance: 200, 500, 1000 or all).
