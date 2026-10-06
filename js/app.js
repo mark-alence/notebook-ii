@@ -1032,8 +1032,8 @@ window.addEventListener('resize', () => $$('#recordform textarea').forEach(growF
 // The search box's hint, longest first: it shows the longest that fits the
 // box in its font and size, and the whole of it on hover.
 const SEARCH_HINTS = {
-  list: ['Find records (/)   e.g. smith  author:smith  year>1980  /regex/', 'Find records (/)  smith  author:smith  /regex/', 'Find records (/)  word or /regex/', 'Find (/)  word or /regex/', 'Find records (/)', 'Find'],
-  record: ['Find in this record (/)   text or /regex/   Enter next, Shift+Enter back', 'Find in this record (/)  text or /regex/  Enter: next', 'Find in record (/)  text or /regex/', 'Find (/)  text or /regex/', 'Find in record (/)', 'Find'],
+  list: ['Find records (/)   e.g. smith  author:smith  year>1980  /regex/', 'Find records (/)  smith  author:smith  /regex/', 'Find records (/)  word or /regex/', 'Find (/)  word or /regex/', 'Find: word or /regex/', 'Find records (/)', 'Find'],
+  record: ['Find in this record (/)   text or /regex/   Enter next, Shift+Enter back', 'Find in this record (/)  text or /regex/  Enter: next', 'Find in record (/)  text or /regex/', 'Find (/)  text or /regex/', 'Find: text or /regex/', 'Find in record (/)', 'Find'],
 };
 const hintCanvas = document.createElement('canvas').getContext('2d');
 function fitSearchHint() {

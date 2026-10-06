@@ -94,11 +94,12 @@ html, body {
 }
 #title .brand { font-weight: bold; }
 #title { align-items: center; }
-#title .dbname { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; padding: 0 1ch; }
+#title .dbname { flex: 0 0 auto; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; padding: 0 1ch; }
 #title .count { margin-left: auto; text-align: right; }
+/* Sized by the window, not the text size: half its width, less if crowded. */
 #search {
-  flex: 1 1 30ch;
-  max-width: 64ch;
+  flex: 0 1 50vw;
+  min-width: 12ch;
   margin: 1px 0;
   border: 0;
   padding: 0 0.5ch;

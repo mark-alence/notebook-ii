@@ -2,8 +2,6 @@
 
 A program for keeping records the way people once kept index cards: research notes, bibliographies, archive sources, or anything else. A **collection** holds **records**; each record has fields you name (Author, Title, Notes …), and every field holds as much text as it needs. Find records by any word, sort them, mark the ones you want, and export them as text, spreadsheets, or PDFs laid out with forms you design. It runs in a web browser or as a desktop app, and works from the keyboard.
 
-ThreeByFive began as a recreation of Notebook II, the text database Pro/Tem Software sold for MS-DOS in the late 1980s, and it still imports Notebook II's files.
-
 ## Running it
 
 It is a static web page with no build step. Serve the folder with any web server and open it:
@@ -129,7 +127,7 @@ A custom form, or vertical text, is saved either as a text file or as a **PDF**.
 
 ### Notebook II files
 
-ThreeByFive reads the files of Notebook II, the DOS program it began as a recreation of.
+ThreeByFive was inspired by Notebook II, the text database Pro/Tem Software sold for MS-DOS in the late 1980s, and it can import Notebook II's files:
 
 - **Notebook II databases.** A database called NAME is several files: choose `NAME.DAT`, `NAME.DEF` and `NAME.IDX` together, plus `NAME.MSC` and any custom print formats (`*.R00`) if you have them. File names can be in any case. Records marked deleted are left out unless you tick *Include records marked deleted* (they then get a `Deleted` field saying `yes`), and print formats become custom forms. `NAME.DAT` on its own is recognized too, but without the `.IDX` every saved copy of an edited record comes in, and without the `.DEF` the fields are called Field 1, Field 2 … The format is described in [docs/notebook-ii-format.md](docs/notebook-ii-format.md).
 - **Notebook II import text.** `%Start:`, `%Author:…` lines and `%End:`, the "Notebook format" that Notebook II's own Import read.
