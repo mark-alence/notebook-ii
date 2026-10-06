@@ -164,6 +164,18 @@ test('search: regular expressions, alone, in a field, and mixed with other terms
   assert.deepEqual(highlightPatterns('/co\\w+/ prices').map((r) => r.source), ['co\\w+', 'prices']);
 });
 
+test('search: regular expression flags m and s work across the lines of a field', () => {
+  const db = createDatabase('t', ['Notes']);
+  addRecord(db, { Notes: 'First line\nSee Smith\nbegin here\nand end' });
+  const ids = (q) => search(db, q).map((r) => r.id);
+  assert.deepEqual(ids('/^see /'), []);
+  assert.deepEqual(ids('/^see /m'), [1]);
+  assert.deepEqual(ids('/begin.*end/'), []);
+  assert.deepEqual(ids('/begin.*end/s'), [1]);
+  assert.deepEqual(ids('/^See/cm'), [1]);
+  assert.deepEqual(ids('/^see/cm'), []);
+});
+
 test('own-delimiter export: line breaks as ¶, read back by Import', () => {
   const db = createDatabase('t', ['Title', 'Notes']);
   addRecord(db, { Title: 'One', Notes: 'first line\nsecond line' });

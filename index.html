@@ -113,7 +113,7 @@
         <tr><td><code>"date of birth":1850</code></td><td>quote field names that have spaces</td></tr>
         <tr><td><code>title=the</code> &nbsp; <code>-title=the</code></td><td>Title begins / doesn't begin with "the"</td></tr>
         <tr><td><code>year&gt;1980</code> &nbsp; <code>author&lt;=m</code></td><td>the field begins later / the same or earlier in alphabetical or numerical order (also <code>&lt;</code> and <code>&gt;=</code>)</td></tr>
-        <tr><td><code>/colou?r/</code></td><td>a regular expression, anywhere in the record. Capitals don't matter unless you add <code>c</code> after it: <code>/Smith/c</code></td></tr>
+        <tr><td><code>/colou?r/</code></td><td>a regular expression, anywhere in the record. Letters after it change how it matches: <code>c</code> matches capitals exactly (<code>/Smith/c</code>; otherwise capitals don't matter); <code>m</code> makes <code>^</code> and <code>$</code> match at the start and end of each line in a field, not just of the whole field (<code>/^see /m</code>); <code>s</code> lets <code>.</code> match line breaks too (<code>/begin.*end/s</code>). They combine: <code>/^Smith/cm</code></td></tr>
         <tr><td><code>#127</code></td><td>record number 127 (Enter opens it)</td></tr>
         <tr><td><code>#120-140</code> &nbsp; <code>#12,15,31</code> &nbsp; <code>#500-</code></td><td>a range of record numbers, a list of them, or 500 and later; mix them with other terms, e.g. <code>#1-200 -farmers</code></td></tr>
         <tr><td><code>@marked</code> &nbsp; <code>-@marked</code></td><td>records you have marked / not marked, e.g. <code>@marked year&gt;1980</code></td></tr>
