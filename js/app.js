@@ -378,7 +378,7 @@ function renderTitle() {
     search.value = job === 'record' ? rf.query : state.query;
     search.placeholder = job === 'record'
       ? 'Find in this record (/)   text or /regex/   Enter next, Shift+Enter back'
-      : 'Find in collection (/)   e.g. smith  author:smith  year>1980  /regex/';
+      : 'Find records (/)   e.g. smith  author:smith  year>1980  /regex/';
     search.setAttribute('aria-label', job === 'record' ? 'Find in this record' : 'Find records');
   }
   $('#themebtn').textContent = THEME_NAMES[getTheme()];
