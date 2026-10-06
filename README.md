@@ -1,6 +1,6 @@
 # ThreeByFive
 
-A program for keeping records the way people once kept index cards: research notes, bibliographies, archive sources, or anything else. A **collection** holds **records**; each record has fields you name (Author, Title, Notes …), and every field holds as much text as it needs. Find records by any word, sort them, mark the ones you want, and export them as text, spreadsheets or PDFs laid out with forms you design. It runs in a web browser or as a desktop app, and works from the keyboard.
+A program for keeping records the way people once kept index cards: research notes, bibliographies, archive sources, or anything else. A **collection** holds **records**; each record has fields you name (Author, Title, Notes …), and every field holds as much text as it needs. Find records by any word, sort them, mark the ones you want, and export them as text, spreadsheets, or PDFs laid out with forms you design. It runs in a web browser or as a desktop app, and works from the keyboard.
 
 ThreeByFive began as a recreation of Notebook II, the text database Pro/Tem Software sold for MS-DOS in the late 1980s, and it still imports Notebook II's files.
 
