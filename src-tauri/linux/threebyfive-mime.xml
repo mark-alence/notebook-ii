@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tells Linux desktops which files are ThreeByFive collections, so that
+     double-clicking one opens it in ThreeByFive. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-threebyfive">
+    <sub-class-of type="application/json"/>
+    <comment>ThreeByFive collection</comment>
+    <glob pattern="*.3x5"/>
+  </mime-type>
+  <mime-type type="application/x-notebook-ii">
+    <sub-class-of type="application/json"/>
+    <comment>ThreeByFive collection (older)</comment>
+    <glob pattern="*.nb2"/>
+  </mime-type>
+</mime-info>

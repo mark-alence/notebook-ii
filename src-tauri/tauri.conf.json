@@ -53,6 +53,20 @@
         "role": "Editor",
         "mimeType": "application/x-notebook-ii"
       }
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/threebyfive.desktop",
+        "files": {
+          "/usr/share/mime/packages/threebyfive.xml": "linux/threebyfive-mime.xml"
+        }
+      },
+      "rpm": {
+        "desktopTemplate": "linux/threebyfive.desktop",
+        "files": {
+          "/usr/share/mime/packages/threebyfive.xml": "linux/threebyfive-mime.xml"
+        }
+      }
+    }
   }
 }

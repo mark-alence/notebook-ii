@@ -1,0 +1,10 @@
+[Desktop Entry]
+Categories=Office;
+Comment=Records with fields you name, like index cards
+Exec=threebyfive %f
+StartupWMClass=threebyfive
+Icon=threebyfive
+Name=ThreeByFive
+Terminal=false
+Type=Application
+MimeType=application/x-threebyfive;application/x-notebook-ii;
