@@ -293,3 +293,28 @@ pub fn run() {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tauri::async_runtime::block_on;
+
+    #[test]
+    fn project_folder_commands() {
+        let dir = std::env::temp_dir().join(format!("threebyfive-test-{}", std::process::id()));
+        let sub = dir.join("backup");
+        block_on(make_dir(sub.to_string_lossy().into())).unwrap();
+        assert!(block_on(path_exists(sub.to_string_lossy().into())));
+        for f in ["b.3x5", "a.NB2", "notes.txt"] {
+            std::fs::write(dir.join(f), "{}").unwrap();
+        }
+        std::fs::write(sub.join("old.3x5"), "{}").unwrap();
+        let mut files: Vec<String> = block_on(list_collections(dir.to_string_lossy().into())).unwrap().into_iter().map(|e| e.file).collect();
+        files.sort();
+        assert_eq!(files, ["a.NB2", "b.3x5"]); // only the top of the folder, only collections
+        let gone = dir.join("b.3x5");
+        block_on(trash_file(gone.to_string_lossy().into())).unwrap();
+        assert!(!gone.exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
