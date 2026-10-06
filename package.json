@@ -1,15 +1,16 @@
 {
-  "name": "notebook-ii",
+  "name": "threebyfive",
   "version": "0.1.0",
   "description": "ThreeByFive: records with fields you name, like index cards; imports Notebook II databases",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "node scripts/test.mjs",
     "start": "npx --yes http-server -c-1 -p 8080 .",
     "build:web": "node scripts/build-web.mjs",
     "desktop": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "tauri": "tauri"
   },
   "license": "MIT",
   "devDependencies": {
