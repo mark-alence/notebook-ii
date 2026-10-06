@@ -12,7 +12,7 @@ import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportVertical, safeFileName, verticalBlocks, exportJson, toBytes } from './exporters.js';
 import { renderReport, renderBlocks } from './printform.js';
 import { PAPERS, FONT_SIZES, PDF_FONTS, makePdf, previewPdf } from './pdf.js';
-import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent, listProjects, addProject, renameProject, removeProject, currentProject, setCurrentProject } from './storage.js';
+import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent, listProjects, addProject, renameProject, removeProject, currentProject, setCurrentProject, listFolders, addFolder, removeFolder, currentFolder, setCurrentFolder } from './storage.js';
 import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
 import { VERSION } from './version.js';
@@ -40,6 +40,8 @@ const state = {
   viewIsNew: false,
   editField: 0, // the field that last had the cursor on the record screen
   project: currentProject(), // the project the home screen shows ('*': all)
+  folder: platform.desktop ? currentFolder() : '', // desktop: the project folder on the start screen ('' none)
+  folderList: null, // desktop: { dir, entries } read from that folder
   copySource: null, // what copy previous copies from: the record you were on when you pressed N
   formIndex: 0,
   exp: null, // the Export screen's choices, kept while the collection is open
@@ -175,12 +177,27 @@ async function backupDb() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
   const stamp = new Date().toISOString();
-  const saved = await download(`${safeFileName(db.name)}-${stamp.slice(0, 10)}${platform.desktop ? '.3x5' : '.3x5.json'}`, toBytes(exportJson(db)), 'application/json');
+  const folder = collectionFolder();
+  const saved = folder ? await backupToFolder(folder, stamp) : await download(`${safeFileName(db.name)}-${stamp.slice(0, 10)}${platform.desktop ? '.3x5' : '.3x5.json'}`, toBytes(exportJson(db)), 'application/json');
   if (!saved) return;
   db.lastBackup = stamp;
   persist();
   if (state.mode === 'view') render();
-  say(platform.desktop ? `Copy saved as ${platform.fileName(saved)}.` : 'Backup saved to your downloads. Import reads it back.');
+  say(folder ? `Copy saved in the project's backup folder as ${platform.fileName(saved)}.` : platform.desktop ? `Copy saved as ${platform.fileName(saved)}.` : 'Backup saved to your downloads. Import reads it back.');
+}
+
+// A collection in a project folder backs up into its backup/ folder, no dialog.
+async function backupToFolder(folder, stamp) {
+  try {
+    const dir = platform.joinPath(folder, 'backup');
+    await platform.makeDir(dir);
+    const path = await uniquePath(dir, `${safeFileName(state.db.name)}-${stamp.slice(0, 10)}`);
+    await platform.writeText(path, exportJson(state.db));
+    return path;
+  } catch (e) {
+    say(String(e.message ?? e), true);
+    return null;
+  }
 }
 
 async function closeDb() {
@@ -196,7 +213,7 @@ async function closeDb() {
 
 async function openFile(path = null) {
   try {
-    path ??= await platform.pickNotebookToOpen();
+    path ??= await platform.pickNotebookToOpen(state.folder || null);
     if (!path) return;
     let db;
     try {
@@ -206,6 +223,8 @@ async function openFile(path = null) {
       throw new Error(`${platform.fileName(path)} is not a ThreeByFive collection. To bring in other files, including Notebook II's own .DAT files, use Import.`);
     }
     if (state.db) await closeDb();
+    // A file in a project folder: the start screen shows that project after.
+    if (listFolders().includes(platform.dirName(path))) setFolder(platform.dirName(path));
     openDb(db, null, path);
   } catch (e) {
     removeRecent(path);
@@ -219,7 +238,7 @@ async function openFile(path = null) {
 async function saveAs() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
-  const path = await platform.pickNotebookPath(safeFileName(db.name));
+  const path = await platform.pickNotebookPath(safeFileName(db.name), collectionFolder() ?? (state.folder || null));
   if (!path) return;
   const oldKey = state.key;
   state.path = path;
@@ -238,9 +257,16 @@ function say(msg, isError = false) {
 }
 
 // A download in the browser, a Save dialog in the desktop app.
+// The desktop dialog starts in the project's exported/ folder.
 async function download(name, bytes, type = 'application/octet-stream') {
   try {
-    return await platform.saveBytes(name, bytes, type);
+    const folder = collectionFolder();
+    let directory = null;
+    if (folder) {
+      directory = platform.joinPath(folder, 'exported');
+      await platform.makeDir(directory);
+    }
+    return await platform.saveBytes(name, bytes, type, { directory });
   } catch (e) {
     say(String(e.message ?? e), true);
     return null;
@@ -259,6 +285,7 @@ function readDelim(s) {
 // ---------- navigation ----------
 
 function go(mode) {
+  if (mode === 'home') state.folderList = null; // read the project folder afresh
   if (state.mode === 'view' && mode !== 'view') { endRecordFind(); leaveRecord(); }
   if (mode !== state.mode && ['browse', 'view'].includes(state.mode)) state.back = state.mode;
   state.mode = mode;
@@ -278,11 +305,13 @@ function goBack() {
 const COMMANDS = [
   { id: 'newdb', label: 'New collection', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
   { id: 'openfile', label: 'Open collection file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
-  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openDb(inProject(databaseFromImport(SAMPLE.name, SAMPLE))) },
+  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openNew(inProject(databaseFromImport(SAMPLE.name, SAMPLE))) },
   { id: 'project', label: 'Choose a project', key: 'p', where: ['home'], run: () => $('#projsel')?.focus() },
-  { id: 'newproject', label: 'New project…', where: ['home'], run: () => newProjectAsk() },
-  { id: 'renameproject', label: 'Rename this project…', where: ['home'], run: () => renameProjectAsk() },
-  { id: 'deleteproject', label: 'Delete this project (its collections become Unfiled)…', where: ['home'], run: () => deleteProjectAsk() },
+  { id: 'newproject', label: 'New project…', where: ['home'], run: () => (platform.desktop ? newFolderProject() : newProjectAsk()) },
+  { id: 'openproject', label: 'Open project folder…', where: ['home'], desktop: true, run: () => openFolderProject() },
+  { id: 'forgetproject', label: 'Remove this project from the list (its folder stays)', where: ['home'], desktop: true, run: () => forgetFolderProject() },
+  { id: 'renameproject', label: 'Rename this project…', where: ['home'], web: true, run: () => renameProjectAsk() },
+  { id: 'deleteproject', label: 'Delete this project (its collections become Unfiled)…', where: ['home'], web: true, run: () => deleteProjectAsk() },
   { id: 'open', label: 'Open selected collection', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
   { id: 'deldb', label: 'Delete selected collection', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
 
@@ -305,7 +334,7 @@ const COMMANDS = [
   { id: 'import', label: 'Import…', key: 'i', where: ['home', 'browse', 'view'], bar: true, run: () => go('importpick') },
   { id: 'export', label: 'Export', key: 'x', where: ['browse', 'view'], bar: true, run: () => go('export') },
   { id: 'saveas', label: 'Save collection as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, desktop: true, run: () => saveAs() },
-  { id: 'backup', label: platform.desktop ? 'Save a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
+  { id: 'backup', label: platform.desktop ? 'Back up a copy (in a project: to its backup folder)' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
   { id: 'mark', label: 'Mark or unmark this record', key: 'm', where: ['browse', 'view'], run: () => toggleMark() },
   { id: 'showmarked', label: 'Show marked records', where: ['browse', 'view'], run: () => showMarked() },
   { id: 'markall', label: 'Mark all records in the list', where: ['browse', 'view'], run: () => markAll() },
@@ -331,6 +360,7 @@ function keyLabel(key) {
 
 function available(c) {
   if (c.desktop && !platform.desktop) return false;
+  if (c.web && platform.desktop) return false;
   if (!(c.where.includes('*') || c.where.includes(state.mode))) return false;
   if (['browse', 'view'].includes(state.mode) && !state.db) return false;
   if (c.newOnly && !state.viewIsNew) return false;
@@ -367,7 +397,9 @@ function renderTitle() {
     const marked = markedRecords(db).length;
     if (marked) right += ` · ${marked} marked`;
   }
-  $('#title .dbname').textContent = db ? (db.project ? `${db.project} › ${db.name}` : db.name) : (state.project !== '*' ? projectName(state.project) : '');
+  $('#title .dbname').textContent = platform.desktop
+    ? (db ? (collectionFolder() ? `${folderName(collectionFolder())} › ${db.name}` : db.name) : state.folder ? folderName(state.folder) : '')
+    : db ? (db.project ? `${db.project} › ${db.name}` : db.name) : (state.project !== '*' ? projectName(state.project) : '');
   $('#title .count').textContent = right;
   // One box, two jobs: in the list it finds records, on a record it finds
   // text in that record. Each keeps its own words.
@@ -377,11 +409,9 @@ function renderTitle() {
   if (search.dataset.job !== job) {
     search.dataset.job = job;
     search.value = job === 'record' ? rf.query : state.query;
-    search.placeholder = job === 'record'
-      ? 'Find in this record (/)   text or /regex/   Enter next, Shift+Enter back'
-      : 'Find records (/)   e.g. smith  author:smith  year>1980  /regex/';
     search.setAttribute('aria-label', job === 'record' ? 'Find in this record' : 'Find records');
   }
+  fitSearchHint();
   $('#themebtn').textContent = THEME_NAMES[getTheme()];
 }
 
@@ -416,11 +446,13 @@ function preview(text, max = 120) {
   return one.length > max ? one.slice(0, max - 1) + '…' : one;
 }
 
-// The start screen lists collections: in the desktop app, recent collection files
-// first, then any kept inside the app; on the web, those kept in this browser.
+// The start screen lists collections: in the desktop app, the files in the
+// project folder, or with no project recent collection files then any kept
+// inside the app; on the web, those kept in this browser.
 function homeEntries() {
-  const files = platform.desktop ? listRecent().map((r) => ({ ...r, kind: 'file' })) : [];
-  const all = [...files, ...listSaved().map((d) => ({ ...d, kind: 'app' }))];
+  if (platform.desktop && state.folder) return (state.folderList?.dir === state.folder && state.folderList.entries) || [];
+  if (platform.desktop) return [...listRecent().map((r) => ({ ...r, kind: 'file' })), ...listSaved().map((d) => ({ ...d, kind: 'app' }))];
+  const all = listSaved().map((d) => ({ ...d, kind: 'app' }));
   return state.project === '*' ? all : all.filter((d) => (d.project ?? '') === state.project);
 }
 
@@ -439,7 +471,7 @@ function projectOptions(selected, { all = false } = {}) {
 }
 
 function inProject(db) {
-  if (state.project !== '*') db.project = state.project;
+  if (!platform.desktop && state.project !== '*') db.project = state.project;
   return db;
 }
 
@@ -484,13 +516,174 @@ async function deleteProjectAsk() {
   say(`Project "${name}" deleted${n ? '; its collections are now Unfiled' : ''}.`);
 }
 
+// ---------- desktop app: projects are folders ----------
+//
+// As in RStudio, a project is a folder on disk: its collections are the .3x5
+// files at the top of it, and new, imported and sample collections made while
+// it is on the start screen are saved there. Backups go to its backup/ folder
+// and exports start in exported/; both are made when needed. Nothing else
+// marks a folder as a project, so any folder can be opened as one.
+
+const folderName = (dir) => platform.fileName(dir.replace(/[\\/]+$/, '')) || dir;
+
+// The project folder the open collection's file is in, if it is in one.
+function collectionFolder() {
+  if (!platform.desktop || !state.path) return null;
+  const dir = platform.dirName(state.path);
+  return listFolders().includes(dir) ? dir : null;
+}
+
+function setFolder(dir) {
+  state.folder = dir;
+  setCurrentFolder(dir);
+  state.folderList = null;
+  state.homeCursor = 0;
+}
+
+// name.3x5, or name-2.3x5 and so on if that file is already there.
+async function uniquePath(dir, base, ext = '.3x5') {
+  for (let n = 1; ; n++) {
+    const path = platform.joinPath(dir, `${base}${n > 1 ? `-${n}` : ''}${ext}`);
+    if (!(await platform.pathExists(path))) return path;
+  }
+}
+
+// A new collection (made, imported or the sample): in a project, a new file in
+// its folder; otherwise as before.
+async function openNew(db) {
+  if (!(platform.desktop && state.folder)) return openDb(db);
+  try {
+    const path = await uniquePath(state.folder, safeFileName(db.name));
+    if (state.db) await closeDb();
+    openDb(db, null, path);
+    await writeFile();
+    return path;
+  } catch (e) {
+    say(String(e.message ?? e), true);
+    return null;
+  }
+}
+
+// Reads the collections in a project folder for the start screen.
+async function loadFolder(dir) {
+  let entries = [];
+  let error = '';
+  try {
+    const files = await platform.listCollections(dir);
+    entries = await Promise.all(files.map(async (f) => {
+      try {
+        const db = JSON.parse(await platform.readText(f.path));
+        return { kind: 'file', path: f.path, file: f.file, name: String(db.name ?? f.file), records: db.records?.length ?? null, modified: db.modified ?? f.modified };
+      } catch {
+        return { kind: 'file', path: f.path, file: f.file, name: `${f.file} (cannot be read)`, records: null, modified: f.modified, unreadable: true };
+      }
+    }));
+    entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.file.localeCompare(b.file));
+  } catch (e) {
+    error = String(e.message ?? e);
+  }
+  if (state.folder !== dir || state.folderList?.dir !== dir) return; // the screen moved on
+  state.folderList = { dir, entries, error };
+  if (state.mode === 'home') render();
+}
+
+async function enterFolder(dir) {
+  if (state.db) await closeDb();
+  addFolder(dir);
+  setFolder(dir);
+  go('home');
+}
+
+async function newFolderProject() {
+  const dir = await platform.pickFolder('New project: choose or make its folder');
+  if (!dir) return;
+  try {
+    await platform.makeDir(platform.joinPath(dir, 'backup'));
+    await platform.makeDir(platform.joinPath(dir, 'exported'));
+  } catch (e) {
+    return say(String(e.message ?? e), true);
+  }
+  await enterFolder(dir);
+  say(`Project ${folderName(dir)} made. New collections are saved in its folder; backups go to backup/ and exports start in exported/.`);
+}
+
+async function openFolderProject() {
+  const dir = await platform.pickFolder('Open project folder');
+  if (!dir) return;
+  await enterFolder(dir);
+  say(`Project ${folderName(dir)}: the collections in ${dir}.`);
+}
+
+function forgetFolderProject() {
+  const dir = state.folder;
+  if (!dir) return say('Choose a project first.', true);
+  removeFolder(dir);
+  setFolder('');
+  render();
+  say(`${folderName(dir)} is no longer in the list of projects. The folder and its files are untouched; Open project brings it back.`);
+}
+
 // The folder and file name; the full path shows on hover.
 function shortPath(path) {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : path;
 }
 
+function homeIntro() {
+  return `
+      <header class="intro">
+        <h1><svg class="introcard" viewBox="7 17 50 30" aria-hidden="true"><rect x="7" y="17" width="50" height="30" rx="1.5" fill="#fbf8ef"/><path d="M7 23.5h50" stroke="#d64545" stroke-width="1.6"/><path d="M11 29.5h42M11 35h42M11 40.5h30" stroke="#6f97c9" stroke-width="1.2"/></svg>ThreeByFive</h1>
+        <p>Records with fields you name, each holding as much text as it needs, like a collection of index cards. Group collections into projects, find and sort records, mark the ones you want, and export them as text, spreadsheets, or PDFs.</p>
+        <p class="hint keys">${[['N', 'new collection'], ...(platform.desktop ? [['O', 'open a collection file']] : []), ['I', 'import'], ['S', 'try a sample'], ['?', 'help'], [keyLabel('Ctrl+k'), 'every command']].map(([k, l]) => `<span><kbd>${esc(k)}</kbd> ${l}</span>`).join(' ')}</p>
+      </header>`;
+}
+
+// Desktop: the project bar chooses a project folder, or none (recent files).
+function renderDesktopHome() {
+  const dir = state.folder;
+  if (dir && state.folderList?.dir !== dir) {
+    state.folderList = { dir, entries: null };
+    loadFolder(dir);
+  }
+  const reading = dir && !state.folderList.entries;
+  const entries = homeEntries();
+  state.homeCursor = Math.min(state.homeCursor, Math.max(0, entries.length - 1));
+  const rows = entries.map((d, i) => `
+    <tr data-i="${i}" class="${i === state.homeCursor ? 'cur' : ''}">
+      <td>${esc(d.name)}</td><td class="where" title="${esc(d.kind === 'file' ? d.path : '')}">${esc(d.kind !== 'file' ? 'kept in the app' : dir ? d.file : shortPath(d.path))}</td><td class="num">${d.records ?? ''}</td><td>${d.modified ? esc(new Date(d.modified).toLocaleString()) : ''}</td>
+    </tr>`).join('');
+  const opt = (v, label) => `<option value="${esc(v)}" ${v === dir ? 'selected' : ''} title="${esc(v)}">${esc(label)}</option>`;
+  const folders = listFolders();
+  const label = (p) => (folders.filter((q) => folderName(q) === folderName(p)).length > 1 ? `${folderName(p)} (${shortPath(p)})` : folderName(p));
+  const error = dir && state.folderList?.error;
+  $('#main').innerHTML = `
+    <div class="panel home">${homeIntro()}
+      <div class="row projectbar"><label for="projsel">Project</label><select id="projsel">${opt('', 'None: recent collections')}${folders.map((p) => opt(p, label(p))).join('')}</select>
+        <button type="button" id="newproj">New project…</button><button type="button" id="openproj">Open project…</button>
+        ${dir ? '<button type="button" id="forgetproj" title="Take it off this list; the folder and its files stay">Remove from list</button>' : ''}</div>
+      ${dir ? `<p class="hint">Folder: ${esc(dir)}</p>` : ''}
+      <h2>${esc(dir ? folderName(dir) : 'Recent collections')}</h2>
+      ${error ? `<p class="warn">${esc(error)}</p>`
+      : reading ? '<p class="hint">Reading the folder…</p>'
+      : entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th><th>File</th><th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="hint">Click a collection to open it, or use ↑ ↓ and Enter. <kbd>P</kbd> chooses another project.</p>`
+      : dir ? `<p>No collections in this project yet. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import one, or <kbd>S</kbd> to try a sample; each is saved as a file in the project folder.</p>`
+      : `<p>No collections yet. Press <kbd>N</kbd> to make one, <kbd>O</kbd> to open a collection file, <kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample. A project (<em>New project…</em>) keeps a piece of work's collections together in one folder.</p>`}
+      <p class="hint">${dir
+        ? 'This project\'s collections are the <code>.3x5</code> files in its folder, saved as you type. <em>Backup</em> saves a dated copy in its <code>backup</code> folder, and exports start in its <code>exported</code> folder.'
+        : 'Each collection is a file on your computer (<code>.3x5</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.'}</p>
+    </div>`;
+  $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
+  const sel = $('#projsel');
+  sel.addEventListener('change', () => { setFolder(sel.value); render(); $('#projsel')?.focus(); });
+  sel.addEventListener('keydown', (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); sel.blur(); } });
+  $('#newproj').addEventListener('click', newFolderProject);
+  $('#openproj').addEventListener('click', openFolderProject);
+  $('#forgetproj')?.addEventListener('click', forgetFolderProject);
+}
+
 function renderHome() {
+  if (platform.desktop) return renderDesktopHome();
   // A project remembered from before that no longer exists: show them all.
   if (state.project !== '*' && state.project !== '' && !listProjects().includes(state.project)) state.project = '*';
   const entries = homeEntries();
@@ -505,12 +698,7 @@ function renderHome() {
     : `<p class="warn">Collections are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a collection, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>`;
   const named = !all && state.project !== '';
   $('#main').innerHTML = `
-    <div class="panel home">
-      <header class="intro">
-        <h1><svg class="introcard" viewBox="7 17 50 30" aria-hidden="true"><rect x="7" y="17" width="50" height="30" rx="1.5" fill="#fbf8ef"/><path d="M7 23.5h50" stroke="#d64545" stroke-width="1.6"/><path d="M11 29.5h42M11 35h42M11 40.5h30" stroke="#6f97c9" stroke-width="1.2"/></svg>ThreeByFive</h1>
-        <p>Records with fields you name, each holding as much text as it needs, like a collection of index cards. Group collections into projects, find and sort records, mark the ones you want, and export them as text, spreadsheets, or PDFs.</p>
-        <p class="hint keys">${[['N', 'new collection'], ...(platform.desktop ? [['O', 'open a collection file']] : []), ['I', 'import'], ['S', 'try a sample'], ['?', 'help'], [keyLabel('Ctrl+k'), 'every command']].map(([k, l]) => `<span><kbd>${esc(k)}</kbd> ${l}</span>`).join(' ')}</p>
-      </header>
+    <div class="panel home">${homeIntro()}
       <div class="row projectbar"><label for="projsel">Project</label><select id="projsel">${projectOptions(state.project, { all: true })}</select>
         <button type="button" id="newproj">New project</button>
         ${named ? '<button type="button" id="renproj">Rename</button><button type="button" id="delproj">Delete</button>' : ''}</div>
@@ -545,6 +733,22 @@ function openSaved(i) {
 function deleteSavedDb() {
   const d = homeEntries()[state.homeCursor];
   if (!d) return;
+  if (d.kind === 'file' && state.folder) {
+    const what = d.unreadable ? d.file : `"${d.name}" (${plural(d.records ?? 0, 'record')}, ${d.file})`;
+    ask(`Move the collection ${what} to the Trash? It can be restored from there.`, 'Move to Trash').then(async (yes) => {
+      if (!yes) return;
+      try {
+        await platform.trashFile(d.path);
+        removeRecent(d.path);
+        state.folderList = null;
+        render();
+        say(`Moved ${d.file} to the Trash.`);
+      } catch (e) {
+        say(String(e.message ?? e), true);
+      }
+    });
+    return;
+  }
   if (d.kind === 'file') {
     removeRecent(d.path);
     render();
@@ -825,6 +1029,28 @@ function growField(t) {
 }
 window.addEventListener('resize', () => $$('#recordform textarea').forEach(growField));
 
+// The search box's hint, longest first: it shows the longest that fits the
+// box in its font and size, and the whole of it on hover.
+const SEARCH_HINTS = {
+  list: ['Find records (/)   e.g. smith  author:smith  year>1980  /regex/', 'Find records (/)  smith  author:smith  /regex/', 'Find records (/)  word or /regex/', 'Find (/)  word or /regex/', 'Find records (/)', 'Find'],
+  record: ['Find in this record (/)   text or /regex/   Enter next, Shift+Enter back', 'Find in this record (/)  text or /regex/  Enter: next', 'Find in record (/)  text or /regex/', 'Find (/)  text or /regex/', 'Find in record (/)', 'Find'],
+};
+const hintCanvas = document.createElement('canvas').getContext('2d');
+function fitSearchHint() {
+  const box = $('#search');
+  if (!box || box.hidden) return;
+  const hints = SEARCH_HINTS[box.dataset.job === 'record' ? 'record' : 'list'];
+  const cs = getComputedStyle(box);
+  hintCanvas.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const room = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4;
+  const hint = hints.find((h) => hintCanvas.measureText(h).width <= room) ?? hints[hints.length - 1];
+  if (box.placeholder !== hint) box.placeholder = hint;
+  box.title = hints[0];
+}
+window.addEventListener('resize', fitSearchHint);
+// Fonts load after the first drawing; measure again once they have.
+document.fonts?.ready.then(fitSearchHint);
+
 function revertRecord() {
   const rec = viewed();
   if (!rec || !recordChanged()) return;
@@ -1015,7 +1241,7 @@ function renderFields() {
       })()}
       <p class="hint">The list of records shows these fields as columns, left to right (top to bottom here), in their own order: it need not follow the order of the fields in a record. Widths follow the contents, so a short field such as Year gets a narrow column.</p>
       <h2>Collection name</h2>
-      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Collection name"><label for="dbproject">Project</label><select id="dbproject">${projectOptions(db.project ?? '')}</select></div>
+      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Collection name">${platform.desktop ? '' : `<label for="dbproject">Project</label><select id="dbproject">${projectOptions(db.project ?? '')}</select>`}</div>
       <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text (a date written <code>1938-03-17</code> sorts in date order, and <code>1938-03-17 (approx.)</code> still does).</p>
       <p class="hint"><strong>Copy into new records</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
@@ -1034,7 +1260,7 @@ function renderFields() {
   }));
   $('#addfield').addEventListener('submit', (e) => { e.preventDefault(); done(() => addField(db, e.target.name.value)); });
   $('#dbname').addEventListener('change', (e) => done(() => { db.name = e.target.value.trim() || db.name; }));
-  $('#dbproject').addEventListener('change', (e) => done(() => { db.project = e.target.value; say(`Moved to ${projectName(db.project)}.`); }));
+  $('#dbproject')?.addEventListener('change', (e) => done(() => { db.project = e.target.value; say(`Moved to ${projectName(db.project)}.`); }));
 }
 
 
@@ -1178,7 +1404,7 @@ function importNumbersNote(r) {
   return `<p class="hint">The ${esc(numbers.field)} column holds record numbers (#${lo}–#${hi}). A new collection keeps them; records added to an open collection get new numbers, so they cannot clash.</p>`;
 }
 
-function finishImport() {
+async function finishImport() {
   const { result: r, target, dbName } = state.imp;
   if (target === 'append' && state.db) {
     // Match incoming fields to existing ones regardless of case.
@@ -1197,7 +1423,7 @@ function finishImport() {
   if (!r.database) db.project = '';
   inProject(db);
   state.imp = null;
-  openDb(db);
+  await openNew(db);
   say(`Imported ${db.records.length} records${recordNumbersIn(r)?.ids ? ', keeping their record numbers' : ''}.`);
 }
 
@@ -1550,7 +1776,7 @@ function renderNewDb() {
     <form class="panel" id="newdbform">
       <h2>New collection</h2>
       <div class="row"><label for="nbname">Name</label><input id="nbname" name="name" value="My collection" required></div>
-      <div class="row"><label for="nbproject">Project</label><select id="nbproject" name="project">${projectOptions(state.project === '*' ? '' : state.project)}</select></div>
+      ${platform.desktop ? (state.folder ? `<p class="hint">Saved as a file in the project folder ${esc(state.folder)}.</p>` : '') : `<div class="row"><label for="nbproject">Project</label><select id="nbproject" name="project">${projectOptions(state.project === '*' ? '' : state.project)}</select></div>`}
       <h2>Start with</h2>
       ${LAYOUTS.map((l, i) => `
         <label class="check layout"><input type="radio" name="layout" value="${l.id}" ${i ? '' : 'checked'}>
@@ -1566,7 +1792,13 @@ function renderNewDb() {
     const layout = LAYOUTS.find((l) => l.id === form.layout.value) ?? LAYOUTS[0];
     const name = form.name.value.trim() || 'My collection';
     const db = createDatabase(name, layout.fields);
-    db.project = form.project.value;
+    if (!platform.desktop) db.project = form.project.value;
+    if (platform.desktop && state.folder) {
+      const path = await openNew(db);
+      if (!path) return;
+      go('fields');
+      return say(`Collection "${name}" made, saved as ${platform.fileName(path)} in the project folder. Set up its fields here, then press Esc to start adding records.`);
+    }
     if (platform.desktop) {
       const path = await platform.pickNotebookPath(safeFileName(name));
       if (!path) return say('Not made: choose where to save the collection file.');
@@ -1721,6 +1953,7 @@ function renderAppearance() {
     const size = +form.size.value;
     $('#sizeval').textContent = `${size} px`;
     setAppearance({ font: form.font.value, custom: form.custom.value, size, spacing: form.spacing.value, listRows: +form.listRows.value, labels: form.labels.value });
+    fitSearchHint();
   };
   form.addEventListener('input', (e) => {
     if (e.target.name === 'theme') { setTheme(e.target.value); renderTitle(); return; }
@@ -2098,7 +2331,10 @@ $('#themebtn').addEventListener('click', cycleTheme);
 const MENU = {
   newdb: () => go('newdb'),
   open: () => openFile(),
+  newproject: () => newFolderProject(),
+  openproject: () => openFolderProject(),
   saveas: () => state.db && saveAs(),
+  backup: () => state.db && backupDb(),
   import: () => go('importpick'),
   export: () => state.db && go('export'),
   print: () => state.db && exportWith('form'),

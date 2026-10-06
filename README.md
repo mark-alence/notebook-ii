@@ -50,7 +50,9 @@ In a new record, **Ctrl+D** copies the source fields (Author, Title, Year and th
 
 ## Projects
 
-A project groups collections, say all those for one book or thesis. The **Project** list at the top of the start screen (P) shows one project's collections, the Unfiled ones, or all of them, and is remembered; *New project*, *Rename* and *Delete* sit beside it (deleting a project keeps its collections, as Unfiled). New and imported collections, and the sample, go into the project on screen; a collection moves to another project from its Fields screen. The title bar shows *project › collection*. The project is kept in the collection and its backups. (In the desktop app, projects are to become folders.)
+A project groups collections, say all those for one book or thesis. On the web page: The **Project** list at the top of the start screen (P) shows one project's collections, the Unfiled ones, or all of them, and is remembered; *New project*, *Rename* and *Delete* sit beside it (deleting a project keeps its collections, as Unfiled). New and imported collections, and the sample, go into the project on screen; a collection moves to another project from its Fields screen. The title bar shows *project › collection*. The project is kept in the collection and its backups.
+
+In the desktop app a project is a folder, as in RStudio. *New project…* asks where to put it (choose a folder or make one) and makes `backup` and `exported` folders inside; *Open project…* makes any existing folder a project. The project's collections are the `.3x5` files at the top of its folder, and new and imported collections, and the sample, are saved there without a dialog. *Back up a copy* saves a dated copy in `backup`, and Export starts in `exported`. Delete on the start screen moves the file to the Trash. *Remove from list* forgets the project but leaves its folder alone. No marker file is written, so a project folder is just a folder.
 
 ## Fields
 

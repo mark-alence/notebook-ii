@@ -12,10 +12,11 @@ export const NOTEBOOK_FILTERS = [{ name: 'ThreeByFive collection', extensions: [
 
 // Save bytes the user asked for (an export, a backup). Web: a download.
 // Desktop: a Save dialog. Returns the path or file name, or null if cancelled.
-export async function saveBytes(name, bytes, type = 'application/octet-stream') {
+// Desktop: `directory` is where the Save dialog starts.
+export async function saveBytes(name, bytes, type = 'application/octet-stream', { directory = null } = {}) {
   if (desktop) {
     const ext = /\.([^.]+)$/.exec(name)?.[1];
-    const path = await invoke('pick_save', { title: 'Save', defaultName: name, filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : [] });
+    const path = await invoke('pick_save', { title: 'Save', defaultName: name, filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : [], directory });
     if (!path) return null;
     await invoke('write_bytes', { path, bytes: Array.from(bytes) });
     return path;
@@ -29,12 +30,32 @@ export async function saveBytes(name, bytes, type = 'application/octet-stream') 
   return name;
 }
 
-export async function pickNotebookToOpen() {
-  return invoke('pick_open', { title: 'Open collection', filters: NOTEBOOK_FILTERS });
+export async function pickNotebookToOpen(directory = null) {
+  return invoke('pick_open', { title: 'Open collection', filters: NOTEBOOK_FILTERS, directory });
 }
 
-export async function pickNotebookPath(name) {
-  return invoke('pick_save', { title: 'Save collection as', defaultName: `${name}.3x5`, filters: NOTEBOOK_FILTERS });
+export async function pickNotebookPath(name, directory = null) {
+  return invoke('pick_save', { title: 'Save collection as', defaultName: `${name}.3x5`, filters: NOTEBOOK_FILTERS, directory });
+}
+
+// Desktop projects are folders: a project's collections are the .3x5 (and
+// .nb2) files at the top of its folder.
+export const pickFolder = (title) => invoke('pick_folder', { title });
+export const listCollections = (dir) => invoke('list_collections', { dir });
+export const makeDir = (path) => invoke('make_dir', { path });
+export const pathExists = (path) => invoke('path_exists', { path });
+// Moves a file to the system Trash (Recycle Bin), where it can be restored.
+export const trashFile = (path) => invoke('trash_file', { path });
+
+// Joins a folder and a name with the folder's own separator.
+export function joinPath(dir, name) {
+  const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/';
+  return dir.endsWith(sep) ? dir + name : dir + sep + name;
+}
+
+export function dirName(path) {
+  const i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  return i <= 0 ? path.slice(0, i + 1) : path.slice(0, i);
 }
 
 export const readText = (path) => invoke('read_text', { path });
