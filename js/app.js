@@ -633,7 +633,7 @@ function homeIntro() {
   return `
       <header class="intro">
         <h1><svg class="introcard" viewBox="7 17 50 30" aria-hidden="true"><rect x="7" y="17" width="50" height="30" rx="1.5" fill="#fbf8ef"/><path d="M7 23.5h50" stroke="#d64545" stroke-width="1.6"/><path d="M11 29.5h42M11 35h42M11 40.5h30" stroke="#6f97c9" stroke-width="1.2"/></svg>ThreeByFive</h1>
-        <p>Records with fields you name, each holding as much text as it needs, like a stack of index cards. Group stacks into projects, find and sort records, mark the ones you want, and export them as text, spreadsheets, or PDFs.</p>
+        <p>Records with fields you name, each holding as much text as it needs, like a stack of index cards. Organize these stacks within projects, find and sort records within stacks, and export them as text, spreadsheets, or PDFs.</p>
         <p class="hint keys">${[['N', 'new stack'], ...(platform.desktop ? [['O', 'open a stack file']] : []), ['I', 'import'], ['S', 'try a sample'], ['?', 'help'], [keyLabel('Ctrl+k'), 'every command']].map(([k, l]) => `<span><kbd>${esc(k)}</kbd> ${l}</span>`).join(' ')}</p>
       </header>`;
 }
