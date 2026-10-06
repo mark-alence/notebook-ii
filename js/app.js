@@ -9,7 +9,7 @@ import {
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
 import { FONTS, SPACING, SIZE, LIST_ROWS, LABELS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
 import { importFiles } from './importers.js';
-import { exportDelimited, exportTagged, exportVertical, verticalBlocks, exportJson, toBytes } from './exporters.js';
+import { exportDelimited, exportTagged, exportVertical, safeFileName, verticalBlocks, exportJson, toBytes } from './exporters.js';
 import { renderReport, renderBlocks } from './printform.js';
 import { PAPERS, FONT_SIZES, PDF_FONTS, makePdf, previewPdf } from './pdf.js';
 import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, removeRecent, listProjects, addProject, renameProject, removeProject, currentProject, setCurrentProject } from './storage.js';
@@ -175,7 +175,7 @@ async function backupDb() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
   const stamp = new Date().toISOString();
-  const saved = await download(`${safeName(db.name)}-${stamp.slice(0, 10)}${platform.desktop ? '.3x5' : '.3x5.json'}`, toBytes(exportJson(db)), 'application/json');
+  const saved = await download(`${safeFileName(db.name)}-${stamp.slice(0, 10)}${platform.desktop ? '.3x5' : '.3x5.json'}`, toBytes(exportJson(db)), 'application/json');
   if (!saved) return;
   db.lastBackup = stamp;
   persist();
@@ -219,7 +219,7 @@ async function openFile(path = null) {
 async function saveAs() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
-  const path = await platform.pickNotebookPath(safeName(db.name));
+  const path = await platform.pickNotebookPath(safeFileName(db.name));
   if (!path) return;
   const oldKey = state.key;
   state.path = path;
@@ -245,10 +245,6 @@ async function download(name, bytes, type = 'application/octet-stream') {
     say(String(e.message ?? e), true);
     return null;
   }
-}
-
-function safeName(s) {
-  return (s || 'notebook').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'notebook';
 }
 
 // Delimiters are shown escaped so invisible characters can be typed.
@@ -1506,13 +1502,13 @@ async function saveExport() {
   if (x.which === 'marked' && !recs.length) return say('No records are marked. Press M on a record to mark it.', true);
   const f = fieldNames(db);
   const shape = exportShape(recs);
-  const base = safeName(db.name);
+  const base = safeFileName(db.name);
   if (PAGED.includes(x.format) && x.output === 'pdf') {
     say('Making the PDF…');
     try {
       const kit = await loadPdfKit(x.pdfFont);
       const { bytes, pages } = makePdf(exportBlocks(recs), { ...kit, ...pdfOptions() });
-      const name = x.format === 'form' ? `${base}-${safeName(currentForm().name)}.pdf` : `${base}.pdf`;
+      const name = x.format === 'form' ? `${base}-${safeFileName(currentForm().name)}.pdf` : `${base}.pdf`;
       if (await download(name, bytes, 'application/pdf')) say(`PDF saved: ${pages} page${pages === 1 ? '' : 's'}, ${recs.length} record${recs.length === 1 ? '' : 's'}.`);
       else say('');
     } catch (e) {
@@ -1525,7 +1521,7 @@ async function saveExport() {
       if (recs.length === db.records.length) { db.lastBackup = new Date().toISOString(); persist(); }
       return download(`${base}.3x5.json`, toBytes(exportJson(db, recs)), 'application/json');
     case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(shape.fields, shape.records)), 'text/plain');
-    case 'form': return download(`${base}-${safeName(currentForm().name)}.txt`, toBytes(renderReport(currentForm(), recs, f, { title: db.name }).replace(/\n/g, '\r\n')), 'text/plain');
+    case 'form': return download(`${base}-${safeFileName(currentForm().name)}.txt`, toBytes(renderReport(currentForm(), recs, f, { title: db.name }).replace(/\n/g, '\r\n')), 'text/plain');
     case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(shape.fields, shape.records)), 'text/csv');
     case 'tab': return download(`${base}.txt`, toBytes(exportDelimited(shape.fields, shape.records, { fieldDelim: '\t' })), 'text/plain');
     case 'tagged': return download(`${base}.txt`, toBytes(exportTagged(shape.fields, shape.records)), 'text/plain');
@@ -1572,7 +1568,7 @@ function renderNewDb() {
     const db = createDatabase(name, layout.fields);
     db.project = form.project.value;
     if (platform.desktop) {
-      const path = await platform.pickNotebookPath(safeName(name));
+      const path = await platform.pickNotebookPath(safeFileName(name));
       if (!path) return say('Not made: choose where to save the collection file.');
       if (state.db) await closeDb();
       openDb(db, null, path);
