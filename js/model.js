@@ -14,7 +14,7 @@ import { upgradeForm } from './printform.js';
 export const LAYOUTS = [
   { id: 'research', name: 'Research notes', fields: [
     { name: 'Author', copy: true }, { name: 'Title', copy: true }, { name: 'Year', copy: true },
-    { name: 'Keywords', copy: false }, { name: 'Notes', copy: false, lines: 10 }] },
+    { name: 'PubInfo', copy: true }, { name: 'Keywords', copy: false }, { name: 'Notes', copy: false, lines: 10 }] },
   { id: 'archive', name: 'Archive notes', fields: [
     { name: 'Header', copy: false }, { name: 'Note', copy: false, lines: 10 },
     { name: 'Citation', copy: true }, { name: 'Date', copy: false }] },
