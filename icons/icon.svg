@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="10" fill="#0000aa"/>
-  <rect x="12" y="10" width="40" height="44" fill="none" stroke="#00aaaa" stroke-width="3"/>
-  <path d="M19 22h26M19 30h26M19 38h18" stroke="#ffffff" stroke-width="3.5" stroke-linecap="square"/>
-  <rect x="19" y="44" width="8" height="3.5" fill="#ffff55"/>
+  <rect width="64" height="64" rx="12" fill="#1f3352"/>
+  <!-- a 3 x 5 index card -->
+  <rect x="7" y="17" width="50" height="30" rx="1.5" fill="#fbf8ef"/>
+  <path d="M7 23.5h50" stroke="#d64545" stroke-width="1.6"/>
+  <path d="M11 29.5h42M11 35h42M11 40.5h30" stroke="#6f97c9" stroke-width="1.2"/>
 </svg>

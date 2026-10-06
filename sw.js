@@ -4,7 +4,7 @@
 // asks the site whether the file has changed (no-cache) rather than taking
 // the browser's own copy, which GitHub Pages lets it keep for 10 minutes; an
 // unchanged file costs only a short "not modified" reply.
-const CACHE = 'notebook-ii-v3';
+const CACHE = 'threebyfive-v1';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'js/app.js', 'js/cp437.js', 'js/exporters.js', 'js/importers.js', 'js/model.js', 'js/platform.js',

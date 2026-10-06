@@ -85,7 +85,9 @@ export function detectDelimited(text) {
     recordDelim,
     quote: '"',
     header: 'auto',
-    newlineMarker: text.includes('\x14') ? '\x14' : '',
+    // Line breaks inside a field: the DOS ¶ (character 20), or the ordinary ¶
+    // that ThreeByFive's own delimited export writes.
+    newlineMarker: text.includes('\x14') ? '\x14' : text.includes('¶') ? '¶' : '',
   };
 }
 

@@ -3,14 +3,14 @@ import { upgradeForm } from './printform.js';
 // A Notebook II-style database: named fields, variable-length records.
 // Every field of every record is free text of any length; the program never
 // interprets it. A field also carries a few display settings:
-//   copy   copied from the previous record by F5 (see copiesFromPrevious)
+//   copy   copied into a new record by Ctrl+D (see copiesFromPrevious)
 //   lines  how many lines it shows when a record opens (see fieldLines)
-//   list   shown in the list of records (older notebooks; the list's columns
+//   list   shown in the list of records (older collections; the list's columns
 //          are now db.listColumns, see listColumns)
 // Each record keeps its id (which is also the order it was entered in) and
 // when it was created and last changed.
 
-// Starting layouts offered for a new notebook. Fields can be changed later.
+// Starting layouts offered for a new collection. Fields can be changed later.
 export const LAYOUTS = [
   { id: 'research', name: 'Research notes', fields: [
     { name: 'Author', copy: true }, { name: 'Title', copy: true }, { name: 'Year', copy: true },
@@ -41,7 +41,7 @@ export function createDatabase(name, fieldNames = ['Text']) {
 export function defaultPrintForm(fieldNames) {
   const width = Math.max(...fieldNames.map((n) => n.length), 4);
   const lines = fieldNames.map((n) => `[[${n.padEnd(width)} : {${n}}]]`);
-  return { name: 'Standard', width: 76, template: lines.join('\n'), header: '', footer: '', textPages: false, pageLines: 66 };
+  return { name: 'Standard', width: 76, template: lines.join('\n'), header: '', footer: '', textPages: false };
 }
 
 function touch(db) {
@@ -80,7 +80,7 @@ export function deleteRecords(db, ids) {
   touch(db);
 }
 
-// Marks: a hand-picked set of records (M), kept with the notebook. Marking
+// Marks: a hand-picked set of records (M), kept with the collection. Marking
 // does not count as changing the record.
 export function setMarked(db, records, on) {
   let n = 0;
@@ -133,7 +133,7 @@ export function renameField(db, oldName, newName) {
 }
 
 export function deleteField(db, name) {
-  if (db.fields.length === 1) throw new Error('A database needs at least one field');
+  if (db.fields.length === 1) throw new Error('A collection needs at least one field');
   db.fields = db.fields.filter((f) => f.name !== name);
   if (db.sortKeys) db.sortKeys = db.sortKeys.filter((k) => k.field !== name);
   if (db.listColumns) db.listColumns = db.listColumns.filter((n) => n !== name);
@@ -149,7 +149,7 @@ export function moveField(db, name, delta) {
   touch(db);
 }
 
-// Copying from the previous record (F5 in the editor) fills in the fields that
+// Copying from the previous record (Ctrl+D in a new record) fills in the fields that
 // describe the source, such as Author, Title and Year, and leaves the note
 // itself alone. Each field can be switched on or off in Fields (F8); until it
 // is, fields whose names sound like notes, pages or keywords are left out.
@@ -177,7 +177,7 @@ export function shownInList(db, field) {
 
 // The list's columns, left to right. Once chosen they are db.listColumns, in
 // their own order, apart from the order of the fields in a record; until then
-// the fields marked "In list" (older notebooks) or the first four.
+// the fields marked "In list" (older collections) or the first four.
 export function listColumns(db) {
   const names = new Set(db.fields.map((f) => f.name));
   const cols = [...new Set(db.listColumns ?? db.fields.filter((f) => shownInList(db, f)).map((f) => f.name))].filter((n) => names.has(n));
@@ -226,7 +226,7 @@ export function copyClashes(db, from, values, only = null) {
   });
 }
 
-// Copy into values (only one field, or the "Copy with F5" fields); text
+// Copy into values (only one field, or the "Copy into new records" fields); text
 // already there is kept unless overwrite is set (the default for one field).
 export function carryOver(db, from, values, only = null, { overwrite = !!only } = {}) {
   const copied = [];
@@ -280,12 +280,12 @@ export function previousEntered(records, rec) {
 //
 // Every record has a number (rec.id), given when it is made and never reused,
 // shown as #127. Exports can carry it as a column called Record#, and an
-// import into a new notebook gives the records those numbers back.
+// import into a new collection gives the records those numbers back.
 
 export const RECORD_FIELD = 'Record#';
 const isRecordField = (name) => /^record\s*#$/i.test(name.trim());
 
-// The fields and records to export, with Record# first (unless the notebook
+// The fields and records to export, with Record# first (unless the collection
 // has a field of that name itself).
 export function withRecordNumbers(fields, records) {
   if (fields.some(isRecordField)) return { fields, records };
@@ -306,7 +306,7 @@ export function recordNumbersIn(imported) {
   return { field, ids: problem ? null : ids, problem };
 }
 
-// Build a database from imported rows ({ fields, records: [ {name: value} ] }).
+// Build a collection from imported rows ({ fields, records: [ {name: value} ] }).
 export function databaseFromImport(name, imported) {
   const numbers = recordNumbersIn(imported);
   // Unusable numbers stay as an ordinary field, so nothing is lost.
@@ -322,8 +322,8 @@ export function databaseFromImport(name, imported) {
   return db;
 }
 
-// Append imported records to an existing database, adding any new fields.
-// Record numbers are not carried over (they could clash with this notebook's
+// Append imported records to an existing collection, adding any new fields.
+// Record numbers are not carried over (they could clash with this collection's
 // own): the records get new numbers and the Record# column is dropped.
 export function appendImport(db, imported, fieldMap = null) {
   const numbers = recordNumbersIn(imported);
@@ -346,7 +346,7 @@ export function appendImport(db, imported, fieldMap = null) {
 
 export function validateDatabase(db) {
   if (!db || typeof db !== 'object' || !Array.isArray(db.fields) || !Array.isArray(db.records)) {
-    throw new Error('Not a Notebook database file');
+    throw new Error('Not a ThreeByFive collection file');
   }
   db.printForms ??= [defaultPrintForm(fieldNames(db))];
   db.printForms.forEach(upgradeForm);

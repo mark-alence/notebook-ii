@@ -1,6 +1,6 @@
 // PDF output for Export: pages laid out from the paper size, margins and font
 // size, with the form's header and footer on every page. The text is set in a
-// DejaVu font built into the PDF, so every character in a notebook prints
+// DejaVu font built into the PDF, so every character in a collection prints
 // (accents of any language, DOS box lines). The monospace font keeps
 // fixed-width columns ({Field:20}) lined up; the serif and sans-serif ones do
 // not, since their letters differ in width.
@@ -98,7 +98,7 @@ export function makePdf(blocks, { jsPDF, font, title = '', header = '', footer =
   const measure = face.fixed ? monoWidth : (s) => doc.getStringUnitWidth(s);
   const { layout, fits, pages } = layoutPdf(blocks, { header, footer, measure, ...options });
   doc.setFontSize(layout.fontSize);
-  doc.setProperties({ title, creator: 'Notebook II' });
+  doc.setProperties({ title, creator: 'ThreeByFive' });
   const x = layout.margin;
   const first = layout.margin + layout.line * 0.8; // baseline of the top line
   const clip = (s) => s.slice(0, fitLength(s, fits));

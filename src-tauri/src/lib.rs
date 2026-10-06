@@ -1,6 +1,6 @@
 //! The desktop shell around the web app in ../js. It adds what a browser page
-//! cannot do: native open and save dialogs, reading and writing notebook files
-//! on disk, a menu bar, and opening a notebook file that was double-clicked.
+//! cannot do: native open and save dialogs, reading and writing collection files
+//! on disk, a menu bar, and opening a collection file that was double-clicked.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -18,7 +18,7 @@ struct Filter {
     extensions: Vec<String>,
 }
 
-/// A notebook file given on the command line (or by the file manager), handed
+/// A collection file given on the command line (or by the file manager), handed
 /// to the page once when it asks.
 #[derive(Default)]
 struct LaunchFile(Mutex<Option<String>>);
@@ -63,7 +63,7 @@ async fn read_text(path: String) -> Result<String, String> {
 }
 
 /// Writes next to the target and renames over it, so the file on disk is
-/// always either the old notebook or the new one, never half of each.
+/// always either the old collection or the new one, never half of each.
 fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
     let target = PathBuf::from(path);
     let mut tmp = target.clone().into_os_string();
@@ -105,15 +105,15 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "File",
         true,
         &[
-            &item("newdb", "New Notebook…", Some("CmdOrCtrl+Shift+N"))?,
-            &item("open", "Open Notebook…", Some("CmdOrCtrl+O"))?,
-            &item("saveas", "Save Notebook As…", None)?,
+            &item("newdb", "New Collection…", Some("CmdOrCtrl+Shift+N"))?,
+            &item("open", "Open Collection…", Some("CmdOrCtrl+O"))?,
+            &item("saveas", "Save Collection As…", None)?,
             &sep()?,
             &item("import", "Import…", None)?,
             &item("export", "Export…", None)?,
             &item("print", "Export with a Form or as PDF…", None)?,
             &sep()?,
-            &item("close", "Close Notebook", Some("CmdOrCtrl+W"))?,
+            &item("close", "Close Collection", Some("CmdOrCtrl+W"))?,
             #[cfg(not(target_os = "macos"))]
             &sep()?,
             #[cfg(not(target_os = "macos"))]
@@ -125,15 +125,15 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "Edit",
         true,
         &[
-            &item("new", "New Note", Some("CmdOrCtrl+N"))?,
-            &item("copyprev", "Copy Previous (F5)", None)?,
-            &item("copyfield", "Copy Field (F6)", None)?,
-            &item("delete", "Delete Note", None)?,
+            &item("new", "New Record", Some("CmdOrCtrl+N"))?,
+            &item("copyprev", "Copy Previous (Ctrl+D)", None)?,
+            &item("copyfield", "Copy Field (Ctrl+Shift+D)", None)?,
+            &item("delete", "Delete Record", None)?,
             &sep()?,
-            &item("mark", "Mark or Unmark Note (M)", None)?,
-            &item("markall", "Mark All Notes Found", None)?,
+            &item("mark", "Mark or Unmark Record (M)", None)?,
+            &item("markall", "Mark All Records Found", None)?,
             &item("clearmarks", "Clear All Marks (Shift+M)", None)?,
-            &item("delmarked", "Delete Marked Notes…", None)?,
+            &item("delmarked", "Delete Marked Records…", None)?,
             &sep()?,
             &PredefinedMenuItem::undo(app, None)?,
             &PredefinedMenuItem::redo(app, None)?,
@@ -150,8 +150,8 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[
             &item("find", "Find (/)", None)?,
-            &item("all", "Show All Notes", None)?,
-            &item("showmarked", "Show Marked Notes", None)?,
+            &item("all", "Show All Records", None)?,
+            &item("showmarked", "Show Marked Records", None)?,
             &item("sort", "Sort…", None)?,
         ],
     )?;
@@ -162,23 +162,23 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[
             &item("fields", "Fields…", None)?,
             &item("appearance", "Appearance…", None)?,
-            &item("theme", "Light or Dark", None)?,
+            &item("theme", "Light, Dark or Retro", None)?,
             &item("palette", "All Commands…", None)?,
         ],
     )?;
-    let help = Submenu::with_items(app, "Help", true, &[&item("help", "Notebook II Help", None)?])?;
+    let help = Submenu::with_items(app, "Help", true, &[&item("help", "ThreeByFive Help", None)?])?;
 
     #[cfg(target_os = "macos")]
     {
         let app_menu = Submenu::with_items(
             app,
-            "Notebook II",
+            "ThreeByFive",
             true,
             &[
                 &PredefinedMenuItem::about(app, None, None)?,
                 &sep()?,
                 &PredefinedMenuItem::hide(app, None)?,
-                &item("quit", "Quit Notebook II", Some("CmdOrCtrl+Q"))?,
+                &item("quit", "Quit ThreeByFive", Some("CmdOrCtrl+Q"))?,
             ],
         )?;
         return Menu::with_items(app, &[&app_menu, &file, &edit, &search, &view, &help]);
@@ -201,7 +201,7 @@ pub fn run() {
             pick_open, pick_save, read_text, write_text, write_bytes, launch_file
         ])
         .build(tauri::generate_context!())
-        .expect("error while starting Notebook II");
+        .expect("error while starting ThreeByFive");
 
     app.run(|_app, _event| {
         // macOS hands a double-clicked file over as an event, not an argument.

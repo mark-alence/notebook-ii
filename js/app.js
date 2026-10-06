@@ -16,7 +16,7 @@ import { listSaved, saveDb, loadDb, removeDb, newKey, listRecent, addRecent, rem
 import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
 import { VERSION } from './version.js';
-import { THEMES, getTheme, setTheme, nextTheme } from './theme.js';
+import { THEMES, THEME_NAMES, getTheme, setTheme, nextTheme } from './theme.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -26,8 +26,8 @@ const CTRL = MAC ? '⌘' : 'Ctrl ';
 
 const state = {
   db: null,
-  key: null, // where the notebook is kept in browser storage, or null
-  path: null, // desktop app: the notebook's file, or null
+  key: null, // where the collection is kept in browser storage, or null
+  path: null, // desktop app: the collection's file, or null
   query: '',
   sortKeys: [],
   list: null, // records shown, after search and sort
@@ -39,9 +39,9 @@ const state = {
   viewSnapshot: null, // its values when it was opened, for Revert
   viewIsNew: false,
   editField: 0, // the field that last had the cursor on the record screen
-  copySource: null, // what F5 and F6 copy from: the record you were on when you pressed N
+  copySource: null, // what copy previous copies from: the record you were on when you pressed N
   formIndex: 0,
-  exp: null, // the Export screen's choices, kept while the notebook is open
+  exp: null, // the Export screen's choices, kept while the collection is open
   imp: null,
   message: '',
   messageIsError: false,
@@ -80,11 +80,11 @@ function persist() {
   if (!state.key) return;
   if (!askedToKeep) { askedToKeep = true; navigator.storage?.persist?.().catch(() => {}); }
   if (!saveDb(state.key, state.db)) {
-    say('Could not save in this browser (storage may be full). Use Export > Notebook file to keep a copy.', true);
+    say('Could not save in this browser (storage may be full). Use Export > ThreeByFive file to keep a copy.', true);
   }
 }
 
-// Desktop app: the notebook is a file, rewritten as it changes. Writes run one
+// Desktop app: the collection is a file, rewritten as it changes. Writes run one
 // after another, so a slow disk never gets them out of order.
 let writing = Promise.resolve();
 function writeFile() {
@@ -118,7 +118,7 @@ function flush() {
 addEventListener('pagehide', flush);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
-// key: the notebook's place in browser storage (a new one by default); path:
+// key: the collection's place in browser storage (a new one by default); path:
 // its file, in the desktop app, when it was opened from or saved to one.
 function openDb(db, key = newKey(), path = null) {
   state.db = db;
@@ -134,14 +134,14 @@ function openDb(db, key = newKey(), path = null) {
   refreshList();
   if (path) addRecent({ path, name: db.name, records: db.records.length, modified: db.modified });
   else persist();
-  platform.setTitle(`${db.name} · Notebook II`);
+  platform.setTitle(`${db.name} · ThreeByFive`);
   go('browse');
-  if (!path && platform.desktop) say(`This notebook is kept inside the app. Save As (${keyLabel('Ctrl+Shift+s')}) makes it a file you can back up and move.`);
-  else if (!path && needsBackup(db)) say(`This notebook has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
+  if (!path && platform.desktop) say(`This collection is kept inside the app. Save As (${keyLabel('Ctrl+Shift+s')}) makes it a file you can back up and move.`);
+  else if (!path && needsBackup(db)) say(`This collection has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
 }
 
 // Without a sort field the list is in the order records were made, newest
-// first unless the notebook is set to oldest first.
+// first unless the collection is set to oldest first.
 function setOrder(order) {
   if (state.mode === 'view') go('browse');
   const id = current()?.id;
@@ -153,7 +153,7 @@ function setOrder(order) {
   say(order === 'oldest' ? 'Oldest records first.' : 'Newest records first.');
 }
 
-// The notebook remembers its sort; no sort fields means date-entered order.
+// The collection remembers its sort; no sort fields means date-entered order.
 function setSort(keys) {
   state.sortKeys = keys;
   state.db.sortKeys = keys;
@@ -167,14 +167,14 @@ function needsBackup(db) {
   return db.modified > db.lastBackup && Date.now() - Date.parse(db.lastBackup) > WEEK;
 }
 
-// Notebooks live in this browser's storage, which is lost if the browser's
-// site data is cleared. A backup is the same file Export > Notebook file
+// Collections live in this browser's storage, which is lost if the browser's
+// site data is cleared. A backup is the same file Export > ThreeByFive file
 // makes; Import reads it back.
 async function backupDb() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
   const stamp = new Date().toISOString();
-  const saved = await download(`${safeName(db.name)}-${stamp.slice(0, 10)}${platform.desktop ? '.nb2' : '.nb2.json'}`, toBytes(exportJson(db)), 'application/json');
+  const saved = await download(`${safeName(db.name)}-${stamp.slice(0, 10)}${platform.desktop ? '.3x5' : '.3x5.json'}`, toBytes(exportJson(db)), 'application/json');
   if (!saved) return;
   db.lastBackup = stamp;
   persist();
@@ -187,11 +187,11 @@ async function closeDb() {
   persist();
   await flushAll();
   state.db = null; state.key = null; state.path = null; state.list = null; state.query = '';
-  platform.setTitle('Notebook II');
+  platform.setTitle('ThreeByFive');
   go('home');
 }
 
-// ---------- desktop app: notebooks as files ----------
+// ---------- desktop app: collections as files ----------
 
 async function openFile(path = null) {
   try {
@@ -202,7 +202,7 @@ async function openFile(path = null) {
       db = validateDatabase(JSON.parse(await platform.readText(path)));
     } catch (e) {
       if (/read/i.test(String(e))) throw e;
-      throw new Error(`${platform.fileName(path)} is not a Notebook file. To bring in other files, including Notebook II's own .DAT files, use Import.`);
+      throw new Error(`${platform.fileName(path)} is not a ThreeByFive collection. To bring in other files, including Notebook II's own .DAT files, use Import.`);
     }
     if (state.db) await closeDb();
     openDb(db, null, path);
@@ -213,8 +213,8 @@ async function openFile(path = null) {
   }
 }
 
-// Saves the open notebook to a new file and keeps working on that file. A
-// notebook that was kept inside the app moves out to the file.
+// Saves the open collection to a new file and keeps working on that file. A
+// collection that was kept inside the app moves out to the file.
 async function saveAs() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
@@ -225,7 +225,7 @@ async function saveAs() {
   state.key = null;
   await writeFile();
   if (oldKey) removeDb(oldKey);
-  platform.setTitle(`${db.name} · Notebook II`);
+  platform.setTitle(`${db.name} · ThreeByFive`);
   if (state.mode === 'view') render();
   say(`Saved as ${platform.fileName(path)}. Changes now go straight to that file.`);
 }
@@ -275,35 +275,35 @@ function goBack() {
 
 // ---------- commands ----------
 //
-// key: the letter (or key name) that runs it; fkey: the original F-key;
+// key: the letter (or key name) that runs it;
 // where: the screens it belongs to; bar: shown on the command bar there.
 
 const COMMANDS = [
-  { id: 'newdb', label: 'New notebook', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
-  { id: 'openfile', label: 'Open notebook file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
+  { id: 'newdb', label: 'New collection', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
+  { id: 'openfile', label: 'Open collection file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
   { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openDb(databaseFromImport(SAMPLE.name, SAMPLE)) },
-  { id: 'open', label: 'Open selected database', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
-  { id: 'deldb', label: 'Delete selected database', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
+  { id: 'open', label: 'Open selected collection', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
+  { id: 'deldb', label: 'Delete selected collection', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
 
   { id: 'back', label: 'Back to the list', key: 'Escape', where: ['view'], bar: true, run: () => go('browse') },
   { id: 'prev', label: 'Previous record', key: 'PageUp', where: ['view'], bar: true, run: () => moveRecord(-1) },
   { id: 'next', label: 'Next record', key: 'PageDown', where: ['view'], bar: true, run: () => moveRecord(1) },
-  { id: 'new', label: 'New note', key: 'n', fkey: 'F3', where: ['browse', 'view'], bar: true, run: () => newRecord() },
-  { id: 'edit', label: 'Edit record', key: 'e', fkey: 'F2', where: ['browse', 'view'], run: () => editRecord() },
-  { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy with F5")', key: 'Ctrl+d', fkey: 'F5', barKey: 'F5', where: ['view'], newOnly: true, bar: true, run: () => copyFromPrevious(false) },
-  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', fkey: 'F6', barKey: 'F6', where: ['view'], newOnly: true, bar: true, run: () => copyFromPrevious(true) },
-  { id: 'save', label: 'Save', key: 'Ctrl+s', fkey: 'F10', barKey: 'F10', where: ['view'], bar: true, run: () => saveRecord() },
+  { id: 'new', label: 'New record', key: 'n', where: ['browse', 'view'], bar: true, run: () => newRecord() },
+  { id: 'edit', label: 'Edit record', key: 'e', where: ['browse', 'view'], run: () => editRecord() },
+  { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy into new records")', key: 'Ctrl+d', where: ['view'], newOnly: true, bar: true, run: () => copyFromPrevious(false) },
+  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', where: ['view'], newOnly: true, bar: true, run: () => copyFromPrevious(true) },
+  { id: 'save', label: 'Save', key: 'Ctrl+s', where: ['view'], bar: true, run: () => saveRecord() },
   { id: 'revert', label: 'Revert changes to this record', where: ['view'], bar: true, run: () => revertRecord() },
-  { id: 'find', label: 'Find (records in the list, or text in the record on screen)', key: '/', fkey: 'F4', where: ['browse', 'view'], bar: true, run: () => focusSearch() },
-  { id: 'all', label: 'Show all records', fkey: 'F5', where: ['browse'], run: () => clearSearch() },
+  { id: 'find', label: 'Find (records in the list, or text in the record on screen)', key: '/', where: ['browse', 'view'], bar: true, run: () => focusSearch() },
+  { id: 'all', label: 'Show all records', where: ['browse'], run: () => clearSearch() },
   { id: 'newest', label: 'Newest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('newest'); } },
   { id: 'oldest', label: 'Oldest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('oldest'); } },
-  { id: 'sort', label: 'Sort…', key: 's', fkey: 'F6', where: ['browse'], bar: true, run: () => go('sort') },
-  { id: 'print', label: 'Export with a custom form, as text or PDF…', key: 'p', fkey: 'F7', where: ['browse', 'view'], run: () => exportWith('form') },
-  { id: 'fields', label: 'Fields', fkey: 'F8', where: ['browse', 'view'], bar: true, run: () => go('fields') },
-  { id: 'import', label: 'Import', key: 'i', fkey: 'F9', where: ['home', 'browse', 'view'], bar: true, run: () => pickFiles(startImport) },
-  { id: 'export', label: 'Export', key: 'x', fkey: 'F10', where: ['browse', 'view'], bar: true, run: () => go('export') },
-  { id: 'saveas', label: 'Save notebook as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, desktop: true, run: () => saveAs() },
+  { id: 'sort', label: 'Sort…', key: 's', where: ['browse'], bar: true, run: () => go('sort') },
+  { id: 'print', label: 'Export with a custom form, as text or PDF…', key: 'p', where: ['browse', 'view'], run: () => exportWith('form') },
+  { id: 'fields', label: 'Fields', where: ['browse', 'view'], bar: true, run: () => go('fields') },
+  { id: 'import', label: 'Import…', key: 'i', where: ['home', 'browse', 'view'], bar: true, run: () => go('importpick') },
+  { id: 'export', label: 'Export', key: 'x', where: ['browse', 'view'], bar: true, run: () => go('export') },
+  { id: 'saveas', label: 'Save collection as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, desktop: true, run: () => saveAs() },
   { id: 'backup', label: platform.desktop ? 'Save a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
   { id: 'mark', label: 'Mark or unmark this record', key: 'm', where: ['browse', 'view'], run: () => toggleMark() },
   { id: 'showmarked', label: 'Show marked records', where: ['browse', 'view'], run: () => showMarked() },
@@ -311,10 +311,10 @@ const COMMANDS = [
   { id: 'clearmarks', label: 'Clear all marks', key: 'Shift+m', where: ['browse', 'view'], run: () => clearMarks() },
   { id: 'delmarked', label: 'Delete marked records…', where: ['browse', 'view'], run: () => deleteMarked() },
   { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
-  { id: 'close', label: 'Close database', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
-  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'import', 'export', 'help', 'newdb', 'appearance'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
-  { id: 'help', label: 'Help', key: '?', fkey: 'F1', where: ['home', 'browse', 'view', 'sort', 'fields', 'import', 'export', 'appearance'], bar: true, run: () => go('help') },
-  { id: 'theme', label: 'Light or dark screen', key: 'Alt+t', where: ['*'], run: () => cycleTheme() },
+  { id: 'close', label: 'Close collection', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
+  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'importpick', 'import', 'export', 'help', 'newdb', 'appearance'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
+  { id: 'help', label: 'Help', key: '?', where: ['home', 'browse', 'view', 'sort', 'fields', 'importpick', 'import', 'export', 'appearance'], bar: true, run: () => go('help') },
+  { id: 'theme', label: 'Light, dark or retro screen', key: 'Alt+t', where: ['*'], run: () => cycleTheme() },
   { id: 'appearance', label: 'Appearance: font, size, spacing, light or dark…', where: ['*'], run: () => go('appearance') },
   { id: 'palette', label: 'Commands', key: 'Ctrl+k', where: ['*'], bar: true, run: () => openPalette() },
 ];
@@ -346,7 +346,7 @@ function runCommand(id) {
 function render() {
   document.body.dataset.mode = state.mode;
   renderTitle();
-  const views = { home: renderHome, appearance: renderAppearance, newdb: renderNewDb, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, import: renderImport, export: renderExport, help: renderHelp };
+  const views = { home: renderHome, importpick: renderImportPick, appearance: renderAppearance, newdb: renderNewDb, browse: renderBrowse, view: renderView, sort: renderSort, fields: renderFields, import: renderImport, export: renderExport, help: renderHelp };
   views[state.mode]();
   renderKeys();
   renderStatus();
@@ -381,7 +381,7 @@ function renderTitle() {
       : 'Find records (/)   e.g. smith  author:smith  year>1980';
     search.setAttribute('aria-label', job === 'record' ? 'Find in this record' : 'Find records');
   }
-  $('#themebtn').textContent = { auto: 'Auto', light: 'Light', dark: 'Dark' }[getTheme()];
+  $('#themebtn').textContent = THEME_NAMES[getTheme()];
 }
 
 function renderKeys() {
@@ -393,7 +393,7 @@ function renderKeys() {
   }).join('');
 }
 
-const SHORT = { print: 'Form/PDF', openfile: 'Open', saveas: 'Save as', newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New note', sort: 'Sort', backup: 'Backup' };
+const SHORT = { print: 'Form/PDF', openfile: 'Open', saveas: 'Save as', newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New record', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
   if (c.id === 'find') return state.mode === 'view' ? 'Find in record' : 'Find';
   if (c.id === 'delete' && state.mode === 'browse' && state.db && markCount()) return `Delete ${markCount()} marked`;
@@ -415,7 +415,7 @@ function preview(text, max = 120) {
   return one.length > max ? one.slice(0, max - 1) + '…' : one;
 }
 
-// The start screen lists notebooks: in the desktop app, recent notebook files
+// The start screen lists collections: in the desktop app, recent collection files
 // first, then any kept inside the app; on the web, those kept in this browser.
 function homeEntries() {
   const files = platform.desktop ? listRecent().map((r) => ({ ...r, kind: 'file' })) : [];
@@ -436,18 +436,16 @@ function renderHome() {
       <td>${esc(d.name)}</td>${platform.desktop ? `<td class="where" title="${esc(d.kind === 'file' ? d.path : '')}">${esc(d.kind === 'file' ? shortPath(d.path) : 'kept in the app')}</td>` : ''}<td class="num">${d.records ?? ''}</td><td>${d.modified ? esc(new Date(d.modified).toLocaleString()) : ''}</td>
     </tr>`).join('');
   const keep = platform.desktop
-    ? `<p class="hint">Each notebook is a file on your computer (<code>.nb2</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.</p>`
-    : `<p class="warn">Notebooks are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a notebook, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>`;
+    ? `<p class="hint">Each collection is a file on your computer (<code>.3x5</code>), saved as you type. Back it up like any other document, or keep it in a synced folder. <kbd>O</kbd> opens one.</p>`
+    : `<p class="warn">Collections are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a collection, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>`;
   $('#main').innerHTML = `
     <div class="panel home">
-      <h2>${platform.desktop ? 'Recent notebooks' : 'Notebooks'}</h2>
+      <h2>${platform.desktop ? 'Recent collections' : 'Collections'}</h2>
       ${entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th>${platform.desktop ? '<th>File</th>' : ''}<th class="num">Records</th><th>Changed</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <p class="hint">Click a notebook to open it, or use ↑ ↓ and Enter.</p>`
-      : `<p>No notebooks yet. Press <kbd>N</kbd> to make one, ${platform.desktop ? '<kbd>O</kbd> to open a notebook file, ' : ''}<kbd>I</kbd> to import a file from Notebook II or another program, or <kbd>S</kbd> to try a sample.</p>`}
+        <p class="hint">Click a collection to open it, or use ↑ ↓ and Enter.</p>`
+      : `<p>No collections yet. Press <kbd>N</kbd> to make one, ${platform.desktop ? '<kbd>O</kbd> to open a collection file, ' : ''}<kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample.</p>`}
       <p class="hint">Every command is on the bar at the bottom, and <kbd>${esc(keyLabel('Ctrl+k'))}</kbd> lists them all.</p>
       ${keep}
-      <h2>Bringing in your old files</h2>
-      <p>Press <kbd>I</kbd> (Import) and choose a Notebook II database's files together: <code>NAME.DAT</code>, <code>NAME.DEF</code> and <code>NAME.IDX</code> (and <code>NAME.MSC</code> and print formats, <code>*.R00</code>, if you have them). Import also reads text that Notebook II or other programs wrote: delimited text (tab, comma, <code>|</code>, <code>~</code> or any character you name), tagged text (<code>Author: …</code> or <code>%Author:…</code> lines), and DOS characters (code page 437). Any other file can be opened with <em>Salvage</em>, which pulls out the readable text.</p>
     </div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
 }
@@ -471,7 +469,7 @@ function deleteSavedDb() {
     render();
     return say(`Removed ${platform.fileName(d.path)} from this list. The file itself is untouched.`);
   }
-  ask(`Delete the notebook "${d.name}" from ${platform.desktop ? 'the app' : 'this browser'}? Make a backup first if you want a copy.`, 'Delete').then((yes) => { if (yes) { removeDb(d.key); render(); } });
+  ask(`Delete the collection "${d.name}" from ${platform.desktop ? 'the app' : 'this browser'}? Make a backup first if you want a copy.`, 'Delete').then((yes) => { if (yes) { removeDb(d.key); render(); } });
 }
 
 // Records drawn at a time in the list (Appearance: 200, 500, 1000 or all).
@@ -533,7 +531,7 @@ function renderBrowse() {
   };
   $('#main').innerHTML = state.list.length
     ? `<div class="browse" role="table" style="--cols: 3ch ${String(Math.max(0, db.nextId - 1)).length + 5}ch ${columnWidths(db, cols)}"><div class="brow bhead" role="row"><span role="columnheader" class="mk" title="Marked records (M marks one; @marked finds them)">✓</span><span role="columnheader" class="num"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></span>${cols.map((c) => `<span role="columnheader"><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></span>`).join('')}</div><div class="bbody" role="rowgroup">${rows}</div></div>${more}`
-    : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This database is empty. Press <kbd>N</kbd> for a new note or <kbd>I</kbd> to import some.'}</p></div>`;
+    : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This collection is empty. Press <kbd>N</kbd> for a new record or <kbd>I</kbd> to import some.'}</p></div>`;
   const body = $('#main .bbody');
   body?.addEventListener('click', (e) => {
     const tr = e.target.closest('[data-i]');
@@ -625,7 +623,7 @@ function newRecord() {
   const rec = addRecord(state.db, {});
   state.copySource = from;
   openRecord(rec, { isNew: true, focus: true });
-  say(from ? `New note. F5 or ${keyLabel('Ctrl+d')} fills in ${copyList()} from ${recordLabel(from)}.` : 'New note.');
+  say(from ? `New record. ${keyLabel('Ctrl+d')} fills in ${copyList()} from ${recordLabel(from)}.` : 'New record.');
 }
 
 function editRecord() {
@@ -713,7 +711,7 @@ function recordMeta(rec) {
   return esc(bits.join(' · '));
 }
 
-// Changes are saved as you type; F10 or Ctrl+S saves at once and says so.
+// Changes are saved as you type; Ctrl+S saves at once and says so.
 function saveRecord() {
   clearTimeout(persistTimer);
   persist();
@@ -756,13 +754,14 @@ function copyList() {
   return names.length ? andList(names) : 'no fields (choose them in Fields)';
 }
 
-// F5 and F6 copy into a new note only: from pressing N until you leave it.
-const NEW_ONLY = 'F5 and F6 copy into a new note only: press N for one.';
+// Copying from the previous record works in a new record only: from pressing N
+// until you leave it.
+const NEW_ONLY = `${keyLabel('Ctrl+d')} and ${keyLabel('Ctrl+Shift+d')} copy into a new record only: press N for one.`;
 
 function copyHint() {
   if (!state.viewIsNew) return '';
-  if (!state.copySource) return '<kbd>F5</kbd> and <kbd>F6</kbd> copy from the record you were on when you pressed <kbd>N</kbd>; there was none.';
-  return `<kbd>F5</kbd> copies ${esc(copyList())} from <strong>${esc(recordLabel(state.copySource))}</strong>, the record you were on when you made this note; <kbd>F6</kbd> copies just the field you are in. Text already in a field is replaced only after you say OK.`;
+  if (!state.copySource) return `<kbd>${esc(keyLabel('Ctrl+d'))}</kbd> and <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> copy from the record you were on when you pressed <kbd>N</kbd>; there was none.`;
+  return `<kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies ${esc(copyList())} from <strong>${esc(recordLabel(state.copySource))}</strong>, the record you were on when you made this record; <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> copies just the field you are in. Text already in a field is replaced only after you say OK.`;
 }
 
 async function copyFromPrevious(onlyCurrentField) {
@@ -902,10 +901,10 @@ function renderFields() {
   $('#main').innerHTML = `
     <div class="panel" id="fields">
       <h2>Fields</h2>
-      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Copy with F5</th><th>Lines</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
+      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Copy into new records</th><th>Lines</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
         <tr><td class="num">${i + 1}</td>
           <td><input data-rename="${esc(name)}" value="${esc(name)}" aria-label="Field name"></td>
-          <td><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''} aria-label="Copy ${esc(name)} with F5"></td>
+          <td><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''} aria-label="Copy ${esc(name)} into new records"></td>
           <td><input type="number" min="1" max="40" data-lines="${esc(name)}" value="${fieldLines(field)}" aria-label="Lines shown for ${esc(name)}"></td>
           <td class="buttons">
             <button type="button" data-move="${esc(name)}" data-d="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
@@ -927,10 +926,10 @@ function renderFields() {
         ${others.length ? `<div class="row"><select id="addcol" aria-label="Field to add as a column">${others.map((n) => `<option>${esc(n)}</option>`).join('')}</select><button type="button" id="addcolbtn">Add column</button></div>` : '<p class="hint">Every field is a column.</p>'}`;
       })()}
       <p class="hint">The list of records shows these fields as columns, left to right (top to bottom here), in their own order: it need not follow the order of the fields in a record. Widths follow the contents, so a short field such as Year gets a narrow column.</p>
-      <h2>Notebook name</h2>
-      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Notebook name"></div>
+      <h2>Collection name</h2>
+      <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Collection name"></div>
       <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text (a date written <code>1938-03-17</code> sorts in date order, and <code>1938-03-17 (approx.)</code> still does).</p>
-      <p class="hint"><strong>Copy with F5</strong>: in a new note, <kbd>F5</kbd> copies these fields from the record you were on when you pressed <kbd>N</kbd>, so a new note from the same source needs only the note. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
+      <p class="hint"><strong>Copy into new records</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
     </div>`;
   const done = (fn) => { try { fn(); persist(); refreshList(); render(); } catch (e) { say(e.message, true); } };
@@ -963,10 +962,42 @@ function pickFiles(onFiles) {
   input.click();
 }
 
-function startImport(files) {
+// What Import offers first: the kind of file, which sets how it is read (the
+// preview screen can still change it). Notebook II's own files come last.
+const IMPORT_KINDS = [
+  { id: 'auto', name: 'Any file', about: 'ThreeByFive works out what kind of file it is', opts: {} },
+  { id: 'json', name: 'ThreeByFive collection', about: 'a backup or collection file: .3x5.json or .3x5 (older ones: .nb2.json, .nb2)', opts: { format: 'json' } },
+  { id: 'csv', name: 'Spreadsheet (CSV)', about: 'comma-separated, from Excel, Numbers, LibreOffice, R …', opts: { format: 'delimited', fieldDelim: ',' } },
+  { id: 'tab', name: 'Tab-delimited text', about: 'one record per line, fields separated by tabs', opts: { format: 'delimited', fieldDelim: '\t' } },
+  { id: 'tagged', name: 'Tagged text', about: 'Field: value lines, as in ThreeByFive\'s own vertical text', opts: { format: 'tagged' } },
+  { id: 'delimited', name: 'Other delimited text', about: 'any separators: they are worked out, and you can change them on the next screen', opts: { format: 'delimited' } },
+  { id: 'salvage', name: 'Salvage', about: 'pulls every readable piece of text out of any file, even a damaged one', opts: { format: 'salvage' } },
+  { id: 'notebook', name: 'Notebook II database', about: 'from the DOS program: choose NAME.DAT, NAME.DEF and NAME.IDX together (and NAME.MSC and print formats, *.R00, if you have them)', opts: { format: 'notebook' } },
+];
+
+function renderImportPick() {
+  $('#main').innerHTML = `
+    <div class="panel" id="importpick">
+      <h2>Import</h2>
+      <p class="hint">Choose what to import, then the file. Press its number, or click it.</p>
+      <div class="kinds">${IMPORT_KINDS.map((k, i) => `
+        <button type="button" class="kind" data-kind="${i}"><kbd>${i + 1}</kbd> <strong>${esc(k.name)}</strong><br><span class="hint">${esc(k.about)}</span></button>`).join('')}
+      </div>
+      ${state.db ? `<p class="hint">Records can go into a new collection or be added to ${esc(state.db.name)}; you choose on the next screen.</p>` : ''}
+    </div>`;
+  $$('#importpick [data-kind]').forEach((b) => b.addEventListener('click', () => importKind(+b.dataset.kind)));
+  $('#importpick [data-kind]')?.focus();
+}
+
+function importKind(i) {
+  const kind = IMPORT_KINDS[i];
+  if (kind) pickFiles((files) => startImport(files, kind.opts));
+}
+
+function startImport(files, preset = {}) {
   const main = files.find((f) => /\.dat$/i.test(f.name)) ?? files[0];
   const name = files.length > 1 ? files.map((f) => f.name).join(', ') : main.name;
-  state.imp = { name, files, opts: { format: 'auto', encoding: 'auto' }, target: 'new', dbName: main.name.replace(/\.[^.]+$/, '') };
+  state.imp = { name, files, opts: { format: 'auto', encoding: 'auto', ...preset }, target: 'new', dbName: main.name.replace(/(\.3x5|\.nb2)?\.[^.]+$/i, '') };
   parseImport();
   go('import');
 }
@@ -994,7 +1025,7 @@ function renderImport() {
     <div class="panel" id="importer">
       <h2>Import ${esc(imp.name)}</h2>
       <div class="row">
-        <label>Read as</label><select data-opt="format">${fmtSel('auto', 'Detect automatically')}${fmtSel('notebook', 'Notebook II database (.DAT .DEF .IDX)')}${fmtSel('delimited', 'Delimited text')}${fmtSel('tagged', 'Tagged text (Field: value)')}${fmtSel('json', 'Notebook file (.json)')}${fmtSel('salvage', 'Salvage: readable text from any file')}</select>
+        <label>Read as</label><select data-opt="format">${fmtSel('auto', 'Detect automatically')}${fmtSel('notebook', 'Notebook II database (.DAT .DEF .IDX)')}${fmtSel('delimited', 'Delimited text')}${fmtSel('tagged', 'Tagged text (Field: value)')}${fmtSel('json', 'ThreeByFive collection (.3x5.json)')}${fmtSel('salvage', 'Salvage: readable text from any file')}</select>
         <label>Characters</label><select data-opt="encoding">${encSel('auto', 'Detect')}${encSel('cp437', 'DOS (code page 437)')}${encSel('utf-8', 'UTF-8')}</select>
       </div>
       ${delimited ? `
@@ -1004,7 +1035,7 @@ function renderImport() {
         <label>Line break marker</label><input data-delim="newlineMarker" value="${esc(showDelim(o.newlineMarker))}" list="delims" size="6" placeholder="none">
         <label>First row is field names</label><select data-opt="header"><option value="true" ${o.header ? 'selected' : ''}>Yes</option><option value="false" ${o.header ? '' : 'selected'}>No</option></select>
       </div>
-      <datalist id="delims"><option value="\\t">Tab</option><option value=",">Comma</option><option value="|"></option><option value="~"></option><option value="^"></option><option value=";"></option><option value="\\n">Line break</option><option value="\\f">Form feed</option><option value="\\x1e">Record separator</option><option value="\\x1f">Unit separator</option><option value="\\x14">¶ (DOS)</option></datalist>
+      <datalist id="delims"><option value="\\t">Tab</option><option value=",">Comma</option><option value="|"></option><option value="~"></option><option value="^"></option><option value=";"></option><option value="\\n">Line break</option><option value="\\f">Form feed</option><option value="\\x1e">Record separator</option><option value="\\x1f">Unit separator</option><option value="¶">¶</option><option value="\\x14">¶ (DOS, character 20)</option></datalist>
       <p class="hint">Type <code>\\t</code> for tab, <code>\\n</code> for a line break, <code>\\f</code> for form feed or <code>\\xNN</code> for any character code.</p>` : ''}
       ${r?.format === 'notebook' ? `<div class="row"><label class="check"><input type="checkbox" id="incdel" ${o.includeDeleted ? 'checked' : ''} ${o.deleted || o.includeDeleted ? '' : 'disabled'}> Include records marked deleted${o.deleted ? ` (${o.deleted})` : ''}</label></div>
       ${r.printForms?.length ? `<p>Print formats: ${r.printForms.map((f) => `<code>${esc(f.name)}</code>`).join(' ')}</p>` : ''}` : ''}
@@ -1019,8 +1050,8 @@ function renderImport() {
       </tbody></table></div>
       ${r.records.length > shown.length ? `<p class="hint">First ${shown.length} records shown.</p>` : ''}
       <div class="row target">
-        <label class="check"><input type="radio" name="target" value="new" ${imp.target === 'new' ? 'checked' : ''}> New database named</label>
-        <input id="newname" value="${esc(imp.dbName)}" aria-label="New database name">
+        <label class="check"><input type="radio" name="target" value="new" ${imp.target === 'new' ? 'checked' : ''}> New collection named</label>
+        <input id="newname" value="${esc(imp.dbName)}" aria-label="New collection name">
         ${state.db ? `<label class="check"><input type="radio" name="target" value="append" ${imp.target === 'append' ? 'checked' : ''}> Add to ${esc(state.db.name)}</label>` : ''}
       </div>
       ${r.format !== 'salvage' && r.records.length ? '<p class="hint">If the preview looks wrong, change <em>Read as</em> (or the delimiters) above. <em>Salvage</em> there pulls the readable text out of any file, even a damaged one.</p>' : ''}
@@ -1055,7 +1086,7 @@ function importNumbersNote(r) {
   if (!numbers.ids) return `<p class="warn">The ${esc(numbers.field)} column cannot be used as record numbers (${esc(numbers.problem)}), so it comes in as an ordinary field.</p>`;
   const lo = Math.min(...numbers.ids);
   const hi = Math.max(...numbers.ids);
-  return `<p class="hint">The ${esc(numbers.field)} column holds record numbers (#${lo}–#${hi}). A new notebook keeps them; records added to an open notebook get new numbers, so they cannot clash.</p>`;
+  return `<p class="hint">The ${esc(numbers.field)} column holds record numbers (#${lo}–#${hi}). A new collection keeps them; records added to an open collection get new numbers, so they cannot clash.</p>`;
 }
 
 function finishImport() {
@@ -1086,13 +1117,13 @@ function finishImport() {
 // Shown as a list, in two groups, so every choice (and PDF) is in view.
 const EXPORT_GROUPS = [
   ['For reading, sharing or printing', [
-    ['vertical', 'Vertical text', 'each record\'s fields one after another, notes under their label', 'text file or PDF'],
+    ['vertical', 'Vertical text', 'each record\'s fields one after another, long text under its label', 'text file or PDF'],
     ['form', 'Custom form', 'your own layout, with a page header and footer', 'text file or PDF'],
   ]],
   ['For other programs', [
     ['csv', 'Spreadsheet', 'comma-separated, for Excel, Numbers, LibreOffice, R', '.csv'],
     ['tab', 'Tab-delimited', 'one record per line, fields separated by tabs', '.txt'],
-    ['json', 'Notebook file', 'everything, to open in Notebook II on another computer (Import)', '.nb2.json'],
+    ['json', 'ThreeByFive file', 'everything, to open in ThreeByFive on another computer (Import)', '.3x5.json'],
     ['tagged', 'Tagged text', 'Field: value lines', '.txt'],
     ['custom', 'Delimited, my own characters', 'choose the separators', '.txt'],
   ]],
@@ -1100,7 +1131,7 @@ const EXPORT_GROUPS = [
 const PAGED = ['vertical', 'form']; // formats that can also be a PDF
 const NUMBERED = ['vertical', 'csv', 'tab', 'tagged', 'custom']; // can carry a Record# column
 
-// Export choices kept on this computer for next time (in every notebook),
+// Export choices kept on this computer for next time (in every collection),
 // with the values each may take.
 const EXPORT_KEY = 'nb2:export';
 const REMEMBERED = {
@@ -1132,7 +1163,7 @@ function exportState() {
   state.exp ??= {
     format: 'vertical', output: 'text', which: 'list',
     paper: /^en-(US|CA)|^es-(MX|US)/.test(navigator.language) ? 'letter' : 'a4', fontSize: 10, pdfFont: 'mono',
-    fieldDelim: '|', recordDelim: '\\r\\n', newlineMarker: '\\x14', header: true,
+    fieldDelim: '|', recordDelim: '\\n', newlineMarker: '¶', header: true,
     numbers: true, ids: '',
     ...rememberedExport(),
   };
@@ -1188,7 +1219,7 @@ function renderExport() {
           ${opt('ids', 'These record numbers…', x.which)}
         </select>
         ${x.which === 'ids' ? `<input name="ids" value="${esc(x.ids)}" placeholder="e.g. 12-40, 55, 500-" size="22" aria-label="Record numbers"> <span id="idcount" class="hint"></span>` : ''}</div>
-        ${NUMBERED.includes(x.format) ? `<div class="row"><label class="check"><input type="checkbox" name="numbers" ${x.numbers ? 'checked' : ''}> <span>Include record numbers (a <code>Record#</code> ${x.format === 'vertical' ? 'line' : 'column'}; importing into a new notebook keeps them)</span></label></div>` : ''}
+        ${NUMBERED.includes(x.format) ? `<div class="row"><label class="check"><input type="checkbox" name="numbers" ${x.numbers ? 'checked' : ''}> <span>Include record numbers (a <code>Record#</code> ${x.format === 'vertical' ? 'line' : 'column'}; importing into a new collection keeps them)</span></label></div>` : ''}
         <div class="buttons"><button type="submit">${pdf ? 'Save as PDF' : 'Save file'}</button></div>
         ${isForm ? formEditor(form, pdf) : ''}
         </div>`;
@@ -1237,9 +1268,7 @@ function formEditor(form, pdf) {
     <p class="hint"><code>{Field}</code> puts in a field, <code>{Field:20}</code> exactly 20 characters of it, <code>{Record#}</code> the record's number (<code>{#id}</code> gives it as <code>#127</code>), <code>{#}</code> its place in this output (1, 2, 3 …). A line written as <code>[[ … ]]</code> is left out when its fields are blank. Fields: ${db.fields.map((f) => `<code>{${esc(f.name)}}</code>`).join(' ')}${db.fields.some((f) => /^\s*record\s*#\s*$/i.test(f.name)) ? '' : ' <code>{Record#}</code>'}</p>
     <div class="row"><label for="formheader">Page header</label><input id="formheader" value="${esc(form.header ?? '')}" placeholder="none" size="40"></div>
     <div class="row"><label for="formfooter">Page footer</label><input id="formfooter" value="${esc(form.footer ?? '')}" placeholder="none" size="40"></div>
-    <p class="hint">In the header and footer: <code>{@page}</code> the page number, <code>{@pages}</code> how many pages, <code>{@date}</code> today's date, <code>{@time}</code> the time — for example <code>Notes, {@date}</code> and <code>Page {@page} of {@pages}</code>.${pdf ? ' They go on every page of the PDF.' : ''}</p>
-    ${pdf ? '' : `<div class="row"><label class="check"><input type="checkbox" id="textpages" ${form.textPages ? 'checked' : ''}> Cut the text file into pages of</label>
-      <input id="pagelines" type="number" min="10" max="255" value="${form.pageLines || 66}" ${form.textPages ? '' : 'disabled'}> lines, with the header and footer on each (otherwise they appear once, at the start and end)</div>`}`;
+    <p class="hint">In the header and footer: <code>{@page}</code> the page number, <code>{@pages}</code> how many pages, <code>{@date}</code> today's date, <code>{@time}</code> the time — for example <code>Notes, {@date}</code> and <code>Page {@page} of {@pages}</code>.${pdf ? ' They go on every page of the PDF.' : ' A text file has them once, at the start and the end.'}</p>`;
 }
 
 function wireFormEditor(form) {
@@ -1250,8 +1279,6 @@ function wireFormEditor(form) {
   $('#formname').addEventListener('change', () => render());
   for (const k of ['header', 'footer']) $(`#form${k}`).addEventListener('input', (e) => { form[k] = e.target.value; changed(); });
   $('#formwidth').addEventListener('input', (e) => { form.width = Math.max(20, Math.min(250, +e.target.value || 76)); changed(); });
-  $('#textpages')?.addEventListener('change', (e) => { form.textPages = e.target.checked; $('#pagelines').disabled = !form.textPages; changed(); });
-  $('#pagelines')?.addEventListener('input', (e) => { form.pageLines = Math.max(10, Math.min(255, +e.target.value || 66)); changed(); });
   $('#formsel').addEventListener('change', (e) => { state.formIndex = +e.target.value; render(); });
   $('#newform').addEventListener('click', () => {
     db.printForms.push({ ...defaultPrintForm(fieldNames(db)), name: `Form ${db.printForms.length + 1}` });
@@ -1319,7 +1346,7 @@ function updateExportPreview() {
   out.style.fontFamily = face?.family ? `"${face.family}"` : '';
   if (face?.loading) text = 'Loading the font…';
   else if (x.output === 'pdf') text = previewPdf(exportBlocks(recs), { ...pdfOptions(), ...(face ? { measure: face.measure } : {}) });
-  else if (x.format === 'form') text = renderReport(currentForm(), recs, fieldNames(state.db)).replace(/\f/g, `${'─'.repeat(currentForm().width)}\n`);
+  else if (x.format === 'form') text = renderReport(currentForm(), recs, fieldNames(state.db));
   else {
     const shape = exportShape(recs);
     text = exportVertical(shape.fields, shape.records).replace(/\r/g, '');
@@ -1400,7 +1427,7 @@ async function saveExport() {
   switch (x.format) {
     case 'json':
       if (recs.length === db.records.length) { db.lastBackup = new Date().toISOString(); persist(); }
-      return download(`${base}.nb2.json`, toBytes(exportJson(db, recs)), 'application/json');
+      return download(`${base}.3x5.json`, toBytes(exportJson(db, recs)), 'application/json');
     case 'vertical': return download(`${base}.txt`, toBytes(exportVertical(shape.fields, shape.records)), 'text/plain');
     case 'form': return download(`${base}-${safeName(currentForm().name)}.txt`, toBytes(renderReport(currentForm(), recs, f, { title: db.name }).replace(/\n/g, '\r\n')), 'text/plain');
     case 'csv': return download(`${base}.csv`, toBytes(exportDelimited(shape.fields, shape.records)), 'text/csv');
@@ -1424,19 +1451,19 @@ function renderHelp() {
 
 // ---------- commands that need more than one line ----------
 
-// A new notebook starts from one of a few layouts, then opens on Fields so the
+// A new collection starts from one of a few layouts, then opens on Fields so the
 // fields can be named and set up before the first record.
 function renderNewDb() {
   $('#main').innerHTML = `
     <form class="panel" id="newdbform">
-      <h2>New notebook</h2>
-      <div class="row"><label for="nbname">Name</label><input id="nbname" name="name" value="Notes" required></div>
+      <h2>New collection</h2>
+      <div class="row"><label for="nbname">Name</label><input id="nbname" name="name" value="My collection" required></div>
       <h2>Start with</h2>
       ${LAYOUTS.map((l, i) => `
         <label class="check layout"><input type="radio" name="layout" value="${l.id}" ${i ? '' : 'checked'}>
           <span><strong>${esc(l.name)}</strong><br><span class="hint">${l.fields.map((f) => esc(f.name)).join(' · ')}</span></span></label>`).join('')}
       <p class="hint">Every field holds text of any length. You can rename, add, remove and reorder fields on the next screen, and at any time later.</p>
-      <div class="buttons"><button type="submit">Make notebook</button></div>
+      <div class="buttons"><button type="submit">Make collection</button></div>
     </form>`;
   const form = $('#newdbform');
   form.name.focus();
@@ -1444,11 +1471,11 @@ function renderNewDb() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const layout = LAYOUTS.find((l) => l.id === form.layout.value) ?? LAYOUTS[0];
-    const name = form.name.value.trim() || 'Notes';
+    const name = form.name.value.trim() || 'My collection';
     const db = createDatabase(name, layout.fields);
     if (platform.desktop) {
       const path = await platform.pickNotebookPath(safeName(name));
-      if (!path) return say('Not made: choose where to save the notebook file.');
+      if (!path) return say('Not made: choose where to save the collection file.');
       if (state.db) await closeDb();
       openDb(db, null, path);
       await writeFile();
@@ -1456,7 +1483,7 @@ function renderNewDb() {
       openDb(db);
     }
     go('fields');
-    say(`Notebook "${name}" made. Set up its fields here, then press Esc to start adding notes.`);
+    say(`Collection "${name}" made. Set up its fields here, then press Esc to start adding records.`);
   });
 }
 
@@ -1560,7 +1587,7 @@ function cycleTheme() {
   const t = nextTheme(getTheme());
   setTheme(t);
   renderTitle();
-  say({ auto: 'Screen follows your computer\'s light or dark setting.', light: 'Light screen.', dark: 'Dark screen.' }[t]);
+  say({ auto: 'Screen follows your computer\'s light or dark setting.', light: 'Light screen.', dark: 'Dark screen.', retro: 'Retro: the blue DOS screen.' }[t]);
 }
 
 // ---------- appearance ----------
@@ -1576,10 +1603,10 @@ function renderAppearance() {
       <h2>Font</h2>
       ${FONTS.map((f) => `
         <label class="check layout"><input type="radio" name="font" value="${f.id}" ${a.font === f.id ? 'checked' : ''}>
-          <span><strong>${esc(f.name)}</strong>${f.id === 'dos' ? ' <span class="hint">(the default)</span>' : ''}<br>
+          <span><strong>${esc(f.name)}</strong>${f.id === 'theme' ? ' <span class="hint">(the default: modern monospace, or the DOS screen font in Retro)</span>' : ''}<br>
           ${f.id === 'custom'
             ? `<input name="custom" value="${esc(a.custom)}" placeholder="Font name, e.g. Courier New or Atkinson Hyperlegible" size="40" aria-label="Font name">`
-            : `<span class="fontsample" style="font-family: ${f.stack ? esc(f.stack) : 'var(--dos-font)'}">${esc(sample)}</span>`}</span></label>`).join('')}
+            : `<span class="fontsample" style="font-family: ${f.stack ? esc(f.stack) : 'var(--modern-font)'}">${esc(sample)}</span>`}</span></label>`).join('')}
       <h2>Text size</h2>
       <div class="row"><button type="button" data-size="-1" title="Smaller">A−</button>
         <input type="range" name="size" min="${SIZE.min}" max="${SIZE.max}" value="${size}" aria-label="Text size">
@@ -1590,9 +1617,9 @@ function renderAppearance() {
       <div class="row">${Object.entries(LABELS).map(([k, l]) => `<label class="check"><input type="radio" name="labels" value="${k}" ${a.labels === k ? 'checked' : ''}> ${l}${k === 'auto' ? ' <span class="hint">(beside the text when there is room for it, above it in a narrow window)</span>' : ''}</label>`).join('')}</div>
       <h2>Records in the list</h2>
       <div class="row">${LIST_ROWS.map((n) => `<label class="check"><input type="radio" name="listRows" value="${n}" ${+a.listRows === n ? 'checked' : ''}> ${n ? n.toLocaleString() + ' at a time' : 'All <span class="hint">(the default)</span>'}</label>`).join('')}</div>
-      <h2>Light or dark</h2>
-      <div class="row">${THEMES.map((t) => `<label class="check"><input type="radio" name="theme" value="${t}" ${theme === t ? 'checked' : ''}> ${{ auto: 'Follow the computer', light: 'Light', dark: 'Dark' }[t]}</label>`).join('')}</div>
-      <p class="hint">Changes show at once and are kept on this ${platform.desktop ? 'computer' : 'browser'}. A font has to be installed on the computer to be used; if it isn't, the DOS screen font shows instead.</p>
+      <h2>Screen</h2>
+      <div class="row">${THEMES.map((t) => `<label class="check"><input type="radio" name="theme" value="${t}" ${theme === t ? 'checked' : ''}> ${{ auto: 'Follow the computer (light or dark)', light: 'Light', dark: 'Dark', retro: 'Retro (the blue DOS screen)' }[t]}</label>`).join('')}</div>
+      <p class="hint">Changes show at once and are kept on this ${platform.desktop ? 'computer' : 'browser'}. A font has to be installed on the computer to be used; if it isn't, a standard monospace font shows instead.</p>
       <div class="buttons"><button type="button" id="resetlook">Back to the defaults</button></div>
     </form>`;
   const form = $('#appearanceform');
@@ -1611,12 +1638,12 @@ function renderAppearance() {
   form.addEventListener('submit', (e) => e.preventDefault());
 }
 
-// ---------- blocks: Ctrl+Space (or Ctrl+F2) in a record's field ----------
+// ---------- blocks: Ctrl+Space in a record's field ----------
 //
 // As in Emacs, Ctrl+Space sets the mark; the arrow keys, Home, End, PgUp, PgDn
 // (with Ctrl for words) then stretch a block from the mark to the cursor.
 // Ctrl+C copies it, Ctrl+X cuts it, Delete or typing replaces it, Esc or
-// Ctrl+Space again cancels it. Ctrl+F2 was "Mark" in Notebook II's editor.
+// Ctrl+Space again cancels it.
 
 const MOVE_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
 let mark = null; // { ta, at: where the mark is, caret: where the cursor is }
@@ -1631,7 +1658,7 @@ function endMark(message) {
 document.addEventListener('keydown', (e) => {
   const t = e.target;
   if (!(t instanceof HTMLTextAreaElement) || !t.closest('#recordform')) return;
-  if (e.ctrlKey && !e.altKey && !e.metaKey && (e.code === 'Space' || e.key === 'F2')) {
+  if (e.ctrlKey && !e.altKey && !e.metaKey && e.code === 'Space') {
     e.preventDefault();
     e.stopImmediatePropagation();
     if (mark?.ta === t) return endMark('Block cancelled.');
@@ -1803,7 +1830,7 @@ const palette = { open: false, items: [], sel: 0 };
 
 function paletteItems() {
   const items = COMMANDS.filter((c) => c.id !== 'palette' && c.id !== 'open' && available(c) && !(c.id === 'revert' && !recordChanged()))
-    .map((c) => ({ label: c.label, hint: keyLabel(c.key) || c.fkey || '', run: c.run }));
+    .map((c) => ({ label: c.label, hint: keyLabel(c.key), run: c.run }));
   if (state.db && ['browse', 'view'].includes(state.mode)) {
     for (const { name } of state.db.fields) {
       items.push({ label: `Sort by ${name}`, hint: '', run: () => { if (state.mode === 'view') go('browse'); setSort([]); sortByColumn(name); } });
@@ -1897,14 +1924,8 @@ function onKey(key, e) {
   if (m === 'view' && (key === 'Alt+PageUp' || key === 'Alt+PageDown')) return moveRecord(key === 'Alt+PageUp' ? -1 : 1);
   if (m === 'view' && (key === 'Ctrl+home' || key === 'Ctrl+end')) return recordEdge(key === 'Ctrl+end');
 
-  if (m === 'view' && ['F5', 'F6', 'Ctrl+d', 'Ctrl+Shift+d'].includes(key) && !state.viewIsNew) return say(NEW_ONLY);
-
-  // Old F-keys: the command that had it on this screen.
-  if (/^F\d+$/.test(key)) {
-    const c = COMMANDS.find((x) => x.fkey === key && available(x));
-    if (c) return c.run();
-    return key === 'F1' ? go('help') : false;
-  }
+  // Ctrl+D would bookmark the page: on a record that is not new, say why nothing happens.
+  if (m === 'view' && ['Ctrl+d', 'Ctrl+Shift+d'].includes(key) && !state.viewIsNew) return say(NEW_ONLY);
 
   const modified = key.includes('+');
   if (typing && !modified) {
@@ -1916,6 +1937,7 @@ function onKey(key, e) {
     return false;
   }
 
+  if (m === 'importpick' && /^[1-9]$/.test(key)) return importKind(+key - 1);
   if (m === 'home' && !typing) {
     const saved = homeEntries();
     if (key === 'ArrowDown') { state.homeCursor = Math.min(saved.length - 1, state.homeCursor + 1); render(); return; }
@@ -1969,7 +1991,7 @@ const MENU = {
   newdb: () => go('newdb'),
   open: () => openFile(),
   saveas: () => state.db && saveAs(),
-  import: () => pickFiles(startImport),
+  import: () => go('importpick'),
   export: () => state.db && go('export'),
   print: () => state.db && exportWith('form'),
   close: () => state.db && closeDb(),
