@@ -310,48 +310,48 @@ function goBack() {
 // ---------- commands ----------
 //
 // key: the letter (or key name) that runs it;
-// where: the screens it belongs to; bar: shown on the command bar there.
+// where: the screens it belongs to (BARS below sets the buttons on each);
+// keyWhere: the screens where the key works, if not all of them.
 
 const COMMANDS = [
-  { id: 'newdb', label: 'New stack', key: 'n', where: ['home'], bar: true, run: () => go('newdb') },
-  { id: 'openfile', label: 'Open stack file…', key: 'o', where: ['home', 'browse'], bar: true, desktop: true, run: () => openFile() },
-  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], bar: true, run: () => openNew(sampleDb()) },
+  { id: 'newdb', label: 'New stack', key: 'n', where: ['home'], run: () => go('newdb') },
+  { id: 'openfile', label: 'Open stack file…', key: 'o', where: ['home', 'browse'], desktop: true, run: () => openFile() },
+  { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], run: () => openNew(sampleDb()) },
   { id: 'changefolder', label: 'Change folder…', key: 'f', where: ['home'], desktop: true, run: () => changeFolder() },
   { id: 'open', label: 'Open selected stack', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
-  { id: 'deldb', label: 'Delete selected stack', key: 'Delete', where: ['home'], bar: true, run: () => deleteSavedDb() },
+  { id: 'deldb', label: 'Delete selected stack', key: 'Delete', where: ['home'], run: () => deleteSavedDb() },
 
-  { id: 'back', label: 'Back to the list', key: 'Escape', where: ['view'], bar: true, run: () => go('browse') },
-  { id: 'prev', label: 'Previous record', key: 'PageUp', where: ['view'], bar: true, run: () => moveRecord(-1) },
-  { id: 'next', label: 'Next record', key: 'PageDown', where: ['view'], bar: true, run: () => moveRecord(1) },
-  { id: 'new', label: 'New record', key: 'n', where: ['browse', 'view'], bar: true, run: () => newRecord() },
+  { id: 'back', label: 'Back to the list', key: 'Escape', where: ['view'], run: () => go('browse') },
+  { id: 'prev', label: 'Previous record', key: 'PageUp', where: ['view'], run: () => moveRecord(-1) },
+  { id: 'next', label: 'Next record', key: 'PageDown', where: ['view'], run: () => moveRecord(1) },
+  { id: 'new', label: 'New record', key: 'n', where: ['browse', 'view'], run: () => newRecord() },
   { id: 'edit', label: 'Edit record', key: 'e', where: ['browse', 'view'], run: () => editRecord() },
-  { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy into new records")', key: 'Ctrl+d', where: ['view'], newOnly: true, bar: true, run: () => copyFromPrevious(false) },
-  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', where: ['view'], newOnly: true, bar: true, run: () => copyFromPrevious(true) },
-  { id: 'save', label: 'Save', key: 'Ctrl+s', where: ['view'], bar: true, run: () => saveRecord() },
-  { id: 'revert', label: 'Revert changes to this record', where: ['view'], bar: true, run: () => revertRecord() },
-  { id: 'find', label: 'Find (records in the list, or text in the record on screen)', key: '/', where: ['browse', 'view'], bar: true, run: () => focusSearch() },
+  { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy into new records")', key: 'Ctrl+d', where: ['view'], newOnly: true, run: () => copyFromPrevious(false) },
+  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', where: ['view'], newOnly: true, run: () => copyFromPrevious(true) },
+  { id: 'save', label: 'Save', key: 'Ctrl+s', where: ['view'], run: () => saveRecord() },
+  { id: 'revert', label: 'Revert changes to this record', where: ['view'], run: () => revertRecord() },
+  { id: 'find', label: 'Find (records in the list, or text in the record on screen)', key: '/', where: ['browse', 'view'], run: () => focusSearch() },
   { id: 'all', label: 'Show all records', where: ['browse'], run: () => clearSearch() },
   { id: 'newest', label: 'Newest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('newest'); } },
   { id: 'oldest', label: 'Oldest first (date entered)', where: ['browse', 'view'], run: () => { setSort([]); setOrder('oldest'); } },
-  { id: 'sort', label: 'Sort…', key: 's', where: ['browse'], bar: true, run: () => go('sort') },
-  { id: 'print', label: 'Export with a custom form, as text or PDF…', key: 'p', where: ['browse', 'view'], run: () => exportWith('form') },
-  { id: 'fields', label: 'Fields', where: ['browse', 'view'], bar: true, run: () => go('fields') },
-  { id: 'import', label: 'Import…', key: 'i', where: ['home', 'browse', 'view'], bar: true, run: () => go('importpick') },
-  { id: 'export', label: 'Export', key: 'x', where: ['browse', 'view'], bar: true, run: () => go('export') },
-  { id: 'saveas', label: 'Save stack as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], bar: true, desktop: true, run: () => saveAs() },
-  { id: 'backup', label: platform.desktop ? 'Back up a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], bar: !platform.desktop, run: () => backupDb() },
+  { id: 'sort', label: 'Sort…', key: 's', where: ['browse'], run: () => go('sort') },
+  { id: 'fields', label: 'Fields', where: ['browse', 'view'], run: () => go('fields') },
+  { id: 'import', label: 'Import…', key: 'i', where: ['home', 'browse', 'view'], run: () => go('importpick') },
+  { id: 'export', label: 'Export', key: 'x', where: ['browse', 'view'], run: () => go('export') },
+  { id: 'saveas', label: 'Save stack as…', key: 'Ctrl+Shift+s', where: ['browse', 'view'], desktop: true, run: () => saveAs() },
+  { id: 'backup', label: platform.desktop ? 'Back up a copy…' : 'Backup: save a copy as a file', key: platform.desktop ? null : 'Ctrl+Shift+s', where: ['browse', 'view'], run: () => backupDb() },
   { id: 'mark', label: 'Mark or unmark this record', key: 'm', where: ['browse', 'view'], run: () => toggleMark() },
   { id: 'showmarked', label: 'Show marked records', where: ['browse', 'view'], run: () => showMarked() },
   { id: 'markall', label: 'Mark all records in the list', where: ['browse', 'view'], run: () => markAll() },
   { id: 'clearmarks', label: 'Clear all marks', key: 'Shift+m', where: ['browse', 'view'], run: () => clearMarks() },
   { id: 'delmarked', label: 'Delete marked records…', where: ['browse', 'view'], run: () => deleteMarked() },
-  { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], bar: true, run: () => deleteCurrent() },
-  { id: 'close', label: 'Close stack', key: 'Escape', where: ['browse'], bar: true, run: () => closeDb() },
-  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'importpick', 'import', 'export', 'help', 'newdb', 'appearance'], bar: true, run: () => (state.db ? go('browse') : go('home')) },
-  { id: 'help', label: 'Help', key: '?', where: ['home', 'browse', 'view', 'sort', 'fields', 'importpick', 'import', 'export', 'appearance'], bar: true, run: () => go('help') },
+  { id: 'delete', label: 'Delete record', key: 'Delete', where: ['browse', 'view'], run: () => deleteCurrent() },
+  { id: 'close', label: 'Close stack', key: 'Escape', where: ['browse'], run: () => closeDb() },
+  { id: 'dback', label: 'Back', key: 'Escape', where: ['sort', 'fields', 'importpick', 'import', 'export', 'help', 'newdb', 'appearance'], run: () => (state.db ? go('browse') : go('home')) },
+  { id: 'help', label: 'Help', key: '?', where: ['home', 'browse', 'view', 'sort', 'fields', 'importpick', 'import', 'export', 'appearance'], run: () => go('help') },
   { id: 'theme', label: 'Light, dark or retro screen', key: 'Alt+t', where: ['*'], run: () => cycleTheme() },
-  { id: 'appearance', label: 'Appearance: font, size, spacing, light or dark…', where: ['*'], run: () => go('appearance') },
-  { id: 'palette', label: 'Commands', key: 'Ctrl+k', where: ['*'], bar: true, run: () => openPalette() },
+  { id: 'appearance', label: 'Appearance: font, size, spacing, light or dark…', key: 'a', keyWhere: ['home'], where: ['*'], run: () => go('appearance') },
+  { id: 'palette', label: 'Commands', key: 'Ctrl+k', where: ['*'], run: () => openPalette() },
 ];
 
 const KEY_NAMES = { Escape: 'Esc', Delete: 'Del', PageUp: 'PgUp', PageDown: 'PgDn', Enter: 'Enter' };
@@ -419,16 +419,27 @@ function renderTitle() {
   $('#themebtn').textContent = THEME_NAMES[getTheme()];
 }
 
+// The buttons on the bar at the bottom, screen by screen, left to right: what
+// belongs to that screen, with Help last. Every other command keeps its key,
+// the menu bar (desktop) and the command list (Ctrl+K).
+const BARS = {
+  home: ['newdb', 'openfile', 'sample', 'import', 'deldb', 'appearance', 'help'],
+  browse: ['new', 'find', 'delete', 'close', 'sort', 'fields', 'export', 'backup', 'help'],
+  view: ['back', 'prev', 'next', 'new', 'copyprev', 'copyfield', 'revert', 'find', 'delete', 'help'],
+  other: ['dback', 'help'],
+};
+
 function renderKeys() {
-  const shown = COMMANDS.filter((c) => c.bar && available(c) && !(c.id === 'revert' && !recordChanged()));
+  const ids = BARS[state.mode] ?? BARS.other;
+  const shown = ids.map((id) => COMMANDS.find((c) => c.id === id)).filter((c) => c && available(c) && !(c.id === 'revert' && !recordChanged()));
   $('#keys').innerHTML = shown.map((c) => {
-    const k = keyLabel(c.barKey ?? c.key);
+    const k = c.keyWhere && !c.keyWhere.includes(state.mode) ? '' : keyLabel(c.barKey ?? c.key);
     const title = barLabel(c) === (SHORT[c.id] ?? c.label) ? c.label : barLabel(c);
     return `<button type="button" data-cmd="${c.id}" title="${esc(title)}${k ? ` (${esc(k)})` : ''}"><span>${esc(barLabel(c))}</span>${k ? `<kbd>${esc(k)}</kbd>` : ''}</button>`;
   }).join('');
 }
 
-const SHORT = { print: 'Form/PDF', openfile: 'Open', saveas: 'Save as', newdb: 'New', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New record', sort: 'Sort', backup: 'Backup' };
+const SHORT = { openfile: 'Open', saveas: 'Save as', newdb: 'New stack', appearance: 'Appearance', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New record', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
   if (c.id === 'find') return state.mode === 'view' ? 'Find in record' : 'Find';
   if (c.id === 'delete' && state.mode === 'browse' && state.db && markCount()) return `Delete ${markCount()} marked`;
@@ -2035,7 +2046,7 @@ const palette = { open: false, items: [], sel: 0 };
 
 function paletteItems() {
   const items = COMMANDS.filter((c) => c.id !== 'palette' && c.id !== 'open' && available(c) && !(c.id === 'revert' && !recordChanged()))
-    .map((c) => ({ label: c.label, hint: keyLabel(c.key), run: c.run }));
+    .map((c) => ({ label: c.label, hint: c.keyWhere && !c.keyWhere.includes(state.mode) ? '' : keyLabel(c.key), run: c.run }));
   if (state.db && ['browse', 'view'].includes(state.mode)) {
     for (const { name } of state.db.fields) {
       items.push({ label: `Sort by ${name}`, hint: '', run: () => { if (state.mode === 'view') go('browse'); setSort([]); sortByColumn(name); } });
@@ -2167,7 +2178,7 @@ function onKey(key, e) {
   // Shift+M: letters are matched without Shift, so name it here.
   if (key === 'M' && e?.shiftKey) return runCommand('clearmarks');
   const k = key.length === 1 ? key.toLowerCase() : key;
-  const c = COMMANDS.find((x) => x.key && (x.key.length === 1 ? x.key.toLowerCase() : x.key) === k && available(x));
+  const c = COMMANDS.find((x) => x.key && (x.key.length === 1 ? x.key.toLowerCase() : x.key) === k && available(x) && (!x.keyWhere || x.keyWhere.includes(state.mode)));
   if (c) return c.run();
   return false;
 }
@@ -2200,7 +2211,6 @@ const MENU = {
   backup: () => state.db && backupDb(),
   import: () => go('importpick'),
   export: () => state.db && go('export'),
-  print: () => state.db && exportWith('form'),
   close: () => state.db && closeDb(),
   new: () => state.db && newRecord(),
   copyprev: () => (state.mode === 'view' && !state.viewIsNew ? say(NEW_ONLY) : runCommand('copyprev')),
