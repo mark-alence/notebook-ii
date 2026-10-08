@@ -1,0 +1,34 @@
+# Deletes all but the newest desktop releases (and their installers). Run it
+# from the Actions tab ("Run workflow"). The version tags stay, so the code
+# of every release can still be found.
+name: Delete old releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: How many of the newest releases to keep
+        type: number
+        default: 1
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          KEEP: ${{ inputs.keep }}
+        with:
+          script: |
+            const keep = Math.max(1, Number(process.env.KEEP) || 1);
+            const { owner, repo } = context.repo;
+            const all = await github.paginate(github.rest.repos.listReleases, { owner, repo });
+            all.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+            core.info(`Keeping: ${all.slice(0, keep).map((r) => r.tag_name).join(', ') || 'none'}`);
+            for (const r of all.slice(keep)) {
+              await github.rest.repos.deleteRelease({ owner, repo, release_id: r.id });
+              core.info(`Deleted ${r.name} (${r.tag_name})`);
+            }
