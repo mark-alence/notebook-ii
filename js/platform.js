@@ -40,7 +40,8 @@ export async function pickNotebookPath(name, directory = null) {
 
 // The start screen shows a folder's stacks: the .3x5 (and .nb2) files at the
 // top of it.
-export const pickFolder = (title) => invoke('pick_folder', { title });
+// directory: where the dialog starts.
+export const pickFolder = (title, directory = null) => invoke('pick_folder', { title, directory });
 export const listStacks = (dir) => invoke('list_stacks', { dir });
 export const makeDir = (path) => invoke('make_dir', { path });
 export const pathExists = (path) => invoke('path_exists', { path });
