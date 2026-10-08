@@ -316,6 +316,7 @@ const COMMANDS = [
   { id: 'openfile', label: 'Open stack file…', key: 'o', where: ['home', 'browse'], desktop: true, run: () => openFile() },
   { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], run: () => openNew(sampleDb()) },
   { id: 'changefolder', label: 'Change folder…', key: 'f', where: ['home'], desktop: true, run: () => changeFolder() },
+  { id: 'newfolder', label: 'New folder… (inside the one shown)', where: ['home'], desktop: true, run: () => newFolder() },
   { id: 'open', label: 'Open selected stack', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
   { id: 'deldb', label: 'Delete selected stack', key: 'Delete', where: ['home'], run: () => deleteSavedDb() },
 
@@ -547,6 +548,24 @@ async function goToFolder(dir) {
   go('home');
 }
 
+// A folder made inside the one on the start screen, which it then shows.
+// (Windows' own folder dialog can make one too, but naming it there is fiddly.)
+async function newFolder() {
+  if (!state.folder) return changeFolder();
+  const name = (await ask(`Name of the new folder, inside ${state.folder}:`, 'Make folder', { input: '' }))?.trim();
+  if (!name) return;
+  if (/[\\/:*?"<>|]/.test(name) || /^\.+$/.test(name)) return say('A folder name cannot contain \\ / : * ? " < > | or be only dots.', true);
+  const dir = platform.joinPath(state.folder, name);
+  try {
+    const existed = await platform.pathExists(dir);
+    if (!existed) await platform.makeDir(dir);
+    await goToFolder(dir);
+    say(existed ? `${name} was already there; it is the folder shown now.` : `Folder ${name} made: new stacks start here.`);
+  } catch (e) {
+    say(String(e.message ?? e), true);
+  }
+}
+
 async function changeFolder() {
   const dir = await platform.pickFolder('Choose the folder to work in');
   if (dir) await goToFolder(dir);
@@ -586,7 +605,7 @@ function renderDesktopHome() {
   const recent = listFolders().filter((p) => p !== dir).slice(0, 5);
   $('#main').innerHTML = `
     <div class="panel home">${homeIntro()}
-      <div class="row folderbar"><span class="label">Folder</span><span class="path">${dir ? esc(dir) : 'none chosen yet'}</span><button type="button" id="chfolder">Change folder…</button></div>
+      <div class="row folderbar"><span class="label">Folder</span><span class="path">${dir ? esc(dir) : 'none chosen yet'}</span><button type="button" id="chfolder">Change folder…</button><button type="button" id="newfolder">New folder…</button></div>
       ${error ? `<p class="warn">${esc(error)}</p>`
       : reading ? '<p class="hint">Reading the folder…</p>'
       : entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th><th>File</th><th class="num">Records</th><th>Changed</th></tr></thead><tbody>${homeRows(entries, true)}</tbody></table></div>
@@ -598,6 +617,7 @@ function renderDesktopHome() {
     </div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
   $('#chfolder').addEventListener('click', changeFolder);
+  $('#newfolder').addEventListener('click', newFolder);
   $$('[data-folder]').forEach((b) => b.addEventListener('click', () => goToFolder(b.dataset.folder)));
 }
 
@@ -677,7 +697,7 @@ function columnWidths(db, cols) {
     const lengths = sample.map((r) => preview(r.values[c] ?? '').length).sort((a, b) => a - b);
     const typical = lengths.length ? lengths[Math.floor((lengths.length - 1) * 0.9)] : 0;
     const w = Math.max(typical, c.length + 2, 3);
-    return w <= 16 ? `${w + 2}ch` : `minmax(12ch, ${Math.min(w, 80)}fr)`;
+    return w <= 16 ? `${w + 2}ch` : `minmax(6ch, ${Math.min(w, 80)}fr)`;
   }).join(' ');
 }
 
