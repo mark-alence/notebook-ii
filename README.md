@@ -46,11 +46,13 @@ On a record, the box in the title bar (**Ctrl+F** or `/`) finds text or a `/rege
 
 In a new record, **Ctrl+D** copies the source fields (Author, Title, Year and the like) from the record you were on when you pressed N, so a new record from the same source needs only what is new; **Ctrl+Shift+D** copies just the field the cursor is in. Either asks for an OK before replacing text already in a field. They work only while the new record is open: once you leave it, it is an ordinary record and they are not offered. The line under the fields names the source, e.g. "from #125 (Darnton, Robert)".
 
-## Projects
+## Folders
 
-A project groups stacks, say all those for one book or thesis. On the web page: The **Project** list at the top of the start screen (P) shows one project's stacks, the Unfiled ones, or all of them, and is remembered; *New project*, *Rename* and *Delete* sit beside it (deleting a project keeps its stacks, as Unfiled). New and imported stacks, and the sample, go into the project on screen; a stack moves to another project from its Fields screen. The title bar shows *project › stack*. The project is kept in the stack and its backups.
+In the desktop app each stack is a `.3x5` file, saved as you type. The start screen shows one folder and the stacks in it (your Documents folder the first time); **Change folder…** (F, also in the File menu) picks another, and the last few folders used are listed below it, a click away. Opening a stack from anywhere makes its folder the one shown.
 
-In the desktop app a project is a folder, as in RStudio. *New project…* asks where to put it (choose a folder or make one) and makes `backup` and `exported` folders inside; *Open project…* makes any existing folder a project. The project's stacks are the `.3x5` files at the top of its folder, and new and imported stacks, and the sample, are saved there without a dialog. *Back up a copy* saves a dated copy in `backup`, and Export starts in `exported`. Delete on the start screen moves the file to the Trash. *Remove from list* forgets the project but leaves its folder alone. No marker file is written, so a project folder is just a folder.
+You choose where every new file goes. A new stack, an import or the sample opens a Save dialog in the folder on the start screen, with the name filled in, and the folder it is saved in becomes the one shown. *Back up a copy* suggests a `backup` folder beside the stack and a name with the date and time (`Notes-2026-10-08-1435.3x5`); Export suggests an `exported` folder. Either is made for the purpose and removed again if the file goes elsewhere. *Save As* starts beside the stack. None of these change the folder on the start screen. Delete on the start screen moves the file to the Trash. Nothing marks a folder as special: it is just a folder.
+
+On the web page, stacks are kept in the browser and the start screen lists them all.
 
 ## Fields
 
@@ -75,6 +77,8 @@ The word at the right of the title bar, or **Alt+T**, switches the screen betwee
 ## Keeping your stacks safe
 
 Stacks are saved in the browser as you work. They are not on your other devices, and clearing the browser's history or site data deletes them. **Backup** (Ctrl+Shift+S) saves the open stack as a `.3x5.json` file, which Import reads back. The app reminds you when a stack has changed and not been backed up for a week, and asks the browser to keep its storage.
+
+In the desktop app each stack is already a file; back it up like any document, or use *Back up a copy*, which suggests a dated, timed copy in a `backup` folder beside it (see [Folders](#folders)).
 
 Export also writes **vertical text**: each record's fields one after another, short values beside their label and long text below it, records separated by a rule. It is the most readable copy to keep or quote from, and Import reads it back. Exports follow the list's current order and search, or take all records, or the marked ones, or **These record numbers** (`12-40, 55, 500-`). Vertical text, CSV, tab-separated, tagged and custom-delimited exports can include a `Record#` line or column. Importing such a file into a **new** stack keeps the record numbers (if every record has a different one); adding it to an existing stack gives the records new numbers, since the old ones may already be taken. A `Record#` column that cannot be used comes in as an ordinary field, so nothing is lost. Every text export is UTF-8; the custom-delimited one marks line breaks inside a field with `¶`, which Import turns back into line breaks.
 
