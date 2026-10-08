@@ -8,9 +8,7 @@ use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Emitter, Runtime, State};
-#[cfg(target_os = "macos")]
-use tauri::Manager;
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use tauri_plugin_dialog::DialogExt;
 
 #[derive(Deserialize)]
@@ -50,7 +48,7 @@ async fn pick_open(app: AppHandle, title: String, filters: Vec<Filter>, director
         .and_then(to_string)
 }
 
-/// directory: the folder the dialog starts in (a project's exported/, say).
+/// directory: the folder the dialog starts in (the stack's exported/, say).
 #[tauri::command]
 async fn pick_save(
     app: AppHandle,
@@ -66,7 +64,7 @@ async fn pick_save(
     with_filters(dialog, &filters).blocking_save_file().and_then(to_string)
 }
 
-/// A project is a folder: the dialog can choose one or make a new one.
+/// The folder to work in: the dialog can choose one or make a new one.
 #[tauri::command]
 async fn pick_folder(app: AppHandle, title: String) -> Option<String> {
     app.dialog().file().set_title(title).blocking_pick_folder().and_then(to_string)
@@ -80,7 +78,7 @@ struct FileEntry {
     modified: Option<u64>,
 }
 
-/// The stacks in a project: the .3x5 (and older .nb2) files directly in
+/// The stacks in a folder: the .3x5 (and older .nb2) files directly in
 /// the folder, not in its subfolders.
 #[tauri::command]
 async fn list_stacks(dir: String) -> Result<Vec<FileEntry>, String> {
@@ -110,6 +108,20 @@ async fn list_stacks(dir: String) -> Result<Vec<FileEntry>, String> {
 #[tauri::command]
 async fn make_dir(path: String) -> Result<(), String> {
     std::fs::create_dir_all(&path).map_err(|e| format!("Could not make the folder {path}: {e}"))
+}
+
+/// Removes a folder only if it is empty (a backup/ or exported/ folder made
+/// for a Save dialog that then saved elsewhere).
+#[tauri::command]
+async fn remove_empty_dir(path: String) -> Result<(), String> {
+    std::fs::remove_dir(&path).map_err(|e| format!("Could not remove the folder {path}: {e}"))
+}
+
+/// The folder the start screen shows the first time: Documents, or home.
+#[tauri::command]
+fn default_folder(app: AppHandle) -> Option<String> {
+    let path = app.path();
+    path.document_dir().or_else(|_| path.home_dir()).ok().map(|p| p.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -174,8 +186,7 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &item("newdb", "New Stack…", Some("CmdOrCtrl+Shift+N"))?,
             &item("open", "Open Stack…", Some("CmdOrCtrl+O"))?,
             &sep()?,
-            &item("newproject", "New Project…", None)?,
-            &item("openproject", "Open Project…", None)?,
+            &item("changefolder", "Change Folder…", None)?,
             &sep()?,
             &item("saveas", "Save Stack As…", None)?,
             &item("backup", "Back Up a Copy", None)?,
@@ -269,7 +280,7 @@ pub fn run() {
             let _ = app.emit("menu", event.id().0.as_str());
         })
         .invoke_handler(tauri::generate_handler![
-            pick_open, pick_save, pick_folder, list_stacks, make_dir, path_exists, trash_file,
+            pick_open, pick_save, pick_folder, list_stacks, make_dir, remove_empty_dir, default_folder, path_exists, trash_file,
             read_text, write_text, write_bytes, launch_file
         ])
         .build(tauri::generate_context!())
@@ -300,7 +311,7 @@ mod tests {
     use tauri::async_runtime::block_on;
 
     #[test]
-    fn project_folder_commands() {
+    fn folder_commands() {
         let dir = std::env::temp_dir().join(format!("threebyfive-test-{}", std::process::id()));
         let sub = dir.join("backup");
         block_on(make_dir(sub.to_string_lossy().into())).unwrap();
@@ -315,6 +326,11 @@ mod tests {
         let gone = dir.join("b.3x5");
         block_on(trash_file(gone.to_string_lossy().into())).unwrap();
         assert!(!gone.exists());
+        // A folder with something in it stays; an empty one goes.
+        assert!(block_on(remove_empty_dir(sub.to_string_lossy().into())).is_err());
+        std::fs::remove_file(sub.join("old.3x5")).unwrap();
+        block_on(remove_empty_dir(sub.to_string_lossy().into())).unwrap();
+        assert!(!sub.exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

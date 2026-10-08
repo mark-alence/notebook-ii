@@ -38,14 +38,17 @@ export async function pickNotebookPath(name, directory = null) {
   return invoke('pick_save', { title: 'Save stack as', defaultName: `${name}.3x5`, filters: NOTEBOOK_FILTERS, directory });
 }
 
-// Desktop projects are folders: a project's stacks are the .3x5 (and
-// .nb2) files at the top of its folder.
+// The start screen shows a folder's stacks: the .3x5 (and .nb2) files at the
+// top of it.
 export const pickFolder = (title) => invoke('pick_folder', { title });
 export const listStacks = (dir) => invoke('list_stacks', { dir });
 export const makeDir = (path) => invoke('make_dir', { path });
 export const pathExists = (path) => invoke('path_exists', { path });
 // Moves a file to the system Trash (Recycle Bin), where it can be restored.
 export const trashFile = (path) => invoke('trash_file', { path });
+export const removeEmptyDir = (path) => invoke('remove_empty_dir', { path });
+// Documents (or home): the folder the start screen shows the first time.
+export const defaultFolder = () => invoke('default_folder');
 
 // Joins a folder and a name with the folder's own separator.
 export function joinPath(dir, name) {

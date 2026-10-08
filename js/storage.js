@@ -26,7 +26,7 @@ export function saveDb(key, db) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(db));
     const list = listSaved().filter((d) => d.key !== key);
-    list.unshift({ key, name: db.name, records: db.records.length, modified: db.modified, project: db.project ?? '' });
+    list.unshift({ key, name: db.name, records: db.records.length, modified: db.modified });
     writeIndex(list);
     return true;
   } catch {
@@ -49,129 +49,8 @@ export function removeDb(key) {
   }
 }
 
-// ---------- projects ----------
-//
-// A project is a name that stacks are grouped under (db.project; '' is
-// "Unfiled"). The names are listed here too, so a project can exist before
-// any stack is in it. The home screen shows one project at a time, or
-// all of them ('*').
-
-const PROJECTS = 'nb2:projects';
-const CURRENT = 'nb2:project';
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-
-function storedProjects() {
-  try {
-    const list = JSON.parse(localStorage.getItem(PROJECTS));
-    return Array.isArray(list) ? list.filter((p) => typeof p === 'string' && p) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeProjects(list) {
-  try {
-    localStorage.setItem(PROJECTS, JSON.stringify([...new Set(list)].sort(collator.compare)));
-  } catch {
-    // nothing to do
-  }
-}
-
-// Every project name: those made, and those stacks are in.
-export function listProjects() {
-  const names = [...storedProjects(), ...listSaved().map((d) => d.project), ...listRecent().map((d) => d.project)].filter(Boolean);
-  return [...new Set(names)].sort(collator.compare);
-}
-
-export function addProject(name) {
-  name = name.trim();
-  if (!name) throw new Error('A project needs a name');
-  if (listProjects().some((p) => p.toLowerCase() === name.toLowerCase() && p !== name)) throw new Error(`There is already a project called ${name}`);
-  writeProjects([...storedProjects(), name]);
-  return name;
-}
-
-// Moves every stack kept in the browser from one project to another
-// ('' for Unfiled); stack files in the desktop app change when opened.
-function moveStacks(from, to) {
-  for (const d of listSaved()) {
-    if ((d.project ?? '') !== from) continue;
-    try {
-      const db = loadDb(d.key);
-      db.project = to;
-      saveDb(d.key, db);
-    } catch {
-      // A stack that cannot be read stays where it was.
-    }
-  }
-}
-
-export function renameProject(from, to) {
-  to = to.trim();
-  if (!to) throw new Error('A project needs a name');
-  if (to !== from && listProjects().some((p) => p.toLowerCase() === to.toLowerCase() && p.toLowerCase() !== from.toLowerCase())) throw new Error(`There is already a project called ${to}`);
-  writeProjects([...storedProjects().filter((p) => p !== from), to]);
-  moveStacks(from, to);
-  if (currentProject() === from) setCurrentProject(to);
-  return to;
-}
-
-// The project's stacks become Unfiled; none is deleted.
-export function removeProject(name) {
-  writeProjects(storedProjects().filter((p) => p !== name));
-  moveStacks(name, '');
-  if (currentProject() === name) setCurrentProject('*');
-}
-
-export function currentProject() {
-  try {
-    return localStorage.getItem(CURRENT) ?? '*';
-  } catch {
-    return '*';
-  }
-}
-
-export function setCurrentProject(name) {
-  try {
-    localStorage.setItem(CURRENT, name);
-  } catch {
-    // Used for this visit only.
-  }
-}
-
-// Desktop app: stack files opened recently, newest first. Only the list is
-// kept here; the stacks themselves are files on disk.
-const RECENT = 'nb2:recent';
-
-export function listRecent() {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT)) ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export function addRecent(entry) {
-  try {
-    const list = listRecent().filter((r) => r.path !== entry.path);
-    list.unshift(entry);
-    localStorage.setItem(RECENT, JSON.stringify(list.slice(0, 20)));
-  } catch {
-    // The list is a convenience; the file itself is saved.
-  }
-}
-
-export function removeRecent(path) {
-  try {
-    localStorage.setItem(RECENT, JSON.stringify(listRecent().filter((r) => r.path !== path)));
-  } catch {
-    // nothing to do
-  }
-}
-
-// Desktop app: a project is a folder, and its stacks are the files in it.
-// Kept here: the project folders used recently (newest first) and the one on
-// the start screen ('' for none).
+// Desktop app: the folders worked in lately (newest first) and the one the
+// start screen shows ('' before the first is chosen).
 const FOLDERS = 'nb2:folders';
 const FOLDER = 'nb2:folder';
 
@@ -188,16 +67,6 @@ export function addFolder(path) {
     localStorage.setItem(FOLDERS, JSON.stringify([path, ...listFolders().filter((p) => p !== path)].slice(0, 20)));
   } catch {
     // The list is a convenience; the folder itself is on disk.
-  }
-}
-
-// Only forgets the folder; nothing on disk changes.
-export function removeFolder(path) {
-  try {
-    localStorage.setItem(FOLDERS, JSON.stringify(listFolders().filter((p) => p !== path)));
-    if (currentFolder() === path) setCurrentFolder('');
-  } catch {
-    // nothing to do
   }
 }
 

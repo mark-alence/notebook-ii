@@ -196,6 +196,13 @@ button:disabled { opacity: 0.5; cursor: default; }
 .home .intro p { margin: 0.3em 0; }
 .home .intro .keys { display: flex; flex-wrap: wrap; gap: 0.2em 2.5ch; }
 .home .intro .keys span { white-space: nowrap; }
+.home .folderbar { align-items: baseline; gap: 1ch; flex-wrap: wrap; }
+.home .folderbar .label { color: var(--label); }
+.home .folderbar .path { color: var(--bright); overflow-wrap: anywhere; }
+.home .recentfolders { list-style: none; margin: 0.2em 0 0.8em; padding: 0; }
+.home .recentfolders li { margin: 0.15em 0; }
+.linklike { background: none; border: 0; padding: 0; color: var(--label); text-decoration: underline; cursor: pointer; font: inherit; }
+.linklike:hover, .linklike:focus-visible { background: none; text-decoration: none; }
 .kinds { display: grid; gap: 0.4em; max-width: 90ch; margin: 0.5em 0; }
 .kinds .kind { display: block; width: 100%; text-align: left; padding: 0.35em 1ch; }
 .kinds .kind kbd { margin-right: 0.5ch; }
@@ -346,7 +353,7 @@ body[data-mode="browse"] #main { scroll-padding-top: 1.6em; }
 }
 
 #main .where { color: var(--hint); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#main .grid tr.cur td.where { color: inherit; }
+#main .grid tr.cur td.where { color: var(--sel-fg); }
 
 /* ---------- find in a record ---------- */
 
