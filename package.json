@@ -1,6 +1,6 @@
 {
   "name": "threebyfive",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "ThreeByFive: records with fields you name, like index cards; imports Notebook II databases",
   "private": true,
   "type": "module",

@@ -66,8 +66,12 @@ async fn pick_save(
 
 /// The folder to work in: the dialog can choose one or make a new one.
 #[tauri::command]
-async fn pick_folder(app: AppHandle, title: String) -> Option<String> {
-    app.dialog().file().set_title(title).blocking_pick_folder().and_then(to_string)
+async fn pick_folder(app: AppHandle, title: String, directory: Option<String>) -> Option<String> {
+    let mut dialog = app.dialog().file().set_title(title);
+    if let Some(dir) = directory {
+        dialog = dialog.set_directory(dir);
+    }
+    dialog.blocking_pick_folder().and_then(to_string)
 }
 
 #[derive(Serialize)]

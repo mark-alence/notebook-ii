@@ -316,7 +316,7 @@ const COMMANDS = [
   { id: 'openfile', label: 'Open stack file…', key: 'o', where: ['home', 'browse'], desktop: true, run: () => openFile() },
   { id: 'sample', label: 'Open the sample', key: 's', where: ['home'], run: () => openNew(sampleDb()) },
   { id: 'changefolder', label: 'Change folder…', key: 'f', where: ['home'], desktop: true, run: () => changeFolder() },
-  { id: 'newfolder', label: 'New folder… (inside the one shown)', where: ['home'], desktop: true, run: () => newFolder() },
+  { id: 'newfolder', label: 'New folder…', where: ['home'], desktop: true, run: () => newFolder() },
   { id: 'open', label: 'Open selected stack', key: 'Enter', where: ['home'], run: () => openSaved(state.homeCursor) },
   { id: 'deldb', label: 'Delete selected stack', key: 'Delete', where: ['home'], run: () => deleteSavedDb() },
 
@@ -548,26 +548,28 @@ async function goToFolder(dir) {
   go('home');
 }
 
-// A folder made inside the one on the start screen, which it then shows.
-// (Windows' own folder dialog can make one too, but naming it there is fiddly.)
+// A new folder: first where (a folder dialog, starting in the one shown),
+// then its name; the start screen then shows it. (Windows' own folder dialog
+// can make one too, but naming it there is fiddly.)
 async function newFolder() {
-  if (!state.folder) return changeFolder();
-  const name = (await ask(`Name of the new folder, inside ${state.folder}:`, 'Make folder', { input: '' }))?.trim();
+  const parent = await platform.pickFolder('New folder: choose where to make it', state.folder || null);
+  if (!parent) return;
+  const name = (await ask(`Name of the new folder, to be made in ${parent}:`, 'Make folder', { input: '' }))?.trim();
   if (!name) return;
   if (/[\\/:*?"<>|]/.test(name) || /^\.+$/.test(name)) return say('A folder name cannot contain \\ / : * ? " < > | or be only dots.', true);
-  const dir = platform.joinPath(state.folder, name);
+  const dir = platform.joinPath(parent, name);
   try {
     const existed = await platform.pathExists(dir);
     if (!existed) await platform.makeDir(dir);
     await goToFolder(dir);
-    say(existed ? `${name} was already there; it is the folder shown now.` : `Folder ${name} made: new stacks start here.`);
+    say(existed ? `${dir} was already there; it is the folder shown now.` : `Folder ${dir} made: new stacks start here.`);
   } catch (e) {
     say(String(e.message ?? e), true);
   }
 }
 
 async function changeFolder() {
-  const dir = await platform.pickFolder('Choose the folder to work in');
+  const dir = await platform.pickFolder('Choose the folder to work in', state.folder || null);
   if (dir) await goToFolder(dir);
 }
 
