@@ -136,8 +136,7 @@ function openDb(db, key = newKey(), path = null) {
   if (!path) persist();
   platform.setTitle(`${db.name} · ThreeByFive`);
   go('browse');
-  if (!path && platform.desktop) say(`This stack is kept inside the app. Save As (${keyLabel('Ctrl+Shift+s')}) makes it a file you can back up and move.`);
-  else if (!path && needsBackup(db)) say(`This stack has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
+  if (!path && needsBackup(db)) say(`This stack has not been backed up for a while. Backup (${keyLabel('Ctrl+Shift+s')}) saves a copy as a file.`);
 }
 
 // Without a sort field the list is in the order records were made, newest
@@ -222,9 +221,8 @@ async function openFile(path = null) {
   }
 }
 
-// Saves the open stack to a new file and keeps working on that file. A
-// stack that was kept inside the app moves out to the file. The folder the
-// start screen shows stays as it was.
+// Saves the open stack to a new file and keeps working on that file. The
+// folder the start screen shows stays as it was.
 async function saveAs() {
   const db = state.db;
   if (state.mode === 'view') leaveRecord();
@@ -462,15 +460,16 @@ function preview(text, max = 120) {
   return one.length > max ? one.slice(0, max - 1) + '…' : one;
 }
 
-// The start screen lists stacks: in the desktop app, the files in its folder,
-// then any kept inside the app by an older version; on the web, those kept
-// in this browser.
+// The start screen lists stacks: in the desktop app, the files in its folder;
+// on the web, those kept in this browser.
 function homeEntries() {
-  const kept = listSaved().map((d) => ({ ...d, kind: 'app' }));
-  if (!platform.desktop) return kept;
-  const files = (state.folder && state.folderList?.dir === state.folder && state.folderList.entries) || [];
-  return [...files, ...kept];
+  if (!platform.desktop) return listSaved().map((d) => ({ ...d, kind: 'app' }));
+  return (state.folder && state.folderList?.dir === state.folder && state.folderList.entries) || [];
 }
+
+// Early desktop versions kept some stacks (the sample, imports) inside the
+// app rather than in files. Every stack is a file now, so those are cleared.
+if (platform.desktop) for (const d of listSaved()) removeDb(d.key);
 
 // ---------- desktop app: the folder you work in ----------
 //
@@ -570,7 +569,7 @@ function homeIntro() {
 function homeRows(entries, desktop) {
   return entries.map((d, i) => `
     <tr data-i="${i}" class="${i === state.homeCursor ? 'cur' : ''}">
-      <td>${esc(d.name)}</td>${desktop ? `<td class="where" title="${esc(d.kind === 'file' ? d.path : '')}">${esc(d.kind === 'file' ? d.file : 'kept in the app')}</td>` : ''}<td class="num">${d.records ?? ''}</td><td>${d.modified ? esc(new Date(d.modified).toLocaleString()) : ''}</td>
+      <td>${esc(d.name)}</td>${desktop ? `<td class="where" title="${esc(d.path)}">${esc(d.file)}</td>` : ''}<td class="num">${d.records ?? ''}</td><td>${d.modified ? esc(new Date(d.modified).toLocaleString()) : ''}</td>
     </tr>`).join('');
 }
 
@@ -594,6 +593,7 @@ function renderDesktopHome() {
         <p class="hint">Click a stack to open it, or use ↑ ↓ and Enter.</p>`
       : `<p>No stacks in this folder. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), <kbd>S</kbd> to try a sample, <kbd>O</kbd> to open a stack file from anywhere, or <kbd>F</kbd> to change folder.</p>`}
       ${recent.length ? `<h2>Recent folders</h2><ul class="recentfolders">${recent.map((p) => `<li><button type="button" class="linklike" data-folder="${esc(p)}" title="${esc(p)}">${esc(folderName(p))}</button> <span class="hint">${esc(shortPath(p))}</span></li>`).join('')}</ul>` : ''}
+      <p class="hint">New to ThreeByFive? <em>Open a sample</em> (<kbd>S</kbd>) to explore it: it is saved, like any new stack, as a file in the folder you choose.</p>
       <p class="hint">Each stack is a <code>.3x5</code> file, saved as you type. A new stack (also an import or the sample) is saved where you choose, starting in this folder. <em>Back up a copy</em> and Export suggest <code>backup</code> and <code>exported</code> folders beside the stack, and you can choose anywhere else.</p>
     </div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
@@ -611,6 +611,7 @@ function renderHome() {
       ${entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th><th class="num">Records</th><th>Changed</th></tr></thead><tbody>${homeRows(entries, false)}</tbody></table></div>
         <p class="hint">Click a stack to open it, or use ↑ ↓ and Enter.</p>`
       : '<p>No stacks yet. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), or <kbd>S</kbd> to try a sample.</p>'}
+      <p class="hint">New to ThreeByFive? <em>Open a sample</em> (<kbd>S</kbd>) to explore it.</p>
       <p class="warn">Stacks are kept in this browser only. Clearing the browser's history or site data deletes them, and they are not on your other devices. Inside a stack, <em>Backup</em> (<kbd>${esc(keyLabel('Ctrl+Shift+s'))}</kbd>) saves a copy as a file; Import reads it back.</p>
     </div>`;
   $$('#main tbody tr').forEach((tr) => tr.addEventListener('click', () => openSaved(+tr.dataset.i)));
