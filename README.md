@@ -35,7 +35,7 @@ The bar at the bottom of the screen holds the commands for the screen you are on
 | Esc | Back: on a record, stop editing, then back to the list; in the list, close the stack | X / I | Export / Import |
 | PgUp / PgDn | Previous / next record (outside a field) | Del | Delete record |
 | Ctrl+D / Ctrl+Shift+D | In a new record: copy previous / copy this field | ? | Help |
-| Tab | Next field (inside a field, arrows and PgUp/PgDn move through the text) | Ctrl+Shift+S | Backup |
+| Tab | Next field (inside a field, arrows and PgUp/PgDn move through the text; Ctrl+I types a tab character) | Ctrl+Shift+S | Backup |
 | M / Shift+M | Mark or unmark a record / clear all marks | Alt+T | Light, Dark, Retro |
 
 The search box in the title bar filters as you type; Enter or ↓ moves to the list and Esc clears it.

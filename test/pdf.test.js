@@ -92,3 +92,10 @@ test('PDF in a serif or sans-serif font: lines break by the real widths of the l
     for (const l of lines) assert.ok(doc.getStringUnitWidth(l) * 10 * 25.4 / 72 <= layout.width + 1e-6);
   }
 });
+
+test('pdf: a tab becomes spaces up to the next 8-column stop', async () => {
+  const { expandTabs } = await import('../js/pdf.js');
+  assert.equal(expandTabs('a\tb'), 'a       b');
+  assert.equal(expandTabs('\tx\t'), '        x       ');
+  assert.equal(expandTabs('no tabs'), 'no tabs');
+});

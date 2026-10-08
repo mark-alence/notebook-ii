@@ -329,6 +329,7 @@ const COMMANDS = [
   { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy into new records")', key: 'Ctrl+d', where: ['view'], newOnly: true, run: () => copyFromPrevious(false) },
   { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', where: ['view'], newOnly: true, run: () => copyFromPrevious(true) },
   { id: 'save', label: 'Save', key: 'Ctrl+s', where: ['view'], run: () => saveRecord() },
+  { id: 'tab', label: 'Type a tab character in the field', key: 'Ctrl+i', where: ['view'], run: () => insertTab() },
   { id: 'revert', label: 'Revert changes to this record', where: ['view'], run: () => revertRecord() },
   { id: 'find', label: 'Find (records in the list, or text in the record on screen)', key: '/', where: ['browse', 'view'], run: () => focusSearch() },
   { id: 'all', label: 'Show all records', where: ['browse'], run: () => clearSearch() },
@@ -894,6 +895,17 @@ function recordMeta(rec) {
 }
 
 // Changes are saved as you type; Ctrl+S saves at once and says so.
+// Tab moves between fields, so Ctrl+I (⌘I) types a tab. It goes in like typed
+// text, so Undo takes it out again.
+function insertTab() {
+  const t = document.activeElement;
+  if (!t?.matches?.('#recordform textarea')) return say(`Click in a field first: ${keyLabel('Ctrl+i')} types a tab there.`);
+  if (!document.execCommand?.('insertText', false, '\t')) {
+    t.setRangeText('\t', t.selectionStart, t.selectionEnd, 'end');
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
 function saveRecord() {
   clearTimeout(persistTimer);
   persist();
@@ -2187,7 +2199,7 @@ document.addEventListener('keydown', (e) => {
   const key = keyName(e);
   if (!key) return;
   // Leave browser and text-editing shortcuts alone (copy, paste, undo …).
-  if (key.startsWith('Ctrl+') && !['Ctrl+s', 'Ctrl+Shift+s', 'Ctrl+k', 'Ctrl+d', 'Ctrl+Shift+d', 'Ctrl+home', 'Ctrl+end', 'Ctrl+f'].includes(key)) return;
+  if (key.startsWith('Ctrl+') && !['Ctrl+s', 'Ctrl+Shift+s', 'Ctrl+k', 'Ctrl+d', 'Ctrl+Shift+d', 'Ctrl+home', 'Ctrl+end', 'Ctrl+f', 'Ctrl+i'].includes(key)) return;
   if (key === 'Ctrl+f' && !(state.db && ['browse', 'view'].includes(state.mode))) return;
   if ((key === 'Ctrl+home' || key === 'Ctrl+end') && state.mode !== 'view') return;
   if (onKey(key, e) !== false) e.preventDefault();
