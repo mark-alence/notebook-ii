@@ -425,7 +425,7 @@ function renderTitle() {
 const BARS = {
   home: ['newdb', 'openfile', 'sample', 'import', 'deldb', 'appearance', 'help'],
   browse: ['new', 'find', 'delete', 'close', 'sort', 'fields', 'export', 'backup', 'help'],
-  view: ['back', 'prev', 'next', 'new', 'copyprev', 'copyfield', 'revert', 'find', 'delete', 'help'],
+  view: ['back', 'prev', 'next', 'new', 'revert', 'find', 'copyfield', 'delete', 'help'],
   other: ['dback', 'help'],
 };
 
@@ -439,7 +439,7 @@ function renderKeys() {
   }).join('');
 }
 
-const SHORT = { openfile: 'Open', saveas: 'Save as', newdb: 'New stack', appearance: 'Appearance', sample: 'Sample', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New record', sort: 'Sort', backup: 'Backup' };
+const SHORT = { openfile: 'Open', saveas: 'Save as', newdb: 'New stack', appearance: 'Appearance', sample: 'Open a sample', import: 'Import', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New record', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
   if (c.id === 'find') return state.mode === 'view' ? 'Find in record' : 'Find';
   if (c.id === 'delete' && state.mode === 'browse' && state.db && markCount()) return `Delete ${markCount()} marked`;
@@ -563,7 +563,6 @@ function homeIntro() {
       <header class="intro">
         <h1><svg class="introcard" viewBox="7 17 50 30" aria-hidden="true"><rect x="7" y="17" width="50" height="30" rx="1.5" fill="#fbf8ef"/><path d="M7 23.5h50" stroke="#d64545" stroke-width="1.6"/><path d="M11 29.5h42M11 35h42M11 40.5h30" stroke="#6f97c9" stroke-width="1.2"/></svg>ThreeByFive</h1>
         <p>Records with fields you name, each holding as much text as it needs, like a stack of index cards. Organize these stacks within folders, find and sort records within stacks, mark the ones you want, and export them as text, spreadsheets, or PDFs.</p>
-        <p class="hint keys">${[['N', 'new stack'], ...(platform.desktop ? [['O', 'open a stack file'], ['F', 'change folder']] : []), ['I', 'import'], ['S', 'try a sample'], ['?', 'help'], [keyLabel('Ctrl+k'), 'every command']].map(([k, l]) => `<span><kbd>${esc(k)}</kbd> ${l}</span>`).join(' ')}</p>
       </header>`;
 }
 
@@ -964,7 +963,7 @@ function copyList() {
 const NEW_ONLY = `${keyLabel('Ctrl+d')} and ${keyLabel('Ctrl+Shift+d')} copy into a new record only: press N for one.`;
 
 function copyHint() {
-  if (!state.viewIsNew) return '';
+  if (!state.viewIsNew) return `In a new record (<kbd>N</kbd>), <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies the fields ticked "Copy into new records" from the record you were on, and <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> (<em>Copy field</em>) copies just the field you are in.`;
   if (!state.copySource) return `<kbd>${esc(keyLabel('Ctrl+d'))}</kbd> and <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> copy from the record you were on when you pressed <kbd>N</kbd>; there was none.`;
   return `<kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies ${esc(copyList())} from <strong>${esc(recordLabel(state.copySource))}</strong>, the record you were on when you made this record; <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> copies just the field you are in. Text already in a field is replaced only after you say OK.`;
 }
@@ -1171,7 +1170,7 @@ function pickFiles(onFiles) {
 // preview screen can still change it). Notebook II's own files come last.
 const IMPORT_KINDS = [
   { id: 'auto', name: 'Any file', about: 'ThreeByFive works out what kind of file it is', opts: {} },
-  { id: 'json', name: 'ThreeByFive stack', about: 'a backup or stack file: .3x5.json or .3x5 (older ones: .nb2.json, .nb2)', opts: { format: 'json' } },
+  { id: 'json', name: 'ThreeByFive stack', about: 'a backup or stack file: .3x5.json or .3x5', opts: { format: 'json' } },
   { id: 'csv', name: 'Spreadsheet (CSV)', about: 'comma-separated, from Excel, Numbers, LibreOffice, R …', opts: { format: 'delimited', fieldDelim: ',' } },
   { id: 'tab', name: 'Tab-delimited text', about: 'one record per line, fields separated by tabs', opts: { format: 'delimited', fieldDelim: '\t' } },
   { id: 'tagged', name: 'Tagged text', about: 'Field: value lines, as in ThreeByFive\'s own vertical text', opts: { format: 'tagged' } },
