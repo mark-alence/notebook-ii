@@ -340,14 +340,19 @@ body[data-mode="browse"] #main { scroll-padding-top: 1.6em; }
 @media (max-width: 760px) {
   html, body { font-size: var(--font-size, 15px); }
   .exportwide { grid-template-columns: 1fr; }
-  .browse { --cols: 3ch 8ch minmax(0, 1fr) !important; }
-  .browse .brow > :nth-child(n+4) { display: none; }
   #title { flex-wrap: wrap; }
   #title .dbname { flex: 1 1 0; min-width: 0; }
   #title .count { font-size: 0.85em; }
   #search { order: 5; flex-basis: 100%; max-width: none; margin-bottom: 2px; }
   #keys button { flex-basis: 25%; }
   .keys-table td { display: block; padding-right: 0; }
+}
+
+/* A phone: the list keeps its first field only. A half-screen window keeps
+   every column, each narrower. */
+@media (max-width: 480px) {
+  .browse { --cols: 3ch 8ch minmax(0, 1fr) !important; }
+  .browse .brow > :nth-child(n+4) { display: none; }
 }
 
 #main .where { color: var(--hint); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

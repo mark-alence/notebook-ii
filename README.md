@@ -48,7 +48,7 @@ In a new record, **Ctrl+D** copies the source fields (Author, Title, Year and th
 
 ## Folders
 
-In the desktop app each stack is a `.3x5` file, saved as you type. The start screen shows one folder and the stacks in it (your Documents folder the first time); **Change folder…** (F, also in the File menu) picks another, and the last few folders used are listed below it, a click away. Opening a stack from anywhere makes its folder the one shown.
+In the desktop app each stack is a `.3x5` file, saved as you type. The start screen shows one folder and the stacks in it (your Documents folder the first time); **Change folder…** (F, also in the File menu) picks another, **New folder…** makes one inside the folder shown and switches to it, and the last few folders used are listed below it, a click away. Opening a stack from anywhere makes its folder the one shown.
 
 You choose where every new file goes. A new stack, an import or the sample opens a Save dialog in the folder on the start screen, with the name filled in, and the folder it is saved in becomes the one shown. *Back up a copy* suggests a `backup` folder beside the stack and a name with the date and time (`Notes-2026-10-08-1435.3x5`); Export suggests an `exported` folder. Either is made for the purpose and removed again if the file goes elsewhere. *Save As* starts beside the stack. None of these change the folder on the start screen. Delete on the start screen moves the file to the Trash. Nothing marks a folder as special: it is just a folder.
 
