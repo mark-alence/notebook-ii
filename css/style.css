@@ -194,8 +194,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 .home .intro h1 { font-size: 1.7em; line-height: 1.2; margin: 0 0 0.25em; color: var(--bright); font-weight: bold; display: flex; align-items: center; gap: 0.5ch; }
 .home .intro .introcard { height: 0.9em; width: 1.5em; flex: none; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); border-radius: 2px; }
 .home .intro p { margin: 0.3em 0; }
-.home .intro .keys { display: flex; flex-wrap: wrap; gap: 0.2em 2.5ch; }
-.home .intro .keys span { white-space: nowrap; }
 .home .folderbar { align-items: baseline; gap: 1ch; flex-wrap: wrap; }
 .home .folderbar .label { color: var(--label); }
 .home .folderbar .path { color: var(--bright); overflow-wrap: anywhere; }
