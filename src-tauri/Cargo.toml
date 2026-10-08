@@ -1,6 +1,6 @@
 [package]
 name = "threebyfive"
-version = "0.1.3"
+version = "0.1.4"
 description = "ThreeByFive: records with fields you name, like index cards"
 edition = "2021"
 license = "MIT"
