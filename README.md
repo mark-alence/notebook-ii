@@ -25,13 +25,13 @@ The desktop app is the same code wrapped with [Tauri](https://tauri.app). To bui
 
 ## Using it
 
-Every command is on the bar at the bottom of the screen, labelled, with its key beside it, so you can click, tap or type. **Ctrl+K** (⌘K on a Mac) opens a list of all commands: type part of a name (`exp` for Export, `sort year`, `find author`) and press Enter.
+The bar at the bottom of the screen holds the commands for the screen you are on, labelled, with its key beside each, so you can click, tap or type; other commands keep their keys and, in the desktop app, the menus. **Ctrl+K** (⌘K on a Mac) opens a list of all commands: type part of a name (`exp` for Export, `sort year`, `find author`) and press Enter.
 
 | Key | Does | Key | Does |
 |---|---|---|---|
 | `/`, F or Ctrl+F | Find: the box in the title bar finds records in the list, and text inside the record on a record | N | New record |
 | Click or Enter | Open a record | S | Sort by as many fields as you like |
-| Column heading | Sort by it (again: Z to A, again: date order) | P | Export with a form / PDF |
+| Column heading | Sort by it (again: Z to A, again: date order) | A | Appearance (start screen) |
 | Esc | Back: on a record, stop editing, then back to the list; in the list, close the stack | X / I | Export / Import |
 | PgUp / PgDn | Previous / next record (outside a field) | Del | Delete record |
 | Ctrl+D / Ctrl+Shift+D | In a new record: copy previous / copy this field | ? | Help |
@@ -72,7 +72,7 @@ Unless it is sorted by a field, the list shows the newest records first; *Oldest
 
 The word at the right of the title bar, or **Alt+T**, switches the screen between **Auto** (the computer's light or dark setting), **Light**, **Dark** and **Retro**. Dark follows current advice for long reading in low light: a very dark blue rather than pure black, off-white rather than pure white text (contrast about 12:1 rather than 21:1, which cuts glare and the smearing of letters), and soft, desaturated colours. Retro is the blue screen of a 1980s DOS program, with the DOS screen font.
 
-**Appearance** (in the command list, or View → Appearance in the desktop app) sets the font (*Match the theme*, the default: a modern monospace, or the DOS screen font in Retro; or the DOS screen font, sans-serif, serif, or any installed font), text size, line spacing, the screen, where a record's field names go (automatically beside the text when the window shows the whole record and above it otherwise, or always above, or always beside), and how many records the list shows (all by default, or 200, 500 or 1,000 at a time), kept on that computer. Even with all records shown, a list of thousands draws and scrolls quickly: the rows in view are drawn at once and the rest while the computer is idle.
+**Appearance** (A or the button on the start screen, the command list, or View → Appearance in the desktop app) sets the font (*Match the theme*, the default: a modern monospace, or the DOS screen font in Retro; or the DOS screen font, sans-serif, serif, or any installed font), text size, line spacing, the screen, where a record's field names go (automatically beside the text when the window shows the whole record and above it otherwise, or always above, or always beside), and how many records the list shows (all by default, or 200, 500 or 1,000 at a time), kept on that computer. Even with all records shown, a list of thousands draws and scrolls quickly: the rows in view are drawn at once and the rest while the computer is idle.
 
 ## Keeping your stacks safe
 
@@ -116,7 +116,7 @@ To collect a hand-picked set, press **M** on a record in the list or on an open 
 
 ## Custom forms and PDFs
 
-**Export → Custom form** (or P) lays records out your own way, with a live preview. A form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{Field:20}` gives exactly 20 characters of it, cut off or padded. `{Record#}` is the record's own number (`127`, or `{Record#:6}` padded to 6 characters), `{#id}` the same as `#127`, and `{#}` the record's place in the output (1, 2, 3 …). A field of your own called Record# takes precedence. A line written as `[[ … ]]` is dropped when all its fields are blank. A name that is not a field stays visible as `{Name}`, so a misspelling shows.
+**Export → Custom form** lays records out your own way, with a live preview. A form is a text template filled in for each record. `{Field}` puts in a field; long or multi-line text wraps and lines up under the placeholder. `{Field:20}` gives exactly 20 characters of it, cut off or padded. `{Record#}` is the record's own number (`127`, or `{Record#:6}` padded to 6 characters), `{#id}` the same as `#127`, and `{#}` the record's place in the output (1, 2, 3 …). A field of your own called Record# takes precedence. A line written as `[[ … ]]` is dropped when all its fields are blank. A name that is not a field stays visible as `{Name}`, so a misspelling shows.
 
 A form can have a page header and footer. In them `{@page}`, `{@pages}`, `{@date}` and `{@time}` give the page number, the number of pages, today's date and the time; the `@` keeps them apart from fields, so `{Date}` is always a field called Date. Forms are saved with the stack.
 

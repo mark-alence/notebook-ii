@@ -193,7 +193,6 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &sep()?,
             &item("import", "Import…", None)?,
             &item("export", "Export…", None)?,
-            &item("print", "Export with a Form or as PDF…", None)?,
             &sep()?,
             &item("close", "Close Stack", Some("CmdOrCtrl+W"))?,
             #[cfg(not(target_os = "macos"))]
