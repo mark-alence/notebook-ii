@@ -72,6 +72,13 @@ function wrapToWidth(text, fits, indent) {
   return out;
 }
 
+// A PDF has no tab stops: a tab becomes spaces up to the next multiple of 8.
+export function expandTabs(line) {
+  let out = '';
+  for (const ch of line) out += ch === '\t' ? ' '.repeat(8 - (out.length % 8)) : ch;
+  return out;
+}
+
 // Records (one text each) cut into pages; long lines wrap to the page width,
 // lining up under their own indentation. measure gives a text's width in ems
 // (the monospace font's unless another is given).
@@ -83,7 +90,7 @@ export function layoutPdf(blocks, { measure = monoWidth, ...options } = {}) {
     const indent = /^ */.exec(line)[0].length;
     return wrapToWidth(line, fits, measure(' '.repeat(indent)) * em < layout.width / 2 ? indent : 0);
   };
-  const wrapped = blocks.map((b) => b.split('\n').flatMap(fit).join('\n'));
+  const wrapped = blocks.map((b) => b.split('\n').map(expandTabs).flatMap(fit).join('\n'));
   return { layout, fits, pages: paginateLines(wrapped, layout.room) };
 }
 
