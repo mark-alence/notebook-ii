@@ -297,33 +297,42 @@ export function search(db, q) {
 }
 
 // Find within one record: every place in the given texts where a plain
-// string (capitals ignored) or a /pattern/ matches. Returns
-// { matches: [{ field, start, end }] } or { error } for an unfinished or broken
-// pattern.
+// string (capitals ignored) or a /pattern/ matches; OR (in capitals) between
+// them finds any of them. Returns { matches: [{ field, start, end }] }, in
+// order, or { error } for an unfinished or broken pattern.
 export function findInTexts(texts, query) {
   const q = query.trim();
   if (!q) return { matches: [] };
-  let re;
+  let res;
   try {
-    if (q.startsWith('/')) {
-      const r = readRegex(q, 0);
-      if (r.i !== q.length) throw new Error('Put nothing after the closing / except flags');
-      re = makeRegex(r.source, r.flags, 'g');
-    } else {
-      re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    }
+    res = q.split(/\s+OR\s+/).map((part) => part.trim()).filter(Boolean).map((part) => {
+      if (!part.startsWith('/')) return new RegExp(part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      const r = readRegex(part, 0);
+      if (r.i !== part.length) throw new Error('Put nothing after the closing / except flags');
+      return makeRegex(r.source, r.flags, 'g');
+    });
   } catch (e) {
     return { error: e.message };
   }
-  const matches = [];
+  const found = [];
   texts.forEach((text, field) => {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(text ?? '')) && matches.length < 10000) {
-      if (!m[0].length) { re.lastIndex++; continue; }
-      matches.push({ field, start: m.index, end: m.index + m[0].length });
+    for (const re of res) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(text ?? '')) && found.length < 10000) {
+        if (!m[0].length) { re.lastIndex++; continue; }
+        found.push({ field, start: m.index, end: m.index + m[0].length });
+      }
     }
   });
+  // In reading order; where two overlap, the first (and longer) one stays.
+  found.sort((a, b) => a.field - b.field || a.start - b.start || b.end - a.end);
+  const matches = [];
+  for (const m of found) {
+    const last = matches[matches.length - 1];
+    if (last && last.field === m.field && m.start < last.end) continue;
+    matches.push(m);
+  }
   return { matches };
 }
 

@@ -51,6 +51,17 @@ test('find in a record: text, patterns, and unfinished patterns', () => {
   assert.equal(findInTexts(texts, '/x*/').matches.length, 0); // empty matches are skipped
 });
 
+test('find in a record: OR finds either, in reading order, overlaps once', () => {
+  const texts = ['Cocoa prices', 'Governor reported that cocoa prices fell.', 'CO 96/728'];
+  const at = (q) => findInTexts(texts, q).matches.map((m) => [m.field, m.start, m.end]);
+  assert.deepEqual(at('prices OR governor'), [[0, 6, 12], [1, 0, 8], [1, 29, 35]]);
+  assert.deepEqual(at('cocoa prices OR /\\d+\\/\\d+/'), [[0, 0, 12], [1, 23, 35], [2, 3, 9]]);
+  assert.deepEqual(at('cocoa OR coco'), [[0, 0, 5], [1, 23, 28]]); // the longer of two at one place
+  assert.deepEqual(at('nothing OR'), []); // a lone OR is ordinary text
+  assert.deepEqual(at('cocoa or prices'), []); // lower-case or is ordinary text
+  assert.match(findInTexts(texts, 'x OR /a(/').error, /does not work/);
+});
+
 test('appearance: CSS for each choice, nothing for the defaults', () => {
   assert.deepEqual(cssVars(DEFAULTS), {});
   assert.match(cssVars({ ...DEFAULTS, font: 'serif' })['--font'], /Georgia/);
