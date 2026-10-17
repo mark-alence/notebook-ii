@@ -93,9 +93,17 @@ test('PDF in a serif or sans-serif font: lines break by the real widths of the l
   }
 });
 
-test('pdf: a tab becomes spaces up to the next 8-column stop', async () => {
+test('pdf: a tab becomes spaces up to the next 4-column stop', async () => {
   const { expandTabs } = await import('../js/pdf.js');
-  assert.equal(expandTabs('a\tb'), 'a       b');
-  assert.equal(expandTabs('\tx\t'), '        x       ');
+  assert.equal(expandTabs('a\tb'), 'a   b');
+  assert.equal(expandTabs('\tx\t'), '    x   ');
   assert.equal(expandTabs('no tabs'), 'no tabs');
+});
+
+test('pdf: a tab at the start of a paragraph indents its first line only', () => {
+  const long = '\tAlpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega '.repeat(2);
+  const lines = layoutPdf([long], { paper: 'a4', fontSize: 12 }).pages.flat().filter((l) => l.trim());
+  assert.ok(lines.length > 1);
+  assert.match(lines[0], /^ {4}Alpha/);
+  for (const l of lines.slice(1)) assert.doesNotMatch(l, /^ /);
 });

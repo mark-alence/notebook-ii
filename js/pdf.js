@@ -72,10 +72,11 @@ function wrapToWidth(text, fits, indent) {
   return out;
 }
 
-// A PDF has no tab stops: a tab becomes spaces up to the next multiple of 8.
+// A PDF has no tab stops: a tab becomes spaces up to the next multiple of 4,
+// as wide as a tab shows in a field.
 export function expandTabs(line) {
   let out = '';
-  for (const ch of line) out += ch === '\t' ? ' '.repeat(8 - (out.length % 8)) : ch;
+  for (const ch of line) out += ch === '\t' ? ' '.repeat(4 - (out.length % 4)) : ch;
   return out;
 }
 
@@ -86,11 +87,14 @@ export function layoutPdf(blocks, { measure = monoWidth, ...options } = {}) {
   const layout = pdfLayout(options);
   const em = layout.fontSize * MM_PER_PT;
   const fits = (s) => measure(s) * em <= layout.width + 1e-6;
+  // The indent is the line's leading spaces, counted before tabs become
+  // spaces: a tab typed at the start of a paragraph indents its first line
+  // only, not the lines it wraps onto.
   const fit = (line) => {
     const indent = /^ */.exec(line)[0].length;
-    return wrapToWidth(line, fits, measure(' '.repeat(indent)) * em < layout.width / 2 ? indent : 0);
+    return wrapToWidth(expandTabs(line), fits, measure(' '.repeat(indent)) * em < layout.width / 2 ? indent : 0);
   };
-  const wrapped = blocks.map((b) => b.split('\n').map(expandTabs).flatMap(fit).join('\n'));
+  const wrapped = blocks.map((b) => b.split('\n').flatMap(fit).join('\n'));
   return { layout, fits, pages: paginateLines(wrapped, layout.room) };
 }
 
