@@ -1167,7 +1167,7 @@ function renderFields() {
       <p class="hint">The list of records shows these fields as columns, left to right (top to bottom here), in their own order: it need not follow the order of the fields in a record. Widths follow the contents, so a short field such as Year gets a narrow column.</p>
       <h2>Stack name</h2>
       <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Stack name"></div>
-      <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text (a date written <code>1938-03-17</code> sorts in date order, and <code>1938-03-17 (approx.)</code> still does).</p>
+      <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text. For dates to sort in date order, write the year first: <code>1938-03-17</code>, or just <code>1938-03</code> or <code>1938</code>. A note after the date does no harm (<code>1938-03-17 approx.</code>), but <code>17 March 1938</code> would sort by the day.</p>
       <p class="hint"><strong>Copy into new records</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
     </div>`;
