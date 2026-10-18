@@ -12,7 +12,7 @@ import { importFiles } from './importers.js';
 import { exportDelimited, exportTagged, exportVertical, safeFileName, verticalBlocks, exportJson, toBytes } from './exporters.js';
 import { renderReport, renderBlocks } from './printform.js';
 import { PAPERS, FONT_SIZES, PDF_FONTS, makePdf, previewPdf } from './pdf.js';
-import { listSaved, saveDb, loadDb, removeDb, newKey, listFolders, addFolder, currentFolder, setCurrentFolder } from './storage.js';
+import { listSaved, saveDb, loadDb, removeDb, newKey, listFolders, addFolder, clearFolders, currentFolder, setCurrentFolder } from './storage.js';
 import * as platform from './platform.js';
 import { SAMPLE } from './sample.js';
 import { VERSION } from './version.js';
@@ -613,7 +613,7 @@ function renderDesktopHome() {
       : entries.length ? `<div class="scrollx"><table class="grid"><thead><tr><th>Name</th><th>File</th><th class="num">Records</th><th>Changed</th></tr></thead><tbody>${homeRows(entries, true)}</tbody></table></div>
         <p class="hint">Click a stack to open it, or use ↑ ↓ and Enter.</p>`
       : `<p>No stacks in this folder. Press <kbd>N</kbd> to make one, <kbd>I</kbd> to import records from a file (a spreadsheet, text or a ThreeByFive backup), <kbd>S</kbd> to try a sample, <kbd>O</kbd> to open a stack file from anywhere, or <kbd>F</kbd> to change folder.</p>`}
-      ${recent.length ? `<h2>Recent folders</h2><ul class="recentfolders">${recent.map((p) => `<li><button type="button" class="linklike" data-folder="${esc(p)}" title="${esc(p)}">${esc(folderName(p))}</button> <span class="hint">${esc(shortPath(p))}</span></li>`).join('')}</ul>` : ''}
+      ${recent.length ? `<h2>Recent folders <button type="button" class="linklike clearrecent" id="clearrecent" title="Empty this list; no folder or file is touched">Clear</button></h2><ul class="recentfolders">${recent.map((p) => `<li><button type="button" class="linklike" data-folder="${esc(p)}" title="${esc(p)}">${esc(folderName(p))}</button> <span class="hint">${esc(shortPath(p))}</span></li>`).join('')}</ul>` : ''}
       <p class="hint">New to ThreeByFive? <em>Open a sample</em> (<kbd>S</kbd>) to explore it: it is saved, like any new stack, as a file in the folder you choose.</p>
       <p class="hint">Each stack is a <code>.3x5</code> file, saved as you type. A new stack (also an import or the sample) is saved where you choose, starting in this folder. <em>Back up a copy</em> and Export suggest <code>backup</code> and <code>exported</code> folders beside the stack, and you can choose anywhere else.</p>
     </div>`;
@@ -621,6 +621,11 @@ function renderDesktopHome() {
   $('#chfolder').addEventListener('click', changeFolder);
   $('#newfolder').addEventListener('click', newFolder);
   $$('[data-folder]').forEach((b) => b.addEventListener('click', () => goToFolder(b.dataset.folder)));
+  $('#clearrecent')?.addEventListener('click', () => {
+    clearFolders(state.folder);
+    render();
+    say('Recent folders cleared. No folders or files were touched.');
+  });
 }
 
 function renderHome() {

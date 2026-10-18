@@ -8,7 +8,7 @@ globalThis.localStorage = {
   setItem: (k, v) => store.set(k, String(v)),
   removeItem: (k) => store.delete(k),
 };
-const { listFolders, addFolder, currentFolder, setCurrentFolder } = await import('../js/storage.js');
+const { listFolders, addFolder, clearFolders, currentFolder, setCurrentFolder } = await import('../js/storage.js');
 
 beforeEach(() => store.clear());
 
@@ -29,4 +29,14 @@ test('folders: the current one is remembered while it is on the list', () => {
   assert.equal(currentFolder(), '/work');
   setCurrentFolder('/elsewhere');
   assert.equal(currentFolder(), '');
+});
+
+test('folders: clearing keeps only the folder shown', () => {
+  for (const f of ['/a', '/b', '/c']) addFolder(f);
+  setCurrentFolder('/b');
+  clearFolders('/b');
+  assert.deepEqual(listFolders(), ['/b']);
+  assert.equal(currentFolder(), '/b');
+  clearFolders();
+  assert.deepEqual(listFolders(), []);
 });
