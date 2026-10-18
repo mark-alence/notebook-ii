@@ -41,7 +41,7 @@ const state = {
   editField: 0, // the field that last had the cursor on the record screen
   folder: platform.desktop ? currentFolder() : '', // desktop: the folder the start screen shows
   folderList: null, // desktop: { dir, entries } read from that folder
-  copySource: null, // what copy previous copies from: the record you were on when you pressed N
+  copySource: null, // what fill from previous fills from: the record you were on when you pressed N
   formIndex: 0,
   exp: null, // the Export screen's choices, kept while the stack is open
   imp: null,
@@ -325,8 +325,8 @@ const COMMANDS = [
   { id: 'next', label: 'Next record', key: 'PageDown', where: ['view'], run: () => moveRecord(1) },
   { id: 'new', label: 'New record', key: 'n', where: ['browse', 'view'], run: () => newRecord() },
   { id: 'edit', label: 'Edit record', key: 'e', where: ['browse', 'view'], run: () => editRecord() },
-  { id: 'copyprev', label: 'Copy previous (the fields ticked "Copy into new records")', key: 'Ctrl+d', where: ['view'], newOnly: true, run: () => copyFromPrevious(false) },
-  { id: 'copyfield', label: 'Copy this field from previous', key: 'Ctrl+Shift+d', where: ['view'], newOnly: true, run: () => copyFromPrevious(true) },
+  { id: 'copyprev', label: 'Fill from previous (the fields ticked "Fill from previous" in Fields)', key: 'Ctrl+d', where: ['view'], newOnly: true, run: () => copyFromPrevious(false) },
+  { id: 'copyfield', label: 'Fill this field from previous', key: 'Ctrl+Shift+d', where: ['view'], newOnly: true, run: () => copyFromPrevious(true) },
   { id: 'save', label: 'Save', key: 'Ctrl+s', where: ['view'], run: () => saveRecord() },
   { id: 'tab', label: 'Type a tab character in the field', key: 'Ctrl+i', where: ['view'], run: () => insertTab() },
   { id: 'revert', label: 'Revert changes to this record', where: ['view'], run: () => revertRecord() },
@@ -439,7 +439,7 @@ function renderKeys() {
   }).join('');
 }
 
-const SHORT = { openfile: 'Open', saveas: 'Save as', newdb: 'New stack', appearance: 'Appearance', sample: 'Open a sample', import: 'Import', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Copy previous', copyfield: 'Copy field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New record', sort: 'Sort', backup: 'Backup' };
+const SHORT = { openfile: 'Open', saveas: 'Save as', newdb: 'New stack', appearance: 'Appearance', sample: 'Open a sample', import: 'Import', deldb: 'Delete', back: 'List', prev: 'Prev', next: 'Next', copyprev: 'Fill from previous', copyfield: 'Fill this field', revert: 'Revert', delete: 'Delete', close: 'Close', dback: 'Back', new: 'New record', sort: 'Sort', backup: 'Backup' };
 function barLabel(c) {
   if (c.id === 'find') return state.mode === 'view' ? 'Find in record' : 'Find';
   if (c.id === 'delete' && state.mode === 'browse' && state.db && markCount()) return `Delete ${markCount()} marked`;
@@ -999,20 +999,20 @@ function copyList() {
   return names.length ? andList(names) : 'no fields (choose them in Fields)';
 }
 
-// Copying from the previous record works in a new record only: from pressing N
+// Filling from the previous record works in a new record only: from pressing N
 // until you leave it.
-const NEW_ONLY = `${keyLabel('Ctrl+d')} and ${keyLabel('Ctrl+Shift+d')} copy into a new record only: press N for one.`;
+const NEW_ONLY = `${keyLabel('Ctrl+d')} and ${keyLabel('Ctrl+Shift+d')} fill a new record only: press N for one.`;
 
 function copyHint() {
-  if (!state.viewIsNew) return `In a new record (<kbd>N</kbd>), <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies the fields ticked "Copy into new records" from the record you were on, and <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> (<em>Copy field</em>) copies just the field you are in.`;
-  if (!state.copySource) return `<kbd>${esc(keyLabel('Ctrl+d'))}</kbd> and <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> copy from the record you were on when you pressed <kbd>N</kbd>; there was none.`;
-  return `<kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies ${esc(copyList())} from <strong>${esc(recordLabel(state.copySource))}</strong>, the record you were on when you made this record; <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> copies just the field you are in. Text already in a field is replaced only after you say OK.`;
+  if (!state.viewIsNew) return `In a new record (<kbd>N</kbd>), <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> fills the fields ticked "Fill from previous" from the record you were on, and <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> (<em>Fill this field</em>) fills just the field you are in.`;
+  if (!state.copySource) return `<kbd>${esc(keyLabel('Ctrl+d'))}</kbd> and <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> fill from the record you were on when you pressed <kbd>N</kbd>; there was none.`;
+  return `<kbd>${esc(keyLabel('Ctrl+d'))}</kbd> fills ${esc(copyList())} from <strong>${esc(recordLabel(state.copySource))}</strong>, the record you were on when you made this record; <kbd>${esc(keyLabel('Ctrl+Shift+d'))}</kbd> fills just the field you are in. Text already in a field is replaced only after you say OK.`;
 }
 
 async function copyFromPrevious(onlyCurrentField) {
   if (!state.viewIsNew) return say(NEW_ONLY);
   const from = state.copySource;
-  if (!from) return say('There is no record to copy from: press N while on (or in) the record to copy from.', true);
+  if (!from) return say('There is no record to fill from: press N while on (or in) the record to fill from.', true);
   const areas = $$('#recordform textarea');
   const values = {};
   state.db.fields.forEach(({ name }, i) => { values[name] = areas[i].value; });
@@ -1022,7 +1022,7 @@ async function copyFromPrevious(onlyCurrentField) {
   const clashes = copyClashes(state.db, from, values, only);
   let overwrite = false;
   if (clashes.length) {
-    if (!(await ask(`${andList(clashes)} already ${clashes.length === 1 ? 'has' : 'have'} text. Replace it with the text from ${recordLabel(from)}?`, 'OK'))) return say('Nothing copied.');
+    if (!(await ask(`${andList(clashes)} already ${clashes.length === 1 ? 'has' : 'have'} text. Replace it with the text from ${recordLabel(from)}?`, 'OK'))) return say('Nothing filled.');
     overwrite = true;
   }
   const copied = carryOver(state.db, from, values, only, { overwrite });
@@ -1033,9 +1033,9 @@ async function copyFromPrevious(onlyCurrentField) {
   });
   const firstBlank = areas.findIndex((a) => !a.value.trim());
   areas[onlyCurrentField || firstBlank < 0 ? state.editField : firstBlank]?.focus();
-  if (copied.length) return say(`Copied ${andList(copied)} from ${recordLabel(from)}.`);
+  if (copied.length) return say(`Filled ${andList(copied)} from ${recordLabel(from)}.`);
   if (onlyCurrentField) return say(`${recordLabel(from)} has the same ${field?.name ?? 'field'}, or it is blank there.`);
-  say(`Nothing to copy: ${recordLabel(from)} has the same text in those fields, or they are blank there.`);
+  say(`Nothing to fill: ${recordLabel(from)} has the same text in those fields, or they are blank there.`);
 }
 
 // ---------- search box ----------
@@ -1146,10 +1146,10 @@ function renderFields() {
   $('#main').innerHTML = `
     <div class="panel" id="fields">
       <h2>Fields</h2>
-      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Copy into new records</th><th>Lines</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
+      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Fill from previous</th><th>Lines</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
         <tr><td class="num">${i + 1}</td>
           <td><input data-rename="${esc(name)}" value="${esc(name)}" aria-label="Field name"></td>
-          <td><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''} aria-label="Copy ${esc(name)} into new records"></td>
+          <td><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''} aria-label="Fill ${esc(name)} from previous"></td>
           <td><input type="number" min="1" max="40" data-lines="${esc(name)}" value="${fieldLines(field)}" aria-label="Lines shown for ${esc(name)}"></td>
           <td class="buttons">
             <button type="button" data-move="${esc(name)}" data-d="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
@@ -1174,7 +1174,7 @@ function renderFields() {
       <h2>Stack name</h2>
       <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Stack name"></div>
       <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text. For dates to sort in date order, write the year first: <code>1938-03-17</code>, or just <code>1938-03</code> or <code>1938</code>. A note after the date does no harm (<code>1938-03-17 approx.</code>), but <code>17 March 1938</code> would sort by the day.</p>
-      <p class="hint"><strong>Copy into new records</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> copies these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
+      <p class="hint"><strong>Fill from previous</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> fills these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
     </div>`;
   const done = (fn) => { try { fn(); persist(); refreshList(); render(); } catch (e) { say(e.message, true); } };
