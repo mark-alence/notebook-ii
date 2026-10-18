@@ -211,8 +211,8 @@ fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         &[
             &item("new", "New Record", Some("CmdOrCtrl+N"))?,
-            &item("copyprev", "Copy Previous (Ctrl+D)", None)?,
-            &item("copyfield", "Copy Field (Ctrl+Shift+D)", None)?,
+            &item("copyprev", "Fill from Previous (Ctrl+D)", None)?,
+            &item("copyfield", "Fill This Field (Ctrl+Shift+D)", None)?,
             &item("delete", "Delete Record", None)?,
             &sep()?,
             &item("mark", "Mark or Unmark Record (M)", None)?,

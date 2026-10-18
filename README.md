@@ -34,7 +34,7 @@ The bar at the bottom of the screen holds the commands for the screen you are on
 | Column heading | Sort by it (again: Z to A, again: date order) | A | Appearance (start screen) |
 | Esc | Back: on a record, stop editing, then back to the list; in the list, close the stack | X / I | Export / Import |
 | PgUp / PgDn | Previous / next record (outside a field) | Del | Delete record |
-| Ctrl+D / Ctrl+Shift+D | In a new record: copy previous / copy this field | ? | Help |
+| Ctrl+D / Ctrl+Shift+D | In a new record: fill from previous / fill this field | ? | Help |
 | Tab | Next field (inside a field, arrows and PgUp/PgDn move through the text; Ctrl+I types a tab character) | Ctrl+Shift+S | Backup |
 | M / Shift+M | Mark or unmark a record / clear all marks | Alt+T | Light, Dark, Retro |
 
@@ -44,7 +44,7 @@ A record opens ready to read and to change: click a field and type, and changes 
 
 On a record, the box in the title bar (**Ctrl+F** or `/`) finds text, `"quoted text"` (whole words, capitals as typed) or a `/regex/` (regular expression), or several joined by `OR` (`cocoa OR /prices?/`), inside that record: every match is highlighted, Enter and Shift+Enter step through them, Esc leaves the cursor on the match, and the words stay as you page through records. Back in the list, the box finds records again. **Ctrl+Space** starts a block as in Emacs: the arrow keys, Home, End and PgUp/PgDn stretch it, Ctrl+C or Ctrl+X copy or cut it, and Esc cancels it.
 
-In a new record, **Ctrl+D** copies the source fields (Author, Title, Year and the like) from the record you were on when you pressed N, so a new record from the same source needs only what is new; **Ctrl+Shift+D** copies just the field the cursor is in. Either asks for an OK before replacing text already in a field. They work only while the new record is open: once you leave it, it is an ordinary record and they are not offered. The line under the fields names the source, e.g. "from #125 (Darnton, Robert)".
+In a new record, **Ctrl+D** (*Fill from previous*) fills the source fields (Author, Title, Year and the like) from the record you were on when you pressed N, so a new record from the same source needs only what is new; **Ctrl+Shift+D** (*Fill this field*) fills just the field the cursor is in. Either asks for an OK before replacing text already in a field. They work only while the new record is open: once you leave it, it is an ordinary record and they are not offered. The line under the fields names the source, e.g. "from #125 (Darnton, Robert)".
 
 ## Folders
 
@@ -61,7 +61,7 @@ A stack is whatever fields you give it, and every field holds plain text of any 
 | Setting | |
 |---|---|
 | Name, order | rename, add, delete, move up and down |
-| Copy into new records | copied by Ctrl+D into a new record; until changed, fields named like Notes, Comments, Pages or Keywords are not |
+| Fill from previous | filled by Ctrl+D in a new record; until changed, fields named like Notes, Comments, Pages or Keywords are not |
 | Lines | room it gets when a record opens (1–40); it grows as you type either way |
 
 Every record has a number of its own, shown as `#127` in the list's first column and at the top of the record. It is given when the record is made and never changes or gets reused, so it can be used to refer to the record. Clicking the `#` heading switches between newest and oldest first.
