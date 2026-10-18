@@ -198,6 +198,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .home .folderbar { align-items: baseline; gap: 1ch; flex-wrap: wrap; }
 .home .folderbar .label { color: var(--label); }
 .home .folderbar .path { color: var(--bright); overflow-wrap: anywhere; }
+.home h2 .clearrecent { margin-left: 1.5ch; font-size: 0.8em; font-weight: normal; text-transform: none; letter-spacing: normal; }
 .home .recentfolders { list-style: none; margin: 0.2em 0 0.8em; padding: 0; }
 .home .recentfolders li { margin: 0.15em 0; }
 .linklike { background: none; border: 0; padding: 0; color: var(--label); text-decoration: underline; cursor: pointer; font: inherit; }

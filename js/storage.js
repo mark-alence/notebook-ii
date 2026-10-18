@@ -70,6 +70,16 @@ export function addFolder(path) {
   }
 }
 
+// Empties the list of recent folders, keeping only the one shown (if any).
+// Nothing on disk changes.
+export function clearFolders(keep = '') {
+  try {
+    localStorage.setItem(FOLDERS, JSON.stringify(keep ? [keep] : []));
+  } catch {
+    // nothing to do
+  }
+}
+
 export function currentFolder() {
   try {
     const f = localStorage.getItem(FOLDER) ?? '';
