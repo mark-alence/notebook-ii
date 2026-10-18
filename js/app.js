@@ -741,7 +741,7 @@ function renderBrowse() {
     return k?.field === c ? (k.descending ? ' ▼' : ' ▲') : '';
   };
   $('#main').innerHTML = state.list.length
-    ? `<div class="browse" role="table" style="--cols: 3ch ${String(Math.max(0, db.nextId - 1)).length + 5}ch ${columnWidths(db, cols)}"><div class="brow bhead" role="row"><span role="columnheader" class="mk" title="Marked records (M marks one; @marked finds them)">✓</span><span role="columnheader" class="num"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></span>${cols.map((c) => `<span role="columnheader"><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></span>`).join('')}</div><div class="bbody" role="rowgroup">${rows}</div></div>${more}`
+    ? `<div class="browse" role="table" style="--cols: 3ch ${String(Math.max(0, db.nextId - 1)).length + 5}ch ${columnWidths(db, cols)}"><div class="brow bhead" role="row"><span role="columnheader" class="mk"><button type="button" class="sorthead" id="markhead" title="${state.list.length && state.list.every((r) => r.marked) ? 'Unmark every record in this list' : 'Mark every record in this list'} (M marks one; @marked finds the marked ones)">✓</button></span><span role="columnheader" class="num"><button type="button" class="sorthead" id="ordernum" title="Record numbers, in the order the records were made: click for newest or oldest first">#${state.sortKeys.length ? '' : state.db.order === 'oldest' ? ' ▲' : ' ▼'}</button></span>${cols.map((c) => `<span role="columnheader"><button type="button" class="sorthead" data-sort="${esc(c)}" title="Sort by ${esc(c)}">${esc(c)}${sortMark(c)}</button></span>`).join('')}</div><div class="bbody" role="rowgroup">${rows}</div></div>${more}`
     : `<div class="panel"><p>${db.records.length ? 'No records match. Clear the search box (Esc in it) to show all records.' : 'This stack is empty. Press <kbd>N</kbd> for a new record or <kbd>I</kbd> to import some.'}</p></div>`;
   const body = $('#main .bbody');
   body?.addEventListener('click', (e) => {
@@ -754,6 +754,7 @@ function renderBrowse() {
   });
   $$('#main [data-sort]').forEach((b) => b.addEventListener('click', () => sortByColumn(b.dataset.sort)));
   // The # heading: date-entered order, newest first, then oldest first.
+  $('#markhead')?.addEventListener('click', toggleMarkList);
   $('#ordernum')?.addEventListener('click', () => {
     const order = !state.sortKeys.length && db.order !== 'oldest' ? 'oldest' : 'newest';
     setSort([]);
@@ -1761,6 +1762,17 @@ function markAll() {
   const n = setMarked(state.db, state.list, true);
   persistSoon();
   say(`Marked ${plural(n, 'record')}. ${plural(markCount(), 'record')} marked.`);
+  render();
+}
+
+// The ✓ heading: marks every record in the list, or, when they all are
+// already, unmarks them. Records not in the list keep their marks.
+function toggleMarkList() {
+  if (!state.list.length) return;
+  if (!state.list.every((r) => r.marked)) return markAll();
+  const n = setMarked(state.db, state.list, false);
+  persistSoon();
+  say(`Unmarked ${plural(n, 'record')}. ${plural(markCount(), 'record')} marked.`);
   render();
 }
 
