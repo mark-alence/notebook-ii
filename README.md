@@ -82,6 +82,12 @@ In the desktop app each stack is already a file; back it up like any document, o
 
 Export also writes **vertical text**: each record's fields one after another, short values beside their label and long text below it, records separated by a rule. It is the most readable copy to keep or quote from, and Import reads it back. Exports follow the list's current order and search, or take all records, or the marked ones, or **These record numbers** (`12-40, 55, 500-`). Vertical text, CSV, tab-separated, tagged and custom-delimited exports can include a `Record#` line or column. Importing such a file into a **new** stack keeps the record numbers (if every record has a different one); adding it to an existing stack gives the records new numbers, since the old ones may already be taken. A `Record#` column that cannot be used comes in as an ordinary field, so nothing is lost. Every text export is UTF-8; the custom-delimited one marks line breaks inside a field with `¶`, which Import turns back into line breaks.
 
+### The .3x5 file
+
+A `.3x5` file is plain text, so your notes never depend on ThreeByFive to be read. Open one in any text editor (Notepad, TextEdit, gedit …) and everything is there in readable form: the stack's name, its fields, and then each record with its number, the dates it was made and changed, and every field's text after the field's name. It is written in JSON, a common standard for structured data, in UTF-8, so accented and non-Latin text appears as itself.
+
+Because it is a standard format, a spreadsheet program that reads JSON can turn it into a table too, with records as rows and fields as columns (in Excel: Data → Get Data → From File → From JSON, then expand the records into columns). The simplest route, while ThreeByFive is at hand, is Export → Spreadsheet (.csv), which any spreadsheet program opens directly.
+
 ## Finding records
 
 ```
