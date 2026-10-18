@@ -1,10 +1,10 @@
 // Retrieval: find records by any word, in one field or anywhere.
 //
 //   smith                 records with "smith" anywhere in any field, also
-//                         inside longer words (smithy, Goldsmith); "smith"
-//                         in quotes matches only the whole word
+//                         inside longer words (smithy, Goldsmith); in quotes,
+//                         "Smith" matches only the whole word, capitals as typed
 //   author:smith          only in the Author field
-//   "civil war"           the phrase, whole words, adjacent
+//   "Civil War"           the phrase, whole words, adjacent, capitals as typed
 //   hist*                 any word starting with "hist"
 //   smith AND jones       both (AND is implied between terms: smith jones)
 //   smith OR jones        either
@@ -201,11 +201,16 @@ export function parseQuery(q) {
 
 // Lowercase and strip accents so "Café" matches "cafe".
 export function fold(s) {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  return stripAccents(s).toLowerCase();
 }
 
-export function words(s) {
-  return fold(s).match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) ?? [];
+// Quoted words keep their capitals but not their accents.
+const stripAccents = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+const WORD = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
+
+export function words(s, { exactCase = false } = {}) {
+  return (exactCase ? stripAccents(s) : fold(s)).match(WORD) ?? [];
 }
 
 function wordPattern(w) {
@@ -238,12 +243,14 @@ function compileTerm(node, fields) {
     if (!want) return () => false;
     return (rec) => (targets ?? fields).some((f) => fold(rec.values[f] ?? '').includes(want));
   }
-  // Quoted words and wildcards match whole words, keeping * and ? as wildcards.
-  const pats = (fold(text).match(/[\p{L}\p{N}*?]+(?:['’][\p{L}\p{N}*?]+)*/gu) ?? []).map(wordPattern);
+  // Quoted words and wildcards match whole words, keeping * and ? as
+  // wildcards; quoted words also match capitals exactly.
+  const exactCase = node.phrase;
+  const pats = ((exactCase ? stripAccents(text) : fold(text)).match(/[\p{L}\p{N}*?]+(?:['’][\p{L}\p{N}*?]+)*/gu) ?? []).map(wordPattern);
   if (!pats.length) return () => false;
   return (rec) => {
     for (const f of targets ?? fields) {
-      const ws = words(rec.values[f] ?? '');
+      const ws = words(rec.values[f] ?? '', { exactCase });
       for (let i = 0; i + pats.length <= ws.length; i++) {
         if (pats.every((p, k) => p.test(ws[i + k]))) return true;
       }
@@ -297,8 +304,8 @@ export function search(db, q) {
 }
 
 // Find within one record: every place in the given texts where a plain
-// string (capitals ignored) or a /pattern/ matches; OR (in capitals) between
-// them finds any of them. Returns { matches: [{ field, start, end }] }, in
+// string (capitals ignored), a "quoted" one (whole words, capitals as typed)
+// or a /pattern/ matches; OR (in capitals) between them finds any of them. Returns { matches: [{ field, start, end }] }, in
 // order, or { error } for an unfinished or broken pattern.
 export function findInTexts(texts, query) {
   const q = query.trim();
@@ -306,6 +313,8 @@ export function findInTexts(texts, query) {
   let res;
   try {
     res = q.split(/\s+OR\s+/).map((part) => part.trim()).filter(Boolean).map((part) => {
+      const quoted = /^"(.+)"$/s.exec(part);
+      if (quoted) return new RegExp(`(?<![\\p{L}\\p{N}])${quoted[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'gu');
       if (!part.startsWith('/')) return new RegExp(part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
       const r = readRegex(part, 0);
       if (r.i !== part.length) throw new Error('Put nothing after the closing / except flags');
@@ -345,7 +354,7 @@ export function highlightPatterns(q) {
       if (!n) return;
       if (n.op === 'term' && !neg && !n.compare && !n.ids && !n.marked) {
         if (n.regex) out.push(makeRegex(n.regex.source, n.regex.flags, 'g'));
-        else for (const w of words(n.text.replace(/[*?]/g, ' '))) out.push(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu'));
+        else for (const w of words(n.text.replace(/[*?]/g, ' '), { exactCase: n.phrase })) out.push(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), n.phrase ? 'gu' : 'giu'));
       }
       if (n.op === 'not') walk(n.arg, !neg);
       if (n.left) { walk(n.left, neg); walk(n.right, neg); }

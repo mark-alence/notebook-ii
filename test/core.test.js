@@ -84,7 +84,8 @@ test('search language', () => {
   addRecord(db, { Author: 'Café Owner', Title: 'History of coffee', 'Date of birth': '1901' });
   const ids = (q) => search(db, q).map((r) => r.id);
   assert.deepEqual(ids('war'), [1, 2]);
-  assert.deepEqual(ids('"civil war"'), [1]);
+  assert.deepEqual(ids('"Civil War"'), [1]);
+  assert.deepEqual(ids('"civil war"'), []); // quotes match capitals as typed
   assert.deepEqual(ids('"war civil"'), []);
   assert.deepEqual(ids('author:smith'), [1]);
   assert.deepEqual(ids('title:smith'), []);
@@ -128,7 +129,8 @@ test('search: plain terms match parts of words, quotes match whole words', () =>
   addRecord(db, { Author: 'Smith', Title: 'Warfare in the Café', Citation: 'CSO 15/2/4' });
   const ids = (q) => search(db, q).map((r) => r.id);
   assert.deepEqual(ids('smith'), [1, 2]);
-  assert.deepEqual(ids('"smith"'), [2]);
+  assert.deepEqual(ids('"Smith"'), [2]);
+  assert.deepEqual(ids('"smith"'), []); // quotes match capitals as typed
   assert.deepEqual(ids('cott'), [1]);
   assert.deepEqual(ids('otto'), [1]);
   assert.deepEqual(ids('war'), [1, 2]);

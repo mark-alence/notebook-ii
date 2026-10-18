@@ -80,7 +80,7 @@
         <tr><td><kbd data-key-label="Ctrl+Home">Ctrl+Home</kbd> <kbd data-key-label="Ctrl+End">Ctrl+End</kbd></td><td>Start / end of the whole record</td></tr>
         <tr><td><kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Previous / next record, when you are not in a field (also ← →). In a field, <kbd>Alt</kbd>+<kbd>PgUp</kbd> / <kbd>PgDn</kbd>.</td></tr>
         <tr><td><kbd>E</kbd> or <kbd>Enter</kbd></td><td>Start typing in the record</td></tr>
-        <tr><td><kbd data-key-label="Ctrl+f">Ctrl+F</kbd> or <kbd>/</kbd></td><td>Find in this record, in the box in the title bar: type text or a <code>/regex/</code> (a regular expression), or several joined by <code>OR</code> (<code>cocoa OR /prices?/</code>); every match is highlighted, Enter goes to the next and Shift+Enter the previous, Esc puts the cursor on the match. The words stay as you page to other records with PgUp/PgDn. (<kbd>/</kbd> only when you are not typing in a field.)</td></tr>
+        <tr><td><kbd data-key-label="Ctrl+f">Ctrl+F</kbd> or <kbd>/</kbd></td><td>Find in this record, in the box in the title bar: type text, <code>"quoted text"</code> (whole words, capitals as typed) or a <code>/regex/</code> (a regular expression), or several joined by <code>OR</code> (<code>cocoa OR /prices?/</code>); every match is highlighted, Enter goes to the next and Shift+Enter the previous, Esc puts the cursor on the match. The words stay as you page to other records with PgUp/PgDn. (<kbd>/</kbd> only when you are not typing in a field.)</td></tr>
         <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Start a block, as in Emacs: move the cursor with the arrows, Home, End, PgUp or PgDn (Ctrl for whole words) and the block follows. Ctrl+C copies it, Ctrl+X cuts it, Delete or typing replaces it, Esc or Ctrl+Space again cancels it. On a Mac, if Ctrl+Space switches keyboard languages, select with Shift and the arrow keys instead.</td></tr>
       </table>
       <p><kbd data-key-label="Ctrl+d">Ctrl+D</kbd> and <kbd data-key-label="Ctrl+Shift+d">Ctrl+Shift+D</kbd> work only in a new record, from pressing <kbd>N</kbd> until you leave it; once you go back to the list or to another record it is an ordinary record and they are not offered. They copy from the record you were on when you pressed <kbd>N</kbd> (open, or highlighted in the list), so after one record you can press <kbd>N</kbd> and then <kbd data-key-label="Ctrl+d">Ctrl+D</kbd> for the next one from the same source. The line under the fields names it, e.g. "copies Author, Title and Year from <strong>#125 (Darnton, Robert)</strong>".</p>
@@ -101,9 +101,9 @@
       <h2>Finding records</h2>
       <table class="keys-table">
         <tr><td><code>smith</code></td><td>anywhere in the record, also inside longer words (smithy, Goldsmith); <code>cott</code> finds cotton</td></tr>
-        <tr><td><code>"smith"</code></td><td>only the whole word</td></tr>
+        <tr><td><code>"Smith"</code></td><td>only the whole word, with capitals as typed (not smith or SMITH)</td></tr>
         <tr><td><code>author:smith</code></td><td>only in the Author field (the start of a field name is enough)</td></tr>
-        <tr><td><code>"civil war"</code></td><td>a phrase</td></tr>
+        <tr><td><code>"Civil War"</code></td><td>a phrase, with capitals as typed</td></tr>
         <tr><td><code>hist*</code> &nbsp; <code>wom?n</code></td><td>any ending &nbsp;/&nbsp; any one letter</td></tr>
         <tr><td><code>labor south</code></td><td>both words (same as <code>labor AND south</code>)</td></tr>
         <tr><td><code>labor OR textiles</code></td><td>either word</td></tr>
@@ -119,7 +119,7 @@
         <tr><td><code>@marked</code> &nbsp; <code>-@marked</code></td><td>records you have marked / not marked, e.g. <code>@marked year&gt;1980</code></td></tr>
         <tr><td><code>citation:/^CO 9\d/</code></td><td>a regular expression in one field; mix it with any other terms, e.g. <code>/^19[34]\d/ -farmers</code></td></tr>
       </table>
-      <p>Capitals and accents don't matter. Sorting and exporting work on the records found.</p>
+      <p>Capitals and accents don't matter, except that capitals in quotes must match. Sorting and exporting work on the records found.</p>
 
       <h2>Marked records</h2>
       <p>When the records you want don't share a search term or a run of numbers, mark them one by one: <kbd>M</kbd> on a row of the list or on an open record, or a click in the ✓ column. The title bar counts them. In the command list (<kbd data-key-label="Ctrl+k">Ctrl+K</kbd>): <em>Show marked records</em> (the same as searching <code>@marked</code>), <em>Mark all records in the list</em> (say after a search), <em>Clear all marks</em> (<kbd>Shift</kbd>+<kbd>M</kbd>, after asking) and <em>Delete marked records</em> (also <kbd>Del</kbd> in the list while records are marked). Export's Records choice has <em>The marked</em>. Marks are kept with the stack and in backups, and marking a record does not count as changing it.</p>
