@@ -81,3 +81,12 @@ test('sort by more than three fields', () => {
   keys[3].descending = true;
   assert.deepEqual(orderRecords(d.records, keys).map((r) => r.values.D), ['3', '2', '1', '', '9']);
 });
+
+test('find in a record: "quoted" text is whole words with capitals as typed', () => {
+  const texts = ['Smith and smith, Goldsmith; SMITH. The US and us, U.S.'];
+  const found = (q) => findInTexts(texts, q).matches.map((m) => texts[0].slice(m.start, m.end));
+  assert.deepEqual(found('smith'), ['Smith', 'smith', 'smith', 'SMITH']);
+  assert.deepEqual(found('"Smith"'), ['Smith']);
+  assert.deepEqual(found('"US" OR "U.S."'), ['US', 'U.S.']);
+  assert.deepEqual(found('"Smith and smith"'), ['Smith and smith']);
+});
