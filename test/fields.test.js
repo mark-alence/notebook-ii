@@ -92,3 +92,35 @@ test('list columns: own order, apart from the fields; older notebooks keep their
   deleteField(db, 'A');
   assert.deepEqual(listColumns(db), ['C']); // never empty: falls back to the first field
 });
+
+test('a field set to sort as numbers sorts by the number its entries start with', async () => {
+  const { orderRecords, sortsAsNumbers, leadingNumber } = await import('../js/model.js');
+  const db = createDatabase('Sums', ['Amount']);
+  for (const v of ['1.5', 'c. 1850', '-10', '', '1.25', '3', '-5', '1850?', '1850', 'n.d.']) addRecord(db, { Amount: v });
+  const sorted = (descending) => orderRecords(db.records, [{ field: 'Amount', descending }], 'oldest', db.fields).map((r) => r.values.Amount);
+  assert.equal(sortsAsNumbers(db.fields[0]), false);
+  assert.deepEqual(sorted(false), ['-5', '-10', '1.5', '1.25', '3', '1850', '1850?', 'c. 1850', 'n.d.', '']);
+  setFieldOption(db, 'Amount', 'numbers', 1);
+  assert.equal(db.fields[0].numbers, true);
+  assert.deepEqual(sorted(false), ['-10', '-5', '1.25', '1.5', '3', '1850', '1850?', 'c. 1850', 'n.d.', '']);
+  assert.deepEqual(sorted(true), ['1850?', '1850', '3', '1.5', '1.25', '-5', '-10', 'n.d.', 'c. 1850', '']);
+  assert.deepEqual(leadingNumber(' −7.5 kg'), { value: -7.5, rest: ' kg' });
+  assert.equal(leadingNumber('1,000').value, 1);
+  assert.equal(leadingNumber('c. 1850'), null);
+});
+
+test('sorting as numbers puts year-first dates, BCE ones included, in date order', async () => {
+  const { orderRecords } = await import('../js/model.js');
+  const db = createDatabase('Dates', [{ name: 'Date', numbers: true }]);
+  for (const v of ['1938-03-17', '-0043-01-01', '1938-3-2', '-0044-04-01', '1938', '-0044-03-15']) addRecord(db, { Date: v });
+  const sorted = orderRecords(db.records, [{ field: 'Date' }], 'oldest', db.fields).map((r) => r.values.Date);
+  assert.deepEqual(sorted, ['-0044-03-15', '-0044-04-01', '-0043-01-01', '1938', '1938-3-2', '1938-03-17']);
+});
+
+test('the search in the help finds the entries that are not numbers', async () => {
+  const { compileQuery } = await import('../js/search.js');
+  const db = createDatabase('Sums', ['Amount']);
+  for (const v of ['1.5', 'c. 1850', ' -10', '', 'n.d.', '+3']) addRecord(db, { Amount: v });
+  const q = compileQuery('amount:* -amount:/^\\s*[-+]?\\d/', ['Amount']);
+  assert.deepEqual(db.records.filter(q).map((r) => r.values.Amount), ['c. 1850', 'n.d.']);
+});

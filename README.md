@@ -62,7 +62,10 @@ A stack is whatever fields you give it, and every field holds plain text of any 
 |---|---|
 | Name, order | rename, add, delete, move up and down |
 | Fill from previous | filled by Ctrl+D in a new record; until changed, fields named like Notes, Comments, Pages or Keywords are not |
+| Sort as numbers | sorted by the number each entry starts with (off unless chosen; see below) |
 | Lines | room it gets when a record opens (1–40); it grows as you type either way |
+
+Numbers within text already sort by value (`p. 9` before `p. 12`), but a minus sign, decimal point or comma counts as text. For decimals and negative numbers, tick **Sort as numbers** for the field. The field is then sorted by the number each entry starts with, so `-5` comes before `3` and `1.25` before `1.5`; entries with the same number are sorted by the rest of their text. Use `.` for decimals and no thousands separators: only the number at the start counts, so `1,000` reads as 1 and `c. 1850` as no number at all. Entries that don't start with a number sort after the ones that do, and the record shows *Not a number: sorts after the numbers* under them; `amount:* -amount:/^\s*[-+]?\d/` finds them all (with the field's name for `amount`). Year-first dates sort in date order either way, but BCE dates written with a minus (`-0044-03-15`) need Sort as numbers; without it the minus is ignored and 44 BCE would come after 43 BCE.
 
 Every record has a number of its own, shown as `#127` in the list's first column and at the top of the record. It is given when the record is made and never changes or gets reused, so it can be used to refer to the record. Clicking the `#` heading switches between newest and oldest first.
 

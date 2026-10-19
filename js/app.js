@@ -4,7 +4,7 @@
 // work too.
 import {
   createDatabase, addRecord, updateRecord, deleteRecords, addField, renameField, deleteField,
-  moveField, orderRecords, withRecordNumbers, recordNumbersIn, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, listColumns, setListColumns, moveListColumn, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
+  moveField, orderRecords, withRecordNumbers, recordNumbersIn, carryOver, copyClashes, copiesFromPrevious, setFieldCopy, setFieldOption, fieldLines, sortsAsNumbers, leadingNumber, listColumns, setListColumns, moveListColumn, touchRecord, LAYOUTS, databaseFromImport, appendImport, validateDatabase, fieldNames, defaultPrintForm, setMarked, markedRecords,
 } from './model.js';
 import { compileQuery, highlightPatterns, findInTexts, parseIdRanges, inIdRanges } from './search.js';
 import { FONTS, SPACING, SIZE, LIST_ROWS, LABELS, getAppearance, setAppearance, resetAppearance } from './appearance.js';
@@ -61,7 +61,7 @@ function refreshList() {
       state.query = '';
     }
   }
-  state.list = orderRecords(recs, state.sortKeys, state.db.order);
+  state.list = orderRecords(recs, state.sortKeys, state.db.order, state.db.fields);
   recs = state.list;
   state.cursor = Math.max(0, Math.min(state.cursor, recs.length - 1));
 }
@@ -879,6 +879,12 @@ function moveRecord(delta) {
   openRecord(list[j]);
 }
 
+// Under a field set to sort as numbers, when its entry doesn't start with one.
+function notNumberNote(field, value = '') {
+  return sortsAsNumbers(field) && value.trim() && !leadingNumber(value)
+    ? '<span class="notnum">Not a number: sorts after the numbers</span>' : '';
+}
+
 function renderView() {
   const rec = viewed();
   if (!rec) { go('browse'); return; }
@@ -887,7 +893,7 @@ function renderView() {
     <form class="record" id="recordform" autocomplete="off">
       ${state.db.fields.map(({ name }, i) => `
         <label class="field"><span class="fname">${esc(name)}</span>
-          <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)" style="min-height: calc(${fieldLines(state.db.fields[i])} * var(--lh, 1.4) * 1em + 2px)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span></label>`).join('')}
+          <span class="fwrap"><textarea name="f${i}" rows="1" spellcheck="true" placeholder="(blank)" style="min-height: calc(${fieldLines(state.db.fields[i])} * var(--lh, 1.4) * 1em + 2px)">${esc(rec.values[name] ?? '')}</textarea>${terms.length && (rec.values[name] ?? '').trim() ? `<span class="fmark" aria-hidden="true">${highlight(rec.values[name], terms)}</span>` : ''}</span>${notNumberNote(state.db.fields[i], rec.values[name])}</label>`).join('')}
       <p class="hint">Fields can be any length, and changes are saved as you type. ${copyHint()} <kbd>Tab</kbd> moves between fields. <kbd>Esc</kbd> stops editing; then <kbd>Esc</kbd> goes back to the list, <kbd>N</kbd> starts a new record, <kbd>PgUp</kbd> <kbd>PgDn</kbd> go to the previous or next record, and <kbd>E</kbd> or <kbd>Enter</kbd> edits again.</p>
       <p class="meta">${recordMeta(rec)}</p>
     </form>`;
@@ -896,7 +902,11 @@ function renderView() {
     t.addEventListener('input', () => {
       growField(t);
       t.parentElement.querySelector('.fmark')?.remove();
-      const name = state.db.fields[i].name;
+      const field = state.db.fields[i], { name } = field;
+      if (sortsAsNumbers(field)) {
+        t.closest('.field').querySelector('.notnum')?.remove();
+        t.parentElement.insertAdjacentHTML('afterend', notNumberNote(field, t.value));
+      }
       const wasChanged = recordChanged();
       rec.values[name] = t.value;
       touchRecord(state.db, rec);
@@ -1120,7 +1130,7 @@ function renderSort() {
       <div class="row"><label>Date entered</label>
         <label class="check"><input type="radio" name="order" value="newest" ${db.order !== 'oldest' ? 'checked' : ''}> Newest first</label>
         <label class="check"><input type="radio" name="order" value="oldest" ${db.order === 'oldest' ? 'checked' : ''}> Oldest first</label></div>
-      <p class="hint">With "(date entered)" the list runs in the order the records were made. Otherwise records are sorted by the fields chosen, in turn: records alike in the first are sorted by the second, and so on; another "Then by" appears when you fill in the last one. Records alike in all of them follow the date-entered order. Numbers sort by value, so 9 comes before 10. Blank fields go last.</p>
+      <p class="hint">With "(date entered)" the list runs in the order the records were made. Otherwise records are sorted by the fields chosen, in turn: records alike in the first are sorted by the second, and so on; another "Then by" appears when you fill in the last one. Records alike in all of them follow the date-entered order. Numbers sort by value, so 9 comes before 10; for decimals, negative numbers and BCE dates, set the field to <strong>Sort as numbers</strong> on the Fields screen. Blank fields go last.</p>
       <div class="buttons"><button type="submit">Sort</button></div>
     </form>`;
   const rows = $('#sortrows');
@@ -1146,10 +1156,11 @@ function renderFields() {
   $('#main').innerHTML = `
     <div class="panel" id="fields">
       <h2>Fields</h2>
-      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Fill from previous</th><th>Lines</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
+      <div class="scrollx"><table class="grid fields"><thead><tr><th class="num">#</th><th>Name</th><th>Fill from previous</th><th>Sort as numbers</th><th>Lines</th><th></th></tr></thead><tbody>${db.fields.map((field, i) => { const { name } = field; return `
         <tr><td class="num">${i + 1}</td>
           <td><input data-rename="${esc(name)}" value="${esc(name)}" aria-label="Field name"></td>
           <td><input type="checkbox" data-copy="${esc(name)}" ${copiesFromPrevious(field) ? 'checked' : ''} aria-label="Fill ${esc(name)} from previous"></td>
+          <td><input type="checkbox" data-numbers="${esc(name)}" ${sortsAsNumbers(field) ? 'checked' : ''} aria-label="Sort ${esc(name)} as numbers"></td>
           <td><input type="number" min="1" max="40" data-lines="${esc(name)}" value="${fieldLines(field)}" aria-label="Lines shown for ${esc(name)}"></td>
           <td class="buttons">
             <button type="button" data-move="${esc(name)}" data-d="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
@@ -1173,13 +1184,20 @@ function renderFields() {
       <p class="hint">The list of records shows these fields as columns, left to right (top to bottom here), in their own order: it need not follow the order of the fields in a record. Widths follow the contents, so a short field such as Year gets a narrow column.</p>
       <h2>Stack name</h2>
       <div class="row"><input id="dbname" value="${esc(db.name)}" aria-label="Stack name"></div>
-      <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text. For dates to sort in date order, write the year first: <code>1938-03-17</code>, or just <code>1938-03</code> or <code>1938</code>. A note after the date does no harm (<code>1938-03-17 approx.</code>), but <code>17 March 1938</code> would sort by the day.</p>
-      <p class="hint"><strong>Fill from previous</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> fills these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
+      <p class="hint">Every field holds text of any length; dates, numbers and anything else are typed as text. For dates to sort in date order, write the year first: <code>1938-03-17</code>, or just <code>1938-03</code> or <code>1938</code>. A note after the date does no harm (<code>1938-03-17 approx.</code>), but <code>17 March 1938</code> would sort by the day. BCE dates written with a minus (<code>-0044-03-15</code>) need <strong>Sort as numbers</strong>.</p>
+      <p class="hint"><strong>Fill from previous</strong>: in a new record, <kbd>${esc(keyLabel('Ctrl+d'))}</kbd> fills these fields from the record you were on when you pressed <kbd>N</kbd>, so a new record from the same source needs only what is new. <strong>Sort as numbers</strong>: sorts the field by the number each entry starts with, so <code>-5</code> comes before <code>3</code> and <code>1.25</code> before <code>1.5</code>; entries that don't start with a number go after the numbers, marked in the record. Use <code>.</code> for decimals and no thousands separators (<code>1,000</code> reads as 1). <strong>Lines</strong>: how much room the field gets when a record opens; it grows as you type either way.</p>
       <p class="hint">Renaming a field keeps its contents and updates print forms. Change a name and press Enter. <kbd>Esc</kbd> goes back to the records.</p>
     </div>`;
   const done = (fn) => { try { fn(); persist(); refreshList(); render(); } catch (e) { say(e.message, true); } };
   $$('[data-rename]').forEach((inp) => inp.addEventListener('change', () => done(() => renameField(db, inp.dataset.rename, inp.value))));
   $$('[data-copy]').forEach((c) => c.addEventListener('change', () => done(() => setFieldCopy(db, c.dataset.copy, c.checked))));
+  $$('[data-numbers]').forEach((c) => c.addEventListener('change', () => done(() => {
+    const name = c.dataset.numbers;
+    setFieldOption(db, name, 'numbers', c.checked);
+    if (!c.checked) return;
+    const n = db.records.filter((r) => (r.values[name] ?? '').trim() && !leadingNumber(r.values[name])).length;
+    if (n) setTimeout(() => say(`${n} ${n === 1 ? 'entry' : 'entries'} in ${name} ${n === 1 ? "doesn't" : "don't"} start with a number; ${n === 1 ? 'it sorts' : 'they sort'} after the numbers.`));
+  })));
   $$('[data-lines]').forEach((c) => c.addEventListener('change', () => done(() => setFieldOption(db, c.dataset.lines, 'lines', c.value))));
   $$('[data-colmove]').forEach((b) => b.addEventListener('click', () => done(() => moveListColumn(db, b.dataset.colmove, +b.dataset.d))));
   $$('[data-colremove]').forEach((b) => b.addEventListener('click', () => done(() => setListColumns(db, listColumns(db).filter((n) => n !== b.dataset.colremove)))));
@@ -1545,8 +1563,8 @@ function wireFormEditor(form) {
 // numbers given (in the list's order).
 function exportRecords() {
   const x = state.exp;
-  if (x.which === 'all') return orderRecords(state.db.records, state.sortKeys, state.db.order);
-  if (x.which === 'marked') return orderRecords(markedRecords(state.db), state.sortKeys, state.db.order);
+  if (x.which === 'all') return orderRecords(state.db.records, state.sortKeys, state.db.order, state.db.fields);
+  if (x.which === 'marked') return orderRecords(markedRecords(state.db), state.sortKeys, state.db.order, state.db.fields);
   if (x.which !== 'ids') return state.list;
   let ranges;
   try {
@@ -1556,7 +1574,7 @@ function exportRecords() {
     return [];
   }
   x.idsError = '';
-  return orderRecords(state.db.records.filter((r) => inIdRanges(r.id, ranges)), state.sortKeys, state.db.order);
+  return orderRecords(state.db.records.filter((r) => inIdRanges(r.id, ranges)), state.sortKeys, state.db.order, state.db.fields);
 }
 
 // Fields and records as exported, with a Record# column if asked for.
