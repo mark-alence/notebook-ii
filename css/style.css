@@ -262,6 +262,7 @@ body[data-mode="browse"] #main { scroll-padding-top: 1.6em; }
 .record .fval.empty { color: var(--hint); opacity: 0.6; }
 /* Fields read like text and become boxes when you point at them or type. */
 .record .fwrap { position: relative; display: block; min-width: 0; }
+.record .notnum { grid-column: -2 / -1; color: var(--warn); font-size: 0.85em; }
 .record textarea {
   display: block;
   width: 100%;

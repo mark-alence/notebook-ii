@@ -7,6 +7,7 @@ import { upgradeForm } from './printform.js';
 //   lines  how many lines it shows when a record opens (see fieldLines)
 //   list   shown in the list of records (older stacks; the list's columns
 //          are now db.listColumns, see listColumns)
+//   numbers  sorted by the number each entry starts with (see sortsAsNumbers)
 // Each record keeps its id (which is also the order it was entered in) and
 // when it was created and last changed.
 
@@ -173,6 +174,24 @@ export function fieldLines(field) {
   return field.lines ?? (LONG.test(field.name) ? 8 : 1);
 }
 
+// "Sort as numbers": entries are sorted by the number they start with, which
+// may have a minus sign and a decimal point (-44, 3.25), and entries with the
+// same number by the rest of their text, so year-first dates sort in date
+// order, BCE ones (-0044-03-15) included. Off unless chosen.
+export function sortsAsNumbers(field) {
+  return !!field?.numbers;
+}
+
+const LEADING_NUMBER = /^[-+\u2212]?\d+(?:\.\d+)?/;
+
+// The number an entry starts with, and the text after it; null if it does
+// not start with one.
+export function leadingNumber(text) {
+  const s = text.trim();
+  const m = LEADING_NUMBER.exec(s);
+  return m ? { value: +m[0].replace('\u2212', '-'), rest: s.slice(m[0].length) } : null;
+}
+
 // Until chosen, the list shows the first four fields (stacks made from a
 // layout choose all of them).
 export function shownInList(db, field) {
@@ -208,6 +227,7 @@ export function moveListColumn(db, name, delta) {
 export function setFieldOption(db, name, key, value) {
   const field = db.fields.find((f) => f.name === name);
   if (!field) throw new Error(`No field called ${name}`);
+  if (key === 'numbers') value = !!value;
   if (key === 'lines') value = Math.max(1, Math.min(40, Math.round(+value) || 1));
   if (key === 'list' && !value && !db.fields.some((f) => f !== field && shownInList(db, f))) {
     throw new Error('The list needs at least one field');
@@ -248,9 +268,20 @@ export function carryOver(db, from, values, only = null, { overwrite = !!only } 
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-// keys: [{ field, descending }]. Empty values always sort last; ties keep
-// the order the records were entered in (newest first unless told otherwise).
-export function sortRecords(records, keys, { newestFirst = false } = {}) {
+// Two entries of a field sorted as numbers: by the number each starts with,
+// then the rest of the text. Entries that don't start with a number come after
+// the ones that do, in either direction; returns [after, order].
+function compareNumbers(x, y) {
+  const a = leadingNumber(x), b = leadingNumber(y);
+  if (!a || !b) return a ? [-1, 0] : b ? [1, 0] : [0, collator.compare(x, y)];
+  return [0, Math.sign(a.value - b.value) || collator.compare(a.rest, b.rest)];
+}
+
+// keys: [{ field, descending }]; fields: the stack's fields, for their "Sort
+// as numbers" setting. Empty values always sort last; ties keep the order the
+// records were entered in (newest first unless told otherwise).
+export function sortRecords(records, keys, { newestFirst = false, fields = [] } = {}) {
+  const numeric = new Set(fields.filter(sortsAsNumbers).map((f) => f.name));
   return [...records].sort((a, b) => {
     for (const { field, descending } of keys) {
       const x = (a.values[field] ?? '').trim();
@@ -258,7 +289,8 @@ export function sortRecords(records, keys, { newestFirst = false } = {}) {
       if (!x && !y) continue;
       if (!x) return 1;
       if (!y) return -1;
-      const c = collator.compare(x, y);
+      const [after, c] = numeric.has(field) ? compareNumbers(x, y) : [0, collator.compare(x, y)];
+      if (after) return after;
       if (c) return descending ? -c : c;
     }
     return newestFirst ? b.id - a.id : a.id - b.id;
@@ -267,9 +299,9 @@ export function sortRecords(records, keys, { newestFirst = false } = {}) {
 
 // The list's order: by the sort fields if there are any, otherwise by when the
 // records were made. db.order is 'newest' (the default) or 'oldest'.
-export function orderRecords(records, sortKeys, order = 'newest') {
+export function orderRecords(records, sortKeys, order = 'newest', fields = []) {
   const newestFirst = order !== 'oldest';
-  if (sortKeys?.length) return sortRecords(records, sortKeys, { newestFirst });
+  if (sortKeys?.length) return sortRecords(records, sortKeys, { newestFirst, fields });
   return [...records].sort((a, b) => (newestFirst ? b.id - a.id : a.id - b.id));
 }
 
